@@ -23,6 +23,7 @@ import type {
   MembershipRole,
   Profile,
   UserRole,
+  FeedbackStatus,
 } from "@/types/database";
 import { slugify } from "@/lib/utils";
 import {
@@ -354,10 +355,29 @@ export async function submitFeedback(data: {
   await createAdminAttentionNotification({
     title: "New feedback requires review",
     message: `${data.category}: ${data.message.slice(0, 160)}`,
-    link: "/admin",
+    link: "/admin/feedback",
     importance: "important",
     type: "system_message",
   });
+  return { success: true };
+}
+
+export async function updateFeedbackStatus(
+  id: string,
+  status: FeedbackStatus
+): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: false, error: "Feedback updates are unavailable in demo mode." };
+  if (!["open", "reviewed", "resolved"].includes(status)) {
+    return { success: false, error: "Invalid feedback status." };
+  }
+  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  if (!supabase || !profile || !isAdminRole(profile.role)) {
+    return { success: false, error: "Administrator access required." };
+  }
+  const { error } = await supabase.from("feedback").update({ status }).eq("id", id);
+  if (error) return { success: false, error: friendlyError(error, "Could not update feedback.") };
+  revalidatePath("/admin/feedback");
   return { success: true };
 }
 

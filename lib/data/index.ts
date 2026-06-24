@@ -25,6 +25,7 @@ import type {
   PendingApprovalItem,
   School,
   AdminUser,
+  FeedbackItem,
 } from "@/types/database";
 import { isAdminRole } from "@/lib/permissions";
 
@@ -960,4 +961,20 @@ export async function getClubRoster(clubId: string): Promise<ClubMembership[]> {
     return [];
   }
   return (data as ClubMembership[]) ?? [];
+}
+
+export async function getFeedbackItems(): Promise<FeedbackItem[]> {
+  if (isDemoMode()) return [];
+  const supabase = await createClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("feedback")
+    .select("*, profile:profiles(id,full_name,email,role)")
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error) {
+    console.error("[getFeedbackItems]", error.message);
+    return [];
+  }
+  return (data as FeedbackItem[]) ?? [];
 }

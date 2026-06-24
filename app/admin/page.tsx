@@ -2,10 +2,11 @@ import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth";
-import { Users, School, FileText, BarChart3 } from "lucide-react";
+import { Users, School, FileText, BarChart3, MessageSquare } from "lucide-react";
 
 const adminLinks = [
   { href: "/admin/users", icon: Users, title: "Users & Roles", description: "Manage student and staff accounts" },
+  { href: "/admin/feedback", icon: MessageSquare, title: "Feedback Inbox", description: "Review contact and support messages" },
   { href: "/admin/schools", icon: School, title: "Schools", description: "School configuration (single-school for now)" },
   { href: "/admin/content", icon: FileText, title: "Content Moderation", description: "Global approval queue" },
   { href: "/manage/analytics", icon: BarChart3, title: "Analytics", description: "Platform-wide metrics" },

@@ -309,6 +309,21 @@ export interface NotificationPreferences {
   updated_at?: string;
 }
 
+export type FeedbackStatus = "open" | "reviewed" | "resolved";
+
+export interface FeedbackItem {
+  id: string;
+  school_id: string;
+  user_id?: string | null;
+  name?: string | null;
+  email?: string | null;
+  message: string;
+  category?: string | null;
+  status: FeedbackStatus;
+  created_at?: string;
+  profile?: Pick<Profile, "id" | "full_name" | "email" | "role"> | null;
+}
+
 export interface EmailOutboxItem {
   id: string;
   recipient_user_id?: string | null;
