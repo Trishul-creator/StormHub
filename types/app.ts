@@ -1,0 +1,22 @@
+/** Re-exports app-level types for convenience. */
+export type {
+  School,
+  Profile,
+  Club,
+  ClubMembership,
+  ClubAnnouncement,
+  ClubResource,
+  Opportunity,
+  Event,
+  EventRSVP,
+  Bookmark,
+  Workshop,
+  ServiceHour,
+  Feedback,
+  AnalyticsSummary,
+  StudentDashboard,
+  UserRole,
+  ClubStatus,
+  ContentStatus,
+  Visibility,
+} from "@/types/database";

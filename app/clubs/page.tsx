@@ -1,0 +1,87 @@
+import { ClubCard } from "@/components/clubs/club-card";
+import { PageHeader } from "@/components/layout/page-header";
+import { SearchBar } from "@/components/layout/search-bar";
+import { FilterSidebar, MobileFilterDrawer } from "@/components/layout/filter-sidebar";
+import { EmptyState } from "@/components/layout/empty-state";
+import { getClubs, getManageableClubs } from "@/lib/data";
+import { checkMembership } from "@/lib/actions";
+import { getAuthContext } from "@/lib/auth";
+import { CLUB_FILTER_GROUPS } from "@/lib/utils";
+
+interface ClubsPageProps {
+  searchParams: Promise<{ q?: string; category?: string; featured?: string; filter?: string }>;
+}
+
+export default async function ClubsPage({ searchParams }: ClubsPageProps) {
+  const params = await searchParams;
+  const clubs = await getClubs({
+    search: params.q,
+    category: params.category,
+    featured: params.featured === "true",
+    filterGroup: params.filter,
+  });
+
+  const filterOptions = [
+    ...CLUB_FILTER_GROUPS.map((g) => ({ label: g.label, value: g.label })),
+    { label: "Featured only", value: "featured" },
+  ];
+
+  const { userId, isLoggedIn, profile } = await getAuthContext();
+  const manageableClubs = profile ? await getManageableClubs(profile) : [];
+  const manageableSlugs = new Set(manageableClubs.map((club) => club.slug));
+  const membershipChecks = await Promise.all(
+    clubs.map(async (club) => ({
+      slug: club.slug,
+      isMember: userId ? await checkMembership(club.slug) : false,
+    }))
+  );
+  const membershipMap = Object.fromEntries(membershipChecks.map((m) => [m.slug, m.isMember]));
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <PageHeader
+        title="Club Directory"
+        description="Discover clubs and activities at Elkhorn South High School. Join to access member resources, announcements, and events."
+      />
+
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row">
+        <SearchBar placeholder="Search clubs..." defaultValue={params.q} className="flex-1" />
+      </div>
+
+      <div className="flex gap-8">
+        <aside className="hidden w-56 shrink-0 lg:block">
+          <FilterSidebar title="Categories" options={filterOptions} activeValue={params.filter} />
+          <div className="mt-6">
+            <a
+              href="?featured=true"
+              className={`block rounded-lg px-3 py-2 text-sm ${params.featured === "true" ? "bg-storm-electric/10 text-storm-electric font-medium" : "hover:bg-storm-light/50 text-muted-foreground"}`}
+            >
+              ⭐ Featured clubs
+            </a>
+          </div>
+        </aside>
+
+        <div className="flex-1">
+          <MobileFilterDrawer title="Filter clubs" options={filterOptions} activeValue={params.filter} />
+          <p className="mb-4 text-sm text-muted-foreground">{clubs.length} clubs found</p>
+          {clubs.length === 0 ? (
+            <EmptyState title="No clubs found" description="Try adjusting your search or filters." actionLabel="View all clubs" actionHref="/clubs" />
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              {clubs.map((club) => (
+                <ClubCard
+                  key={club.id}
+                  club={club}
+                  isMember={membershipMap[club.slug]}
+                  isLoggedIn={isLoggedIn}
+                  canJoin={profile?.role === "student"}
+                  canManage={manageableSlugs.has(club.slug)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

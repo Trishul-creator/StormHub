@@ -1,0 +1,45 @@
+import Link from "next/link";
+import { APP_NAME, SCHOOL_NAME } from "@/lib/utils";
+import type { UserRole } from "@/types/database";
+
+export function Footer({ role }: { role?: UserRole }) {
+  return (
+    <footer className="border-t bg-storm-navy text-storm-silver">
+      <div className="container mx-auto px-4 py-12">
+        <div className="grid gap-8 md:grid-cols-4">
+          <div className="md:col-span-2">
+            <h3 className="text-lg font-bold text-white">{APP_NAME}</h3>
+            <p className="mt-2 text-sm max-w-md">
+              Student-built opportunity hub for {SCHOOL_NAME}. Discover clubs, opportunities, and everything happening on the school calendar.
+            </p>
+            <p className="mt-4 text-xs text-storm-silver/70">
+              Student-built platform. Not an official school system unless approved by school administration.
+            </p>
+          </div>
+          <div>
+            <h4 className="font-semibold text-white mb-3">Explore</h4>
+            <ul className="space-y-2 text-sm">
+              <li><Link href="/clubs" className="hover:text-white transition-colors">Clubs</Link></li>
+              {role !== "teacher" && (
+                <li><Link href="/opportunities" className="hover:text-white transition-colors">Opportunities</Link></li>
+              )}
+              <li><Link href="/calendar" className="hover:text-white transition-colors">Calendar</Link></li>
+              <li><Link href="/workshops" className="hover:text-white transition-colors">Workshops</Link></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold text-white mb-3">Info</h4>
+            <ul className="space-y-2 text-sm">
+              <li><Link href="/about" className="hover:text-white transition-colors">About</Link></li>
+              <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link></li>
+              <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+            </ul>
+          </div>
+        </div>
+        <div className="mt-8 border-t border-storm-blue pt-8 text-center text-xs text-storm-silver/60">
+          © {new Date().getFullYear()} {APP_NAME} · Privacy-first · Built for ESHS students
+        </div>
+      </div>
+    </footer>
+  );
+}
