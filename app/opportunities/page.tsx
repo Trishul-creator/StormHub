@@ -3,10 +3,9 @@ import { PageHeader } from "@/components/layout/page-header";
 import { SearchBar } from "@/components/layout/search-bar";
 import { FilterSidebar, MobileFilterDrawer } from "@/components/layout/filter-sidebar";
 import { EmptyState } from "@/components/layout/empty-state";
-import { getOpportunities } from "@/lib/data";
+import { getOpportunities, getOpportunityCategories } from "@/lib/data";
 import { getUserBookmarkIds } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
-import { OPPORTUNITY_CATEGORIES } from "@/lib/utils";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -20,16 +19,19 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
   const { userId, isLoggedIn, profile } = await getAuthContext();
   if (profile?.role === "teacher") redirect("/calendar");
 
-  const opportunities = await getOpportunities({
+  const [opportunities, categories] = await Promise.all([
+    getOpportunities({
     search: params.q,
     category: params.category,
     closingSoon: params.closing === "true",
-  });
+    }),
+    getOpportunityCategories(),
+  ]);
 
   const canParticipate = profile?.role === "student" || !profile;
   const bookmarkedIds = canParticipate ? await getUserBookmarkIds(userId) : new Set<string>();
 
-  const filterOptions = OPPORTUNITY_CATEGORIES.map((c) => ({ label: c, value: c }));
+  const filterOptions = categories.map((category) => ({ label: category, value: category }));
 
   return (
     <div className="container mx-auto px-4 py-8">

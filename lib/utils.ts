@@ -13,6 +13,16 @@ export function slugify(text: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+export function humanizeLabel(value: string | null | undefined): string {
+  if (!value) return "";
+  return value
+    .replace(/[_-]+/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export function formatDate(date: string | Date | null | undefined): string {
   if (!date) return "TBD";
   const d = typeof date === "string" ? new Date(date) : date;

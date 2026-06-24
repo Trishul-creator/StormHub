@@ -6,7 +6,7 @@ import { EventCard } from "@/components/events/event-card";
 import { getMemberClubData } from "@/lib/data";
 import { checkMembership } from "@/lib/actions";
 import { requireAuth } from "@/lib/auth";
-import { formatDate } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
 import { LeaveClubButton } from "@/components/clubs/leave-club-button";
 import { MemberBlocked } from "@/components/clubs/member-blocked";
 import { canManageClub } from "@/lib/permissions";
@@ -90,7 +90,9 @@ export default async function MemberClubPage({ params }: MemberPageProps) {
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">{a.body}</p>
-                    {a.published_at && <p className="mt-2 text-xs text-muted-foreground">{formatDate(a.published_at)}</p>}
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Posted {formatDateTime(a.published_at ?? a.created_at)}
+                    </p>
                   </div>
                 ))}
               </div>

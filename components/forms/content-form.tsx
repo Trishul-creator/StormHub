@@ -184,7 +184,7 @@ export function ContentForm({ type, clubSlug }: ContentFormProps) {
         </div>
       )}
       <Button type="submit" disabled={loading}>
-        {loading ? "Submitting..." : type === "opportunity" ? "Publish opportunity" : "Submit for approval"}
+        {loading ? "Submitting..." : type === "opportunity" ? "Publish opportunity" : `Create ${type}`}
       </Button>
     </form>
   );

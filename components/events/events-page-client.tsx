@@ -60,9 +60,11 @@ const eventColors: Record<string, string> = {
 
 function CalendarEvent({
   event,
+  hasRsvp = false,
   compact = false,
 }: {
   event: Event;
+  hasRsvp?: boolean;
   compact?: boolean;
 }) {
   return (
@@ -72,6 +74,7 @@ function CalendarEvent({
       className={cn(
         "block truncate rounded-md border px-1.5 py-1 text-[11px] font-medium leading-tight transition hover:-translate-y-px hover:shadow-sm",
         eventColors[event.event_type] ?? eventColors.other,
+        hasRsvp && "border-green-300 bg-green-100 text-green-900 ring-1 ring-green-400",
         compact && "px-1 py-0.5 text-[10px]"
       )}
     >
@@ -130,6 +133,12 @@ export function EventsPageClient({
     setSelectedDay(startOfMonth(nextMonth));
   }
 
+  function goToToday() {
+    const today = new Date();
+    setVisibleMonth(startOfMonth(today));
+    setSelectedDay(today);
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border bg-white p-3 shadow-sm sm:p-4">
@@ -146,7 +155,7 @@ export function EventsPageClient({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => changeMonth(startOfMonth(new Date()))}
+              onClick={goToToday}
             >
               Today
             </Button>
@@ -257,6 +266,7 @@ export function EventsPageClient({
                   isSameDay(parseISO(event.starts_at), day)
                 );
                 const selected = isSameDay(day, selectedDay);
+                const hasRsvpEvent = dayEvents.some((event) => rsvpSet.has(event.id));
                 return (
                   <button
                     key={day.toISOString()}
@@ -264,6 +274,7 @@ export function EventsPageClient({
                     className={cn(
                       "min-h-24 border-b border-r p-1.5 text-left align-top transition hover:bg-storm-light/30 sm:min-h-32 sm:p-2",
                       !isSameMonth(day, visibleMonth) && "bg-slate-50/70 text-muted-foreground",
+                      hasRsvpEvent && "bg-green-50/70",
                       selected && "bg-blue-50/70 ring-2 ring-inset ring-storm-electric/40"
                     )}
                   >
@@ -281,6 +292,7 @@ export function EventsPageClient({
                         <CalendarEvent
                           key={event.id}
                           event={event}
+                          hasRsvp={rsvpSet.has(event.id)}
                           compact={calendarDays.length > 35}
                         />
                       ))}

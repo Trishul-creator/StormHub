@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Filter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -19,12 +20,21 @@ interface FilterSidebarProps {
 }
 
 export function FilterSidebar({ title = "Filter", options, activeValue, paramName = "filter", className }: FilterSidebarProps) {
+  const searchParams = useSearchParams();
+  function hrefFor(value?: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set(paramName, value);
+    else params.delete(paramName);
+    const query = params.toString();
+    return query ? `?${query}` : "?";
+  }
+
   return (
     <div className={cn("space-y-2", className)}>
       <h3 className="font-semibold text-storm-navy text-sm">{title}</h3>
       <div className="flex flex-col gap-1">
         <a
-          href="?"
+          href={hrefFor()}
           className={cn(
             "rounded-lg px-3 py-2 text-sm transition-colors",
             !activeValue ? "bg-storm-electric/10 text-storm-electric font-medium" : "hover:bg-storm-light/50 text-muted-foreground"
@@ -35,7 +45,7 @@ export function FilterSidebar({ title = "Filter", options, activeValue, paramNam
         {options.map((opt) => (
           <a
             key={opt.value}
-            href={`?${paramName}=${encodeURIComponent(opt.value)}`}
+            href={hrefFor(opt.value)}
             className={cn(
               "rounded-lg px-3 py-2 text-sm transition-colors",
               activeValue === opt.value ? "bg-storm-electric/10 text-storm-electric font-medium" : "hover:bg-storm-light/50 text-muted-foreground"

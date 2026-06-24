@@ -14,7 +14,7 @@ import {
   getUserMembershipBySlug,
 } from "@/lib/data";
 import { getAuthContext } from "@/lib/auth";
-import { formatDate } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
 import { canManageClub } from "@/lib/permissions";
 
 interface ClubPageProps {
@@ -72,9 +72,9 @@ export default async function ClubPage({ params }: ClubPageProps) {
                   <div key={a.id} className="rounded-xl border p-4">
                     <h3 className="font-medium">{a.title}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">{a.body}</p>
-                    {a.published_at && (
-                      <p className="mt-2 text-xs text-muted-foreground">{formatDate(a.published_at)}</p>
-                    )}
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Posted {formatDateTime(a.published_at ?? a.created_at)}
+                    </p>
                   </div>
                 ))}
               </div>

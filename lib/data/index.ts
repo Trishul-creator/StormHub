@@ -26,8 +26,10 @@ import type {
   School,
   AdminUser,
   FeedbackItem,
+  ApprovalContentType,
 } from "@/types/database";
 import { isAdminRole } from "@/lib/permissions";
+import { CLUB_FILTER_GROUPS } from "@/lib/utils";
 
 export { isDemoMode } from "@/lib/supabase/mode";
 
@@ -121,7 +123,14 @@ export async function getClubs(filters?: {
     .in("status", ["interest_open", "active"]);
   if (filters?.featured) query = query.eq("is_featured", true);
   if (filters?.category) query = query.eq("category", filters.category);
-  if (filters?.search) query = query.ilike("name", `%${filters.search}%`);
+  if (filters?.filterGroup) {
+    const group = CLUB_FILTER_GROUPS.find((item) => item.label === filters.filterGroup);
+    if (group) query = query.in("category", [...group.categories]);
+  }
+  if (filters?.search) {
+    const q = `%${filters.search}%`;
+    query = query.or(`name.ilike.${q},short_description.ilike.${q},category.ilike.${q}`);
+  }
 
   const { data, error } = await query.order("name");
   if (error) {
@@ -224,8 +233,42 @@ export async function getClubAnnouncements(
     query = query.eq("visibility", "public");
   }
   // members visibility: RLS ensures only members see member-only posts
-  const { data } = await query.order("published_at", { ascending: false });
+  const { data } = await query
+    .order("published_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
   return (data as ClubAnnouncement[]) || [];
+}
+
+export async function getClubManagedContent(
+  clubId: string,
+  type: Exclude<ApprovalContentType, "opportunity" | "workshop">
+): Promise<Array<ClubAnnouncement | ClubResource | Event>> {
+  if (isDemoMode()) {
+    if (type === "announcement") return demoAnnouncements.filter((item) => item.club_id === clubId);
+    if (type === "resource") return Object.values(demoMemberResources).flat().filter((item) => item.club_id === clubId);
+    return demoEvents.filter((item) => item.club_id === clubId);
+  }
+  const supabase = await createClient();
+  if (!supabase) return [];
+  const table =
+    type === "announcement"
+      ? "club_announcements"
+      : type === "resource"
+        ? "club_resources"
+        : "events";
+  const orderColumn = type === "event" ? "starts_at" : type === "announcement" ? "published_at" : "created_at";
+  const { data, error } = await supabase
+    .from(table)
+    .select("*")
+    .eq("club_id", clubId)
+    .neq("status", "archived")
+    .order(orderColumn, { ascending: type === "event", nullsFirst: false })
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("[getClubManagedContent]", error.message);
+    return [];
+  }
+  return (data as Array<ClubAnnouncement | ClubResource | Event>) ?? [];
 }
 
 export async function getRecentAnnouncements(limit = 5): Promise<(ClubAnnouncement & { club?: Club })[]> {
@@ -323,12 +366,28 @@ export async function getOpportunities(filters?: {
     query = query.eq("status", "approved").eq("visibility", "public");
   }
   if (filters?.category) query = query.eq("category", filters.category);
+  if (filters?.search) {
+    const q = `%${filters.search}%`;
+    query = query.or(`title.ilike.${q},summary.ilike.${q},description.ilike.${q},category.ilike.${q}`);
+  }
+  if (filters?.closingSoon) {
+    const soon = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    query = query.not("deadline", "is", null).gte("deadline", new Date().toISOString()).lte("deadline", soon);
+  }
   const { data, error } = await query.order("created_at", { ascending: false });
   if (error) {
     console.error("[getOpportunities]", error.message);
     return [];
   }
   return (data as Opportunity[]) || [];
+}
+
+export async function getOpportunityCategories(): Promise<string[]> {
+  if (isDemoMode()) {
+    return [...new Set(demoOpportunities.map((opportunity) => opportunity.category).filter(Boolean) as string[])].sort();
+  }
+  const opportunities = await getOpportunities();
+  return [...new Set(opportunities.map((opportunity) => opportunity.category).filter(Boolean) as string[])].sort();
 }
 
 export async function getOpportunityBySlug(slug: string): Promise<Opportunity | null> {

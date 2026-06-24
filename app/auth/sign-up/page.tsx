@@ -24,6 +24,12 @@ export default function SignUpPage() {
     const email = form.get("email") as string;
     const password = form.get("password") as string;
     const fullName = form.get("fullName") as string;
+    const website = String(form.get("website") ?? "");
+    if (website) {
+      setLoading(false);
+      toast({ title: "Sign up failed", description: "Please try again.", variant: "destructive" });
+      return;
+    }
 
     if (isDemo) {
       const { demoSignIn: signIn } = await import("@/lib/actions");
@@ -79,6 +85,10 @@ export default function SignUpPage() {
               <Label htmlFor="password">Password</Label>
               <Input id="password" name="password" type="password" required minLength={6} className="mt-1" />
             </div>
+            <div className="hidden" aria-hidden="true">
+              <Label htmlFor="website">Website</Label>
+              <Input id="website" name="website" tabIndex={-1} autoComplete="off" />
+            </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Creating account..." : "Create account"}
             </Button>
@@ -88,8 +98,7 @@ export default function SignUpPage() {
             <Link href="/auth/sign-in" className="text-storm-electric hover:underline">Sign in</Link>
           </p>
           <p className="mt-3 text-xs text-muted-foreground text-center">
-            {/* TODO: Restrict signups to school email domain in Supabase Auth settings */}
-            In production, signups can be restricted to @elkhornsouth.org emails via Supabase Auth settings.
+            Student accounts should use a school email. Administrators can also set ALLOWED_SIGNUP_EMAIL_DOMAINS in Vercel.
           </p>
         </CardContent>
       </Card>

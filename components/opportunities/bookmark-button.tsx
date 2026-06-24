@@ -14,9 +14,21 @@ interface BookmarkButtonProps {
   isBookmarked?: boolean;
   size?: "default" | "sm" | "lg" | "icon";
   className?: string;
+  activeLabel?: string;
+  inactiveLabel?: string;
+  disableWhenBookmarked?: boolean;
 }
 
-export function BookmarkButton({ opportunityId, isLoggedIn, isBookmarked, size = "default", className }: BookmarkButtonProps) {
+export function BookmarkButton({
+  opportunityId,
+  isLoggedIn,
+  isBookmarked,
+  size = "default",
+  className,
+  activeLabel = "Saved",
+  inactiveLabel = "Save",
+  disableWhenBookmarked = true,
+}: BookmarkButtonProps) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -32,6 +44,7 @@ export function BookmarkButton({ opportunityId, isLoggedIn, isBookmarked, size =
   }
 
   function handleBookmark() {
+    if (isBookmarked && disableWhenBookmarked) return;
     startTransition(async () => {
       const result = await bookmarkEntity("opportunity", opportunityId);
       if (result.success) {
@@ -48,7 +61,7 @@ export function BookmarkButton({ opportunityId, isLoggedIn, isBookmarked, size =
       size={size}
       variant={isBookmarked ? "secondary" : "outline"}
       onClick={handleBookmark}
-      disabled={pending}
+      disabled={pending || Boolean(isBookmarked && disableWhenBookmarked)}
       className={cn(className)}
     >
       {pending ? (
@@ -58,7 +71,7 @@ export function BookmarkButton({ opportunityId, isLoggedIn, isBookmarked, size =
       ) : (
         <Bookmark className="h-4 w-4" />
       )}
-      {size !== "icon" && (isBookmarked ? "Saved" : "Save")}
+      {size !== "icon" && (isBookmarked ? activeLabel : inactiveLabel)}
     </Button>
   );
 }

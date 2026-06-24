@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { humanizeLabel } from "@/lib/utils";
 
 interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: "default" | "secondary" | "outline" | "success" | "warning" | "destructive";
@@ -26,7 +27,7 @@ export function Badge({ className, variant = "default", ...props }: BadgeProps) 
 }
 
 export function CategoryBadge({ category }: { category: string }) {
-  return <Badge variant="secondary">{category}</Badge>;
+  return <Badge variant="secondary">{humanizeLabel(category)}</Badge>;
 }
 
 export function StatusBadge({ status }: { status: string }) {
@@ -38,6 +39,9 @@ export function StatusBadge({ status }: { status: string }) {
     rejected: "destructive",
     active: "success",
     going: "success",
+    open: "warning",
+    reviewed: "secondary",
+    resolved: "success",
   };
   const labels: Record<string, string> = {
     submitted: "Submitted",
@@ -45,8 +49,11 @@ export function StatusBadge({ status }: { status: string }) {
     rejected: "Rejected",
     pending: "Pending",
     draft: "Draft",
+    open: "Open",
+    reviewed: "Reviewed",
+    resolved: "Resolved",
   };
-  return <Badge variant={map[status] || "default"}>{labels[status] || status}</Badge>;
+  return <Badge variant={map[status] || "default"}>{labels[status] || humanizeLabel(status)}</Badge>;
 }
 
 export function ApprovalStatusBadge({ status }: { status: string }) {
@@ -54,9 +61,9 @@ export function ApprovalStatusBadge({ status }: { status: string }) {
 }
 
 export function RoleBadge({ role }: { role: string }) {
-  return <Badge variant="outline">{role.replace(/_/g, " ")}</Badge>;
+  return <Badge variant="outline">{humanizeLabel(role)}</Badge>;
 }
 
 export function EventTypeBadge({ type }: { type: string }) {
-  return <Badge>{type}</Badge>;
+  return <Badge>{humanizeLabel(type)}</Badge>;
 }

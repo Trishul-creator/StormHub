@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { cancelRsvp, rsvpToEvent } from "@/lib/actions";
+import { rsvpToEvent } from "@/lib/actions";
 import { toast } from "@/hooks/use-toast";
 import { CalendarCheck, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -34,23 +34,24 @@ export function RSVPButton({ eventId, isLoggedIn, hasRsvp, size = "default", cla
 
   function handleRsvp() {
     startTransition(async () => {
-      const result = hasRsvp ? await cancelRsvp(eventId) : await rsvpToEvent(eventId);
+      if (hasRsvp) return;
+      const result = await rsvpToEvent(eventId);
       if (result.success) {
         toast({
-          title: hasRsvp ? "RSVP canceled" : "RSVP confirmed",
-          description: hasRsvp ? "You are no longer marked as going." : "You're marked as going to this event.",
+          title: "RSVP confirmed",
+          description: "You're marked as going to this event.",
         });
         router.refresh();
       } else {
-        toast({ title: hasRsvp ? "Could not cancel RSVP" : "RSVP failed", description: result.error, variant: "destructive" });
+        toast({ title: "RSVP failed", description: result.error, variant: "destructive" });
       }
     });
   }
 
   return (
-    <Button size={size} variant={hasRsvp ? "secondary" : "default"} onClick={handleRsvp} disabled={pending} className={cn(className)}>
+    <Button size={size} variant={hasRsvp ? "secondary" : "default"} onClick={handleRsvp} disabled={pending || hasRsvp} className={cn(className)}>
       {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarCheck className="h-4 w-4" />}
-      {hasRsvp ? "Cancel RSVP" : "RSVP"}
+      {hasRsvp ? "Done" : "RSVP"}
     </Button>
   );
 }

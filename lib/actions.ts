@@ -11,6 +11,7 @@ import { getClubBySlug } from "@/lib/data";
 import { friendlyError } from "@/lib/errors";
 import {
   canApproveContent,
+  canApproveClubContent,
   canDeleteUser,
   canEditRole,
   canManageClub,
@@ -29,6 +30,7 @@ import { slugify } from "@/lib/utils";
 import {
   createAdminAttentionNotification,
   createApprovalNeededNotifications,
+  createEmailOutboxItem,
   createEventRsvpNotifications,
   createNotification,
   createNotificationsForClubMembers,
@@ -381,6 +383,56 @@ export async function updateFeedbackStatus(
   return { success: true };
 }
 
+export async function respondToFeedback(
+  id: string,
+  response: string
+): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: false, error: "Feedback replies are unavailable in demo mode." };
+  const trimmed = response.trim();
+  if (!trimmed) return { success: false, error: "Response message is required." };
+  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  if (!supabase || !profile || !isAdminRole(profile.role)) {
+    return { success: false, error: "Administrator access required." };
+  }
+
+  const { data: feedback, error: feedbackError } = await supabase
+    .from("feedback")
+    .select("*, profile:profiles(id,email,full_name)")
+    .eq("id", id)
+    .maybeSingle();
+  if (feedbackError) return { success: false, error: friendlyError(feedbackError, "Could not load feedback.") };
+  if (!feedback) return { success: false, error: "Feedback message not found." };
+
+  const recipientEmail = feedback.email || feedback.profile?.email;
+  if (!recipientEmail) return { success: false, error: "This feedback message does not have a reply email." };
+
+  await createEmailOutboxItem({
+    recipientUserId: feedback.user_id ?? feedback.profile?.id ?? null,
+    recipientEmail,
+    subject: "[StormHub] Response to your feedback",
+    body: `Hi ${feedback.name || feedback.profile?.full_name || "there"},\n\nThanks for contacting StormHub. Here is the response from the admin team:\n\n${trimmed}\n\nOriginal message:\n${feedback.message}\n\nStatus: Resolved`,
+    type: "feedback_response",
+  });
+
+  if (feedback.user_id) {
+    await createNotification({
+      recipientUserId: feedback.user_id,
+      type: "system_message",
+      importance: "important",
+      title: "Your feedback was resolved",
+      message: trimmed.slice(0, 220),
+      link: "/contact",
+      sendEmail: false,
+    });
+  }
+
+  const { error } = await supabase.from("feedback").update({ status: "resolved" }).eq("id", id);
+  if (error) return { success: false, error: friendlyError(error, "Could not mark feedback resolved.") };
+  revalidatePath("/admin/feedback");
+  return { success: true };
+}
+
 export async function submitWorkshop(data: {
   title: string;
   description: string;
@@ -461,8 +513,10 @@ export async function submitContent(data: {
 
   const trustedPost =
     isAdminRole(profile.role) ||
+    Boolean(club && canManageClub(profile, club, membership)) ||
     (profile.role === "teacher" && membership?.role === "sponsor");
   const contentStatus = trustedPost ? "approved" : "pending";
+  const publishedAt = trustedPost ? new Date().toISOString() : null;
 
   let table: string;
   let insert: Record<string, unknown>;
@@ -478,6 +532,7 @@ export async function submitContent(data: {
       status: contentStatus,
       importance: data.importance ?? "normal",
       send_email_to_members: Boolean(data.send_email_to_members),
+      published_at: publishedAt,
     };
   } else if (data.type === "event") {
     if (!club) return { success: false, error: "A club is required." };
@@ -540,7 +595,8 @@ export async function submitContent(data: {
     return { success: false, error: "Your profile is missing a school. Run the Supabase database patch." };
   }
 
-  const { data: created, error } = await supabase.from(table).insert(insert).select("id").single();
+  const contentWriter = trustedPost && club ? (createAdminClient() ?? supabase) : supabase;
+  const { data: created, error } = await contentWriter.from(table).insert(insert).select("id").single();
   if (error) return { success: false, error: friendlyError(error, `Could not submit ${data.type}.`) };
 
   if (!trustedPost && profile.school_id && created?.id) {
@@ -559,17 +615,24 @@ export async function submitContent(data: {
       message: `${profile.full_name ?? profile.email ?? "A student"} submitted a ${data.type} and is waiting for review.`,
       link: "/manage/approvals",
     });
-  } else if (trustedPost && club && created?.id && ["announcement", "event"].includes(data.type)) {
+  } else if (trustedPost && club && created?.id && ["announcement", "event", "resource"].includes(data.type)) {
     await createNotificationsForClubMembers({
       clubId: club.id,
-      type: data.type === "announcement" ? "club_announcement" : "club_event_created",
+      type:
+        data.type === "announcement"
+          ? "club_announcement"
+          : data.type === "event"
+            ? "club_event_created"
+            : "system_message",
       importance: data.importance ?? "normal",
       title: data.title,
       message:
         data.type === "announcement"
           ? `A new announcement was posted in ${club.name}.`
-          : `A new event was added for ${club.name}.`,
-      link: data.type === "announcement" ? `/clubs/${club.slug}/member` : `/events/${created.id}`,
+          : data.type === "event"
+            ? `A new event was added for ${club.name}.`
+            : `A new resource was posted in ${club.name}.`,
+      link: data.type === "event" ? `/events/${created.id}` : `/clubs/${club.slug}/member`,
       eventId: data.type === "event" ? created.id : null,
       sendEmail: Boolean(data.send_email_to_members),
     });
@@ -841,6 +904,17 @@ export async function supabaseSignIn(email: string, password: string) {
 }
 
 export async function supabaseSignUp(email: string, password: string, fullName: string) {
+  const allowedDomains = (process.env.ALLOWED_SIGNUP_EMAIL_DOMAINS ?? "")
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase())
+    .filter(Boolean);
+  const emailDomain = email.split("@")[1]?.toLowerCase();
+  if (allowedDomains.length > 0 && (!emailDomain || !allowedDomains.includes(emailDomain))) {
+    return {
+      success: false,
+      error: `Please use an approved school email address (${allowedDomains.join(", ")}).`,
+    };
+  }
   const supabase = await createClient();
   if (!supabase) return { success: false, error: "Database not configured." };
   const { data, error } = await supabase.auth.signUp({
@@ -928,6 +1002,61 @@ const APPROVAL_TABLES: Record<ApprovalContentType, string> = {
   workshop: "workshops",
 };
 
+const CLUB_CONTENT_TABLES: Record<"announcement" | "event" | "resource", string> = {
+  announcement: "club_announcements",
+  event: "events",
+  resource: "club_resources",
+};
+
+export async function archiveClubContent(
+  id: string,
+  contentType: "announcement" | "event" | "resource"
+): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: false, error: "Content deletion is unavailable in demo mode." };
+  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  if (!supabase || !profile) return { success: false, error: "Please sign in." };
+  const table = CLUB_CONTENT_TABLES[contentType];
+  if (!table) return { success: false, error: "Unknown content type." };
+
+  const { data: content } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
+  if (!content?.club_id) return { success: false, error: "Content not found." };
+  const { data: club } = await supabase.from("clubs").select("*").eq("id", content.club_id).maybeSingle();
+  if (!club) return { success: false, error: "Club not found." };
+  const { data: membership } = await supabase
+    .from("club_memberships")
+    .select("club_id,status,role")
+    .eq("club_id", club.id)
+    .eq("user_id", profile.id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!canApproveClubContent(profile, club, membership)) {
+    return { success: false, error: "Only the teacher sponsor or an admin can delete club content." };
+  }
+
+  const { error } = await supabase.from(table).update({ status: "archived" }).eq("id", id);
+  if (error) return { success: false, error: friendlyError(error, "Could not delete content.") };
+
+  if (content.author_id && content.author_id !== profile.id) {
+    await createNotification({
+      recipientUserId: content.author_id,
+      type: "system_message",
+      importance: "important",
+      title: `${content.title ?? "Content"} was removed`,
+      message: `A teacher sponsor or admin removed your ${contentType}.`,
+      link: `/clubs/${club.slug}/member`,
+      clubId: club.id,
+      eventId: contentType === "event" ? id : null,
+    });
+  }
+
+  revalidatePath(`/manage/clubs/${club.slug}`);
+  revalidatePath(`/manage/clubs/${club.slug}/${contentType === "announcement" ? "announcements" : `${contentType}s`}`);
+  revalidatePath(`/clubs/${club.slug}/member`);
+  revalidatePath("/calendar");
+  return { success: true };
+}
+
 export async function approveContent(
   id: string,
   contentType: ApprovalContentType
@@ -953,7 +1082,9 @@ export async function approveContent(
     .eq("content_id", id)
     .eq("status", "pending")
     .maybeSingle();
-  const { error } = await supabase.from(table).update({ status: "approved" }).eq("id", id);
+  const updatePayload: Record<string, unknown> = { status: "approved" };
+  if (contentType === "announcement") updatePayload.published_at = new Date().toISOString();
+  const { error } = await supabase.from(table).update(updatePayload).eq("id", id);
   if (error) return { success: false, error: friendlyError(error) };
   await supabase
     .from("approval_requests")

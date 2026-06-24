@@ -15,6 +15,9 @@ export function Footer({ role }: { role?: UserRole }) {
             <p className="mt-4 text-xs text-storm-silver/70">
               Student-built platform. Not an official school system unless approved by school administration.
             </p>
+            <p className="mt-2 text-xs text-storm-silver/70">
+              Need help? Use the contact form or email support@stormhubapp.com.
+            </p>
           </div>
           <div>
             <h4 className="font-semibold text-white mb-3">Explore</h4>

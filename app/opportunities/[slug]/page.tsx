@@ -95,6 +95,16 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
               </a>
             </Button>
           )}
+          {!opportunity.external_url && canParticipate && (
+            <BookmarkButton
+              opportunityId={opportunity.id}
+              isLoggedIn={isLoggedIn}
+              isBookmarked={isBookmarked}
+              inactiveLabel={opportunity.action_label || "I'm interested"}
+              activeLabel="Done"
+              className="w-full"
+            />
+          )}
           {!canParticipate && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
               Administrator preview. Student sign-up actions are disabled for administrator accounts.
