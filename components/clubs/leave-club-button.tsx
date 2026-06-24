@@ -24,7 +24,7 @@ export function LeaveClubButton({ clubSlug }: { clubSlug: string }) {
   }
 
   return (
-    <Button variant="outline" size="sm" onClick={handleLeave} disabled={pending} className="border-white/30 text-white hover:bg-white/10 shrink-0">
+    <Button variant="outline" size="sm" onClick={handleLeave} disabled={pending} className="shrink-0 border-white/30 bg-transparent text-white hover:bg-white/10">
       {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
       Leave
     </Button>

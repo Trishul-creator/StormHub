@@ -27,9 +27,11 @@ import type {
 import { slugify } from "@/lib/utils";
 import {
   createAdminAttentionNotification,
+  createApprovalNeededNotifications,
   createEventRsvpNotifications,
   createNotification,
   createNotificationsForClubMembers,
+  createNotificationsForClubSponsors,
   createOpportunityDeadlineReminders,
 } from "@/lib/notifications";
 import { processEmailOutbox } from "@/lib/email";
@@ -41,6 +43,18 @@ const DEMO_MEMBERSHIPS_COOKIE = "stormhub_demo_memberships";
 const DEMO_BOOKMARKS_COOKIE = "stormhub_demo_bookmarks";
 const DEMO_RSVPS_COOKIE = "stormhub_demo_rsvps";
 const DEMO_READ_NOTIFICATIONS_COOKIE = "stormhub_demo_read_notifications";
+
+function formatMembershipRole(role: MembershipRole): string {
+  return role.replace(/_/g, " ");
+}
+
+function contentReviewLink(contentType: ApprovalContentType, content: Record<string, unknown> | null, club?: { slug: string } | null): string {
+  if (contentType === "event" && typeof content?.id === "string") return `/events/${content.id}`;
+  if (contentType === "opportunity" && typeof content?.slug === "string") return `/opportunities/${content.slug}`;
+  if (club?.slug) return `/clubs/${club.slug}/member`;
+  if (contentType === "workshop") return "/workshops";
+  return "/dashboard";
+}
 
 async function getDemoMemberships(): Promise<Set<string>> {
   const cookieStore = await cookies();
@@ -113,6 +127,13 @@ export async function joinClub(clubSlug: string): Promise<{ success: boolean; er
 
   if (error) return { success: false, error: friendlyError(error, "Could not join club.") };
 
+  await createNotificationsForClubSponsors({
+    clubId: club.id,
+    title: `New member joined: ${profile.full_name ?? profile.email ?? "Student"}`,
+    message: `${profile.full_name ?? profile.email ?? "A student"} joined ${club.name}.`,
+    link: `/manage/clubs/${club.slug}/members`,
+  });
+
   revalidatePath(`/clubs/${clubSlug}`);
   revalidatePath(`/clubs/${clubSlug}/member`);
   revalidatePath("/dashboard");
@@ -146,6 +167,14 @@ export async function leaveClub(clubSlug: string): Promise<{ success: boolean; e
     .eq("user_id", user.id);
 
   if (error) return { success: false, error: friendlyError(error) };
+
+  const profile = await getCurrentProfile();
+  await createNotificationsForClubSponsors({
+    clubId: club.id,
+    title: `Member left: ${profile?.full_name ?? user.email ?? "Student"}`,
+    message: `${profile?.full_name ?? user.email ?? "A student"} left ${club.name}.`,
+    link: `/manage/clubs/${club.slug}/members`,
+  });
 
   revalidatePath(`/clubs/${clubSlug}`);
   revalidatePath(`/clubs/${clubSlug}/member`);
@@ -503,12 +532,12 @@ export async function submitContent(data: {
       status: "pending",
     });
     if (approvalError) console.error("[submitContent approval request]", approvalError.message);
-    await createAdminAttentionNotification({
+    await createApprovalNeededNotifications({
+      schoolId: profile.school_id,
+      clubId: club?.id ?? null,
       title: `${data.title} needs approval`,
-      message: `A ${data.type} was submitted and is waiting for review.`,
+      message: `${profile.full_name ?? profile.email ?? "A student"} submitted a ${data.type} and is waiting for review.`,
       link: "/manage/approvals",
-      importance: "important",
-      type: "approval_needed",
     });
   } else if (trustedPost && club && created?.id && ["announcement", "event"].includes(data.type)) {
     await createNotificationsForClubMembers({
@@ -650,13 +679,52 @@ export async function updateClubMember(data: {
     return { success: false, error: "You cannot change your own roster assignment here." };
   }
 
+  const { data: targetProfile } = await supabase
+    .from("profiles")
+    .select("full_name,email")
+    .eq("id", data.userId)
+    .maybeSingle();
+  const targetName = targetProfile?.full_name ?? targetProfile?.email ?? "A club member";
+  const nextRole = data.remove ? "member" : (data.role ?? "member");
+
   const { error } = await supabase.rpc("manage_club_roster_member", {
     target_club_id: data.clubId,
     target_user_id: data.userId,
-    new_membership_role: data.remove ? "member" : (data.role ?? "member"),
+    new_membership_role: nextRole,
     remove_member: !!data.remove,
   });
   if (error) return { success: false, error: friendlyError(error, "Could not update the roster.") };
+
+  if (data.remove) {
+    await createNotification({
+      recipientUserId: data.userId,
+      type: "system_message",
+      importance: "important",
+      title: `Removed from ${club.name}`,
+      message: `You were removed from the ${club.name} roster.`,
+      link: `/clubs/${club.slug}`,
+      clubId: club.id,
+    });
+  } else {
+    const isLeadershipRole = nextRole === "officer" || nextRole === "president";
+    await createNotification({
+      recipientUserId: data.userId,
+      type: "system_message",
+      importance: isLeadershipRole ? "important" : "normal",
+      title: `Club role updated: ${club.name}`,
+      message: `Your role in ${club.name} is now ${formatMembershipRole(nextRole)}.`,
+      link: `/clubs/${club.slug}/member`,
+      clubId: club.id,
+      sendEmail: isLeadershipRole,
+    });
+    await createNotificationsForClubSponsors({
+      clubId: club.id,
+      title: `Roster role changed: ${targetName}`,
+      message: `${targetName}'s role in ${club.name} is now ${formatMembershipRole(nextRole)}.`,
+      link: `/manage/clubs/${club.slug}/members`,
+      excludeUserIds: [actor.id],
+    });
+  }
 
   revalidatePath(`/manage/clubs/${club.slug}/members`);
   revalidatePath(`/clubs/${club.slug}`);
@@ -872,6 +940,12 @@ export async function approveContent(
     .update({ status: "approved", reviewed_by: profile.id, reviewed_at: new Date().toISOString() })
     .eq("content_id", id)
     .eq("status", "pending");
+  const contentRecord = (content as Record<string, unknown> | null) ?? null;
+  const { data: contentClub } = content?.club_id
+    ? await supabase.from("clubs").select("name,slug").eq("id", content.club_id).maybeSingle()
+    : { data: null };
+  const submitterLink = contentReviewLink(contentType, contentRecord, contentClub);
+
   if (approval?.submitted_by) {
     await createNotification({
       recipientUserId: approval.submitted_by,
@@ -879,11 +953,13 @@ export async function approveContent(
       importance: "normal",
       title: `${content?.title ?? "Content"} approved`,
       message: `Your ${contentType.replace("_", " ")} was approved.`,
-      link: "/manage/approvals",
+      link: submitterLink,
+      clubId: content?.club_id ?? null,
+      eventId: contentType === "event" ? id : null,
     });
   }
   if (content?.club_id && ["announcement", "event"].includes(contentType)) {
-    const { data: club } = await supabase.from("clubs").select("name,slug").eq("id", content.club_id).maybeSingle();
+    const club = contentClub;
     if (club) {
       await createNotificationsForClubMembers({
         clubId: content.club_id,
@@ -925,7 +1001,7 @@ export async function rejectContent(
   const table = APPROVAL_TABLES[contentType];
   if (!table) return { success: false, error: "Unknown content type." };
 
-  const { data: content } = await supabase.from(table).select("title").eq("id", id).maybeSingle();
+  const { data: content } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
   const { data: approval } = await supabase
     .from("approval_requests")
     .select("submitted_by")
@@ -944,6 +1020,11 @@ export async function rejectContent(
     })
     .eq("content_id", id)
     .eq("status", "pending");
+  const contentRecord = (content as Record<string, unknown> | null) ?? null;
+  const { data: contentClub } = content?.club_id
+    ? await supabase.from("clubs").select("slug").eq("id", content.club_id).maybeSingle()
+    : { data: null };
+
   if (approval?.submitted_by) {
     await createNotification({
       recipientUserId: approval.submitted_by,
@@ -951,7 +1032,9 @@ export async function rejectContent(
       importance: "important",
       title: `${content?.title ?? "Content"} needs changes`,
       message: reviewerNotes || `Your ${contentType.replace("_", " ")} was rejected.`,
-      link: "/manage/approvals",
+      link: contentReviewLink(contentType, contentRecord, contentClub),
+      clubId: content?.club_id ?? null,
+      eventId: contentType === "event" ? id : null,
       sendEmail: true,
     });
   }

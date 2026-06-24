@@ -42,11 +42,11 @@ export default async function HomePage() {
                 <Link href="/clubs">Explore Clubs <ArrowRight className="h-4 w-4" /></Link>
               </Button>
               {auth.profile?.role !== "teacher" && (
-                <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10" asChild>
+                <Button size="lg" variant="outline" className="border-white/30 bg-transparent text-white hover:bg-white/10" asChild>
                   <Link href="/opportunities">View Opportunities</Link>
                 </Button>
               )}
-              <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10" asChild>
+              <Button size="lg" variant="outline" className="border-white/30 bg-transparent text-white hover:bg-white/10" asChild>
                 <Link href="/calendar">Open Calendar</Link>
               </Button>
             </div>

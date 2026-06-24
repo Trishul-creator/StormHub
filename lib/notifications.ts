@@ -141,6 +141,16 @@ interface CreateNotificationInput {
   adminAttention?: boolean;
 }
 
+function isClubUpdateNotification(type: NotificationType): boolean {
+  return [
+    "club_announcement",
+    "club_event_created",
+    "club_event_updated",
+    "club_event_canceled",
+    "club_opportunity_created",
+  ].includes(type);
+}
+
 export async function createEmailOutboxItem(input: {
   recipientUserId?: string | null;
   recipientEmail: string;
@@ -208,7 +218,7 @@ export async function createNotification(input: CreateNotificationInput): Promis
   ]);
   if (!profile) return;
   const preferences = (preferenceRow as NotificationPreferences | null) ?? defaultPreferences(input.recipientUserId);
-  if (input.clubId && !preferences.club_updates_enabled) return;
+  if (input.clubId && isClubUpdateNotification(input.type) && !preferences.club_updates_enabled) return;
   if (input.type === "opportunity_deadline_soon" && !preferences.opportunity_deadlines_enabled) return;
 
   if (preferences.in_app_enabled) {
@@ -273,6 +283,54 @@ export async function createNotificationsForClubMembers(input: {
   );
 }
 
+export async function createNotificationsForClubSponsors(input: {
+  clubId: string;
+  type?: NotificationType;
+  importance?: NotificationImportance;
+  title: string;
+  message: string;
+  link: string;
+  eventId?: string | null;
+  sendEmail?: boolean;
+  excludeUserIds?: string[];
+}): Promise<void> {
+  if (isDemoMode()) return;
+  const admin = createAdminClient();
+  if (!admin) return;
+  const { data, error } = await admin
+    .from("club_memberships")
+    .select("user_id,profiles!inner(role)")
+    .eq("club_id", input.clubId)
+    .eq("status", "active")
+    .eq("role", "sponsor")
+    .eq("profiles.role", "teacher");
+
+  if (error) {
+    console.error("[createNotificationsForClubSponsors]", error.message);
+    return;
+  }
+
+  const excluded = new Set(input.excludeUserIds ?? []);
+  await Promise.all(
+    (data ?? [])
+      .filter((sponsor: { user_id: string }) => !excluded.has(sponsor.user_id))
+      .map((sponsor: { user_id: string }) =>
+        createNotification({
+          recipientUserId: sponsor.user_id,
+          type: input.type ?? "system_message",
+          importance: input.importance ?? "normal",
+          title: input.title,
+          message: input.message,
+          link: input.link,
+          clubId: input.clubId,
+          eventId: input.eventId,
+          sendEmail: input.sendEmail,
+          adminAttention: input.type === "approval_needed",
+        })
+      )
+  );
+}
+
 export async function createEventRsvpNotifications(input: {
   eventId: string;
   studentName: string;
@@ -293,34 +351,14 @@ export async function createEventRsvpNotifications(input: {
   }
   if (!event?.club_id) return;
 
-  const { data: sponsors, error: sponsorsError } = await admin
-    .from("club_memberships")
-    .select("user_id,profiles!inner(role)")
-    .eq("club_id", event.club_id)
-    .eq("status", "active")
-    .eq("role", "sponsor")
-    .eq("profiles.role", "teacher");
-
-  if (sponsorsError) {
-    console.error("[createEventRsvpNotifications]", sponsorsError.message);
-    return;
-  }
-
-  await Promise.all(
-    (sponsors ?? []).map((sponsor: { user_id: string }) =>
-      createNotification({
-        recipientUserId: sponsor.user_id,
-        type: "system_message",
-        importance: "normal",
-        title: `New RSVP: ${input.studentName}`,
-        message: `${input.studentName} RSVP'd to ${event.title}.`,
-        link: `/events/${event.id}`,
-        clubId: event.club_id,
-        eventId: event.id,
-        sendEmail: false,
-      })
-    )
-  );
+  await createNotificationsForClubSponsors({
+    clubId: event.club_id,
+    title: `New RSVP: ${input.studentName}`,
+    message: `${input.studentName} RSVP'd to ${event.title}.`,
+    link: `/events/${event.id}`,
+    eventId: event.id,
+    sendEmail: false,
+  });
 }
 
 export async function createAdminAttentionNotification(input: {
@@ -343,6 +381,61 @@ export async function createAdminAttentionNotification(input: {
         title: input.title,
         message: input.message,
         link: input.link,
+        sendEmail: true,
+        adminAttention: true,
+      })
+    )
+  );
+}
+
+export async function createApprovalNeededNotifications(input: {
+  schoolId: string;
+  clubId?: string | null;
+  title: string;
+  message: string;
+  link: string;
+}): Promise<void> {
+  if (isDemoMode()) return;
+  const admin = createAdminClient();
+  if (!admin) return;
+
+  const recipientIds = new Set<string>();
+  const { data: admins, error: adminError } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("school_id", input.schoolId)
+    .in("role", ["admin", "super_admin"]);
+
+  if (adminError) {
+    console.error("[createApprovalNeededNotifications admins]", adminError.message);
+  }
+  for (const profile of admins ?? []) recipientIds.add(profile.id);
+
+  if (input.clubId) {
+    const { data: sponsors, error: sponsorsError } = await admin
+      .from("club_memberships")
+      .select("user_id,profiles!inner(role)")
+      .eq("club_id", input.clubId)
+      .eq("status", "active")
+      .eq("role", "sponsor")
+      .eq("profiles.role", "teacher");
+
+    if (sponsorsError) {
+      console.error("[createApprovalNeededNotifications sponsors]", sponsorsError.message);
+    }
+    for (const sponsor of sponsors ?? []) recipientIds.add(sponsor.user_id);
+  }
+
+  await Promise.all(
+    [...recipientIds].map((recipientUserId) =>
+      createNotification({
+        recipientUserId,
+        type: "approval_needed",
+        importance: "important",
+        title: input.title,
+        message: input.message,
+        link: input.link,
+        clubId: input.clubId ?? null,
         sendEmail: true,
         adminAttention: true,
       })
