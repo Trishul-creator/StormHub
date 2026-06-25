@@ -1,11 +1,11 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { rsvpToEvent } from "@/lib/actions";
+import { cancelRsvp, rsvpToEvent } from "@/lib/actions";
 import { toast } from "@/hooks/use-toast";
-import { CalendarCheck, Loader2 } from "lucide-react";
+import { CalendarCheck, Loader2, X } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 
@@ -20,6 +20,7 @@ interface RSVPButtonProps {
 
 export function RSVPButton({ eventId, isLoggedIn, hasRsvp, size = "default", className, canParticipate = true }: RSVPButtonProps) {
   const [pending, startTransition] = useTransition();
+  const [rsvped, setRsvped] = useState(Boolean(hasRsvp));
   const router = useRouter();
 
   if (!canParticipate) return null;
@@ -34,9 +35,10 @@ export function RSVPButton({ eventId, isLoggedIn, hasRsvp, size = "default", cla
 
   function handleRsvp() {
     startTransition(async () => {
-      if (hasRsvp) return;
+      if (rsvped) return;
       const result = await rsvpToEvent(eventId);
       if (result.success) {
+        setRsvped(true);
         toast({
           title: "RSVP confirmed",
           description: "You're marked as going to this event.",
@@ -48,10 +50,41 @@ export function RSVPButton({ eventId, isLoggedIn, hasRsvp, size = "default", cla
     });
   }
 
+  function handleRemoveRsvp() {
+    startTransition(async () => {
+      const result = await cancelRsvp(eventId);
+      if (result.success) {
+        setRsvped(false);
+        toast({
+          title: "RSVP removed",
+          description: "You are no longer marked as going to this event.",
+        });
+        router.refresh();
+      } else {
+        toast({ title: "Could not remove RSVP", description: result.error, variant: "destructive" });
+      }
+    });
+  }
+
+  if (rsvped) {
+    return (
+      <div className={cn("flex gap-2", className)}>
+        <Button size={size} variant="secondary" disabled className="flex-1">
+          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarCheck className="h-4 w-4" />}
+          Done
+        </Button>
+        <Button size={size} variant="outline" onClick={handleRemoveRsvp} disabled={pending} className="flex-1">
+          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+          Remove RSVP
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <Button size={size} variant={hasRsvp ? "secondary" : "default"} onClick={handleRsvp} disabled={pending || hasRsvp} className={cn(className)}>
+    <Button size={size} variant="default" onClick={handleRsvp} disabled={pending} className={cn(className)}>
       {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarCheck className="h-4 w-4" />}
-      {hasRsvp ? "Done" : "RSVP"}
+      RSVP
     </Button>
   );
 }

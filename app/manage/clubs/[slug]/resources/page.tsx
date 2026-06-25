@@ -5,7 +5,7 @@ import { getClubBySlug, getClubManagedContent } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Eye } from "lucide-react";
+import { Eye, Link as LinkIcon } from "lucide-react";
 import { StatusBadge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/utils";
 import { ArchiveContentButton } from "@/components/manage/archive-content-button";
@@ -41,6 +41,17 @@ export default async function ManageResourcesPage({ params }: PageProps) {
                     <StatusBadge status={resource.status} />
                   </div>
                   {resource.description && <p className="mt-1 text-sm text-muted-foreground">{resource.description}</p>}
+                  {resource.resource_type === "link" && resource.url && (
+                    <a
+                      href={resource.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-flex items-center gap-1 text-sm text-storm-electric hover:underline"
+                    >
+                      <LinkIcon className="h-3.5 w-3.5" />
+                      {resource.content || "Open resource"}
+                    </a>
+                  )}
                   <p className="mt-2 text-xs text-muted-foreground">Posted {formatDateTime(resource.created_at)}</p>
                 </div>
                 {canDelete && <ArchiveContentButton id={resource.id} type="resource" />}

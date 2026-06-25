@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { submitContent } from "@/lib/actions";
+import { humanizeLabel } from "@/lib/utils";
 import type { NotificationImportance } from "@/types/database";
 
 interface ContentFormProps {
@@ -35,6 +36,8 @@ export function ContentForm({ type, clubSlug }: ContentFormProps) {
       event_date: String(form.get("event_date") ?? "") || undefined,
       external_url: String(form.get("external_url") ?? "") || undefined,
       action_label: String(form.get("action_label") ?? "") || undefined,
+      resource_url: String(form.get("resource_url") ?? "") || undefined,
+      resource_label: String(form.get("resource_label") ?? "") || undefined,
       importance,
       send_email_to_members: form.get("send_email_to_members") === "on",
       deadline_reminder_enabled: form.get("deadline_reminder_enabled") === "on",
@@ -60,9 +63,38 @@ export function ContentForm({ type, clubSlug }: ContentFormProps) {
         <Input id="title" name="title" required className="mt-1" />
       </div>
       <div>
-        <Label htmlFor="body">Content</Label>
+        <Label htmlFor="body">{type === "resource" ? "Description or notes" : "Content"}</Label>
         <Textarea id="body" name="body" required rows={5} className="mt-1" />
       </div>
+      {type === "resource" && (
+        <div className="rounded-xl border bg-storm-light/20 p-4 space-y-4">
+          <div>
+            <Label htmlFor="resource_url">Resource link</Label>
+            <Input
+              id="resource_url"
+              name="resource_url"
+              type="url"
+              placeholder="https://docs.google.com/..."
+              className="mt-1"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Optional. If you add a link, members can click it from the resources list.
+            </p>
+          </div>
+          <div>
+            <Label htmlFor="resource_label">Clickable link text</Label>
+            <Input
+              id="resource_label"
+              name="resource_label"
+              placeholder="Open study guide"
+              className="mt-1"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              This is the text shown for the hyperlink. If blank, StormHub uses “Open resource”.
+            </p>
+          </div>
+        </div>
+      )}
       {type === "event" && (
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -184,7 +216,7 @@ export function ContentForm({ type, clubSlug }: ContentFormProps) {
         </div>
       )}
       <Button type="submit" disabled={loading}>
-        {loading ? "Submitting..." : type === "opportunity" ? "Publish opportunity" : `Create ${type}`}
+        {loading ? "Submitting..." : type === "opportunity" ? "Publish Opportunity" : `Create ${humanizeLabel(type)}`}
       </Button>
     </form>
   );

@@ -23,9 +23,9 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
 
   const links = [
     { href: `/manage/clubs/${slug}/edit`, icon: Pencil, label: "Edit profile" },
-    { href: `/manage/clubs/${slug}/announcements`, icon: Megaphone, label: "Announcements" },
-    { href: `/manage/clubs/${slug}/events`, icon: Calendar, label: "Events" },
-    { href: `/manage/clubs/${slug}/resources`, icon: FileText, label: "Resources" },
+    { href: `/manage/clubs/${slug}/announcements`, icon: Megaphone, label: "Create Announcement" },
+    { href: `/manage/clubs/${slug}/events`, icon: Calendar, label: "Create Event" },
+    { href: `/manage/clubs/${slug}/resources`, icon: FileText, label: "Create Resource" },
     { href: `/manage/clubs/${slug}/members`, icon: Users, label: "Members" },
     { href: `/clubs/${slug}/member`, icon: Eye, label: "View club dashboard" },
   ];

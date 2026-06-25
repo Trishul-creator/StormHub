@@ -4,7 +4,7 @@ import { ArrowLeft, FileText, Link as LinkIcon, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EventCard } from "@/components/events/event-card";
 import { getMemberClubData } from "@/lib/data";
-import { checkMembership } from "@/lib/actions";
+import { checkMembership, getUserRsvpIds } from "@/lib/actions";
 import { requireAuth } from "@/lib/auth";
 import { formatDateTime } from "@/lib/utils";
 import { LeaveClubButton } from "@/components/clubs/leave-club-button";
@@ -41,6 +41,7 @@ export default async function MemberClubPage({ params }: MemberPageProps) {
   if (!data) notFound();
 
   const { announcements, resources, events } = data;
+  const rsvpIds = auth.profile?.role === "student" ? await getUserRsvpIds(auth.userId) : new Set<string>();
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -108,6 +109,7 @@ export default async function MemberClubPage({ params }: MemberPageProps) {
                     key={event.id}
                     event={event}
                     isLoggedIn
+                    hasRsvp={rsvpIds.has(event.id)}
                     canParticipate={auth.profile?.role === "student"}
                   />
                 ))}
@@ -132,7 +134,7 @@ export default async function MemberClubPage({ params }: MemberPageProps) {
                     {r.description && <p className="text-xs text-muted-foreground mt-0.5">{r.description}</p>}
                     {r.resource_type === "link" && r.url && (
                       <a href={r.url} className="mt-1 flex items-center gap-1 text-xs text-storm-electric hover:underline">
-                        <LinkIcon className="h-3 w-3" /> Open link
+                        <LinkIcon className="h-3 w-3" /> {r.content || "Open resource"}
                       </a>
                     )}
                     {r.resource_type === "text" && r.content && (

@@ -14,17 +14,19 @@ interface ClubsPageProps {
 
 export default async function ClubsPage({ searchParams }: ClubsPageProps) {
   const params = await searchParams;
+  const featuredOnly = params.featured === "true" || params.filter === "featured";
   const clubs = await getClubs({
     search: params.q,
     category: params.category,
-    featured: params.featured === "true",
-    filterGroup: params.filter,
+    featured: featuredOnly,
+    filterGroup: params.filter === "featured" ? undefined : params.filter,
   });
 
-  const filterOptions = [
-    ...CLUB_FILTER_GROUPS.map((g) => ({ label: g.label, value: g.label })),
-    { label: "Featured only", value: "featured" },
-  ];
+  const filterOptions = CLUB_FILTER_GROUPS.map((g) => ({ label: g.label, value: g.label }));
+  const featuredHref = `?${new URLSearchParams({
+    ...(params.q ? { q: params.q } : {}),
+    featured: "true",
+  }).toString()}`;
 
   const { userId, isLoggedIn, profile } = await getAuthContext();
   const manageableClubs = profile ? await getManageableClubs(profile) : [];
@@ -53,8 +55,8 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
           <FilterSidebar title="Categories" options={filterOptions} activeValue={params.filter} />
           <div className="mt-6">
             <a
-              href="?featured=true"
-              className={`block rounded-lg px-3 py-2 text-sm ${params.featured === "true" ? "bg-storm-electric/10 text-storm-electric font-medium" : "hover:bg-storm-light/50 text-muted-foreground"}`}
+              href={featuredHref}
+              className={`block rounded-lg px-3 py-2 text-sm ${featuredOnly ? "bg-storm-electric/10 text-storm-electric font-medium" : "hover:bg-storm-light/50 text-muted-foreground"}`}
             >
               ⭐ Featured clubs
             </a>

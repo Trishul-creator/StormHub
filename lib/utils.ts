@@ -23,6 +23,13 @@ export function humanizeLabel(value: string | null | undefined): string {
     .join(" ");
 }
 
+export function opportunityActionLabel(label: string | null | undefined): string {
+  const normalized = (label ?? "").trim();
+  if (!normalized) return "Sign Up";
+  if (normalized.toLowerCase() === "rsvp") return "Sign Up";
+  return humanizeLabel(normalized);
+}
+
 export function formatDate(date: string | Date | null | undefined): string {
   if (!date) return "TBD";
   const d = typeof date === "string" ? new Date(date) : date;

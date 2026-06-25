@@ -7,7 +7,7 @@ import { BookmarkButton } from "@/components/opportunities/bookmark-button";
 import { getOpportunityBySlug } from "@/lib/data";
 import { getUserBookmarkIds } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
-import { formatDate, isDeadlineSoon } from "@/lib/utils";
+import { formatDate, isDeadlineSoon, opportunityActionLabel } from "@/lib/utils";
 
 interface OpportunityPageProps {
   params: Promise<{ slug: string }>;
@@ -23,6 +23,7 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
   const canParticipate = profile?.role === "student" || !profile;
   const bookmarkIds = canParticipate ? await getUserBookmarkIds(userId) : new Set<string>();
   const isBookmarked = bookmarkIds.has(opportunity.id);
+  const actionLabel = opportunityActionLabel(opportunity.action_label);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -37,7 +38,13 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
           {opportunity.summary && <p className="mt-2 text-lg text-muted-foreground">{opportunity.summary}</p>}
         </div>
         {canParticipate && (
-          <BookmarkButton opportunityId={opportunity.id} isLoggedIn={isLoggedIn} isBookmarked={isBookmarked} />
+          <BookmarkButton
+            opportunityId={opportunity.id}
+            isLoggedIn={isLoggedIn}
+            isBookmarked={isBookmarked}
+            inactiveLabel={actionLabel}
+            activeLabel="Done"
+          />
         )}
       </div>
 
@@ -91,7 +98,7 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
           {opportunity.external_url && canParticipate && (
             <Button asChild className="w-full">
               <a href={opportunity.external_url} target="_blank" rel="noopener noreferrer">
-                {opportunity.action_label || "Learn more"} <ExternalLink className="h-4 w-4" />
+                {actionLabel} <ExternalLink className="h-4 w-4" />
               </a>
             </Button>
           )}
@@ -100,7 +107,7 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
               opportunityId={opportunity.id}
               isLoggedIn={isLoggedIn}
               isBookmarked={isBookmarked}
-              inactiveLabel={opportunity.action_label || "I'm interested"}
+              inactiveLabel={actionLabel}
               activeLabel="Done"
               className="w-full"
             />

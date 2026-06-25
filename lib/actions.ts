@@ -483,6 +483,8 @@ export async function submitContent(data: {
   event_date?: string;
   external_url?: string;
   action_label?: string;
+  resource_url?: string;
+  resource_label?: string;
   importance?: NotificationImportance;
   send_email_to_members?: boolean;
   deadline_reminder_enabled?: boolean;
@@ -553,14 +555,17 @@ export async function submitContent(data: {
     };
   } else if (data.type === "resource") {
     if (!club) return { success: false, error: "A club is required." };
+    const resourceUrl = data.resource_url?.trim();
+    const resourceLabel = data.resource_label?.trim();
     table = "club_resources";
     insert = {
       club_id: club.id,
       author_id: profile.id,
       title: data.title,
       description: data.body,
-      resource_type: "text",
-      content: data.body,
+      resource_type: resourceUrl ? "link" : "text",
+      url: resourceUrl || null,
+      content: resourceUrl ? resourceLabel || "Open resource" : data.body,
       visibility: "members",
       status: contentStatus,
     };

@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { CategoryBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Opportunity } from "@/types/database";
-import { formatDate, isDeadlineSoon } from "@/lib/utils";
+import { formatDate, isDeadlineSoon, opportunityActionLabel } from "@/lib/utils";
 import { BookmarkButton } from "@/components/opportunities/bookmark-button";
 
 interface OpportunityCardProps {
@@ -16,6 +16,7 @@ interface OpportunityCardProps {
 
 export function OpportunityCard({ opportunity, isLoggedIn, isBookmarked, canParticipate = true }: OpportunityCardProps) {
   const closingSoon = isDeadlineSoon(opportunity.deadline);
+  const actionLabel = opportunityActionLabel(opportunity.action_label);
 
   return (
     <Card className={`hover:shadow-md transition-shadow ${closingSoon ? "border-amber-300" : ""}`}>
@@ -63,6 +64,8 @@ export function OpportunityCard({ opportunity, isLoggedIn, isBookmarked, canPart
             isLoggedIn={isLoggedIn}
             isBookmarked={isBookmarked}
             size="sm"
+            inactiveLabel={actionLabel}
+            activeLabel="Done"
           />
         )}
       </CardFooter>

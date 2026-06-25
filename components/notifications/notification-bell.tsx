@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { markAllNotificationsRead, markNotificationRead } from "@/lib/actions";
 import type { Notification } from "@/types/database";
 import { useRouter } from "next/navigation";
+import { humanizeLabel } from "@/lib/utils";
 
 export function NotificationBell({
   notifications,
@@ -85,7 +86,7 @@ export function NotificationBell({
                     <p className="text-sm font-semibold text-storm-navy">{notification.title}</p>
                     {notification.importance !== "normal" && (
                       <Badge variant={notification.importance === "urgent" ? "destructive" : "warning"}>
-                        {notification.importance}
+                        {humanizeLabel(notification.importance)}
                       </Badge>
                     )}
                   </div>
