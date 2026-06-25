@@ -919,27 +919,42 @@ export async function supabaseSignIn(email: string, password: string) {
 }
 
 export async function supabaseSignUp(email: string, password: string, fullName: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedFullName = fullName.trim().replace(/\s+/g, " ");
+  if (normalizedFullName.length < 3 || normalizedFullName.length > 120) {
+    return { success: false, error: "Enter your full name." };
+  }
+  if (password.length < 6) {
+    return { success: false, error: "Password must be at least 6 characters." };
+  }
   const allowedDomains = (process.env.ALLOWED_SIGNUP_EMAIL_DOMAINS ?? "")
     .split(",")
     .map((domain) => domain.trim().toLowerCase())
     .filter(Boolean);
-  const emailDomain = email.split("@")[1]?.toLowerCase();
+  const blockedDomains = (process.env.BLOCKED_SIGNUP_EMAIL_DOMAINS ?? "")
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase())
+    .filter(Boolean);
+  const emailDomain = normalizedEmail.split("@")[1]?.toLowerCase();
   if (allowedDomains.length > 0 && (!emailDomain || !allowedDomains.includes(emailDomain))) {
     return {
       success: false,
       error: `Please use an approved school email address (${allowedDomains.join(", ")}).`,
     };
   }
+  if (emailDomain && blockedDomains.includes(emailDomain)) {
+    return { success: false, error: "Please use a school email address." };
+  }
   const supabase = await createClient();
   if (!supabase) return { success: false, error: "Database not configured." };
   const { data, error } = await supabase.auth.signUp({
-    email,
+    email: normalizedEmail,
     password,
-    options: { data: { full_name: fullName } },
+    options: { data: { full_name: normalizedFullName } },
   });
   if (error) return { success: false, error: friendlyError(error, "Sign up failed.") };
   if (data.user) {
-    await createProfileIfMissing(data.user.id, email, fullName);
+    await createProfileIfMissing(data.user.id, normalizedEmail, normalizedFullName);
   }
   return { success: true, needsConfirmation: !data.session };
 }

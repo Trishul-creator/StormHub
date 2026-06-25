@@ -15,6 +15,7 @@ import { Zap } from "lucide-react";
 export default function SignUpPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [loadedAt] = useState(() => Date.now());
   const isDemo = !isSupabaseConfigured();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -25,9 +26,20 @@ export default function SignUpPage() {
     const password = form.get("password") as string;
     const fullName = form.get("fullName") as string;
     const website = String(form.get("website") ?? "");
+    const formLoadedAt = Number(form.get("loadedAt") ?? 0);
     if (website) {
       setLoading(false);
       toast({ title: "Sign up failed", description: "Please try again.", variant: "destructive" });
+      return;
+    }
+    if (!formLoadedAt || Date.now() - formLoadedAt < 1500) {
+      setLoading(false);
+      toast({ title: "Sign up failed", description: "Please try again.", variant: "destructive" });
+      return;
+    }
+    if (fullName.trim().length < 3) {
+      setLoading(false);
+      toast({ title: "Sign up failed", description: "Enter your full name.", variant: "destructive" });
       return;
     }
 
@@ -89,6 +101,7 @@ export default function SignUpPage() {
               <Label htmlFor="website">Website</Label>
               <Input id="website" name="website" tabIndex={-1} autoComplete="off" />
             </div>
+            <input type="hidden" name="loadedAt" value={loadedAt} />
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Creating account..." : "Create account"}
             </Button>
@@ -98,7 +111,7 @@ export default function SignUpPage() {
             <Link href="/auth/sign-in" className="text-storm-electric hover:underline">Sign in</Link>
           </p>
           <p className="mt-3 text-xs text-muted-foreground text-center">
-            Student accounts should use a school email. Administrators can also set ALLOWED_SIGNUP_EMAIL_DOMAINS in Vercel.
+            To reduce spam, StormHub may restrict signups to approved school email domains.
           </p>
         </CardContent>
       </Card>

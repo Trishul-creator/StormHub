@@ -133,7 +133,12 @@ export default async function MemberClubPage({ params }: MemberPageProps) {
                     <p className="font-medium text-sm">{r.title}</p>
                     {r.description && <p className="text-xs text-muted-foreground mt-0.5">{r.description}</p>}
                     {r.resource_type === "link" && r.url && (
-                      <a href={r.url} className="mt-1 flex items-center gap-1 text-xs text-storm-electric hover:underline">
+                      <a
+                        href={r.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 flex items-center gap-1 text-xs text-storm-electric hover:underline"
+                      >
                         <LinkIcon className="h-3 w-3" /> {r.content || "Open resource"}
                       </a>
                     )}
