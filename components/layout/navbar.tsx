@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import {
-  Menu, X, Zap, User, LogOut, LayoutDashboard, Settings, Shield,
+  Bot, Menu, X, Zap, LogOut, LayoutDashboard, Settings, Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/utils";
@@ -80,6 +80,9 @@ export function Navbar({
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/dashboard"><LayoutDashboard className="h-4 w-4 mr-1" />Dashboard</Link>
               </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/assistant"><Bot className="h-4 w-4 mr-1" />Assistant</Link>
+              </Button>
               {canManage && (
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/manage"><Shield className="h-4 w-4 mr-1" />Manage</Link>
@@ -122,6 +125,7 @@ export function Navbar({
             {isLoggedIn ? (
               <>
                 <Link href="/dashboard" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Dashboard</Link>
+                <Link href="/assistant" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Assistant</Link>
                 {canManage && <Link href="/manage" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Manage</Link>}
                 <Link href="/notifications" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>
                   Notifications{unreadNotificationCount > 0 ? ` (${unreadNotificationCount})` : ""}

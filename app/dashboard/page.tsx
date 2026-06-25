@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Bookmark, Calendar, CheckSquare, Settings, Users } from "lucide-react";
+import { ArrowRight, Bookmark, Bot, Calendar, CheckSquare, Settings, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DashboardCard } from "@/components/layout/stat-cards";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -82,6 +82,23 @@ export default async function DashboardPage() {
           {manageableClubs.length ? "Student Officer Dashboard" : "Your Dashboard"}
         </h1>
         <p className="mt-1 text-muted-foreground">Your clubs, events, and opportunities at a glance.</p>
+      </div>
+
+      <div className="mb-8 rounded-xl border bg-storm-light/20 p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <Bot className="mt-0.5 h-5 w-5 text-storm-electric" />
+            <div>
+              <h2 className="font-semibold text-storm-navy">Need help deciding what to do next?</h2>
+              <p className="text-sm text-muted-foreground">
+                Ask StormHub Assistant to summarize events, recommend opportunities, or explain club actions.
+              </p>
+            </div>
+          </div>
+          <Button size="sm" asChild>
+            <Link href="/assistant">Open Assistant</Link>
+          </Button>
+        </div>
       </div>
 
       {manageableClubs.length > 0 && (
