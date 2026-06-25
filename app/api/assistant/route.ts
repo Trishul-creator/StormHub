@@ -29,6 +29,15 @@ const MAX_MESSAGE_LENGTH = 1200;
 const MAX_MESSAGES = 10;
 const MODEL = process.env.GROQ_MODEL ?? "openai/gpt-oss-20b";
 
+const academicSubjectPattern =
+  /\b(math|algebra|geometry|calculus|statistics|science|biology|chemistry|physics|reading|english|literature|essay|homework|assignment|worksheet|quiz|test|exam|answer key|solve|proof|equation|lab report|book report|summary of|analyze this passage|write my|do my|code this|programming assignment)\b/i;
+
+const appContextPattern =
+  /\b(stormhub|club|clubs|event|events|calendar|rsvp|opportunit(?:y|ies)|announcement|announcements|resource|resources|notification|notifications|feedback|teacher|president|officer|sponsor|admin|manage|dashboard|sign up|saved|science bowl|math club|robotics)\b/i;
+
+const explicitCheatingPattern =
+  /\b(give me the answer|answers only|do this for me|cheat|bypass|plagiarize|write my essay|solve my homework|complete my assignment|take my quiz|take my test)\b/i;
+
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -50,6 +59,32 @@ function checkRateLimit(key: string) {
   }
   current.count += 1;
   return { ok: true, remaining: Math.max(DAILY_LIMIT - current.count, 0) };
+}
+
+function shouldBlockAcademicHelp(message: string): boolean {
+  const normalized = message.toLowerCase();
+  if (explicitCheatingPattern.test(normalized)) return true;
+  if (!academicSubjectPattern.test(normalized)) return false;
+
+  const asksForAppHelp = appContextPattern.test(normalized);
+  const asksForAcademicWork =
+    /\b(solve|answer|explain this problem|write|draft my essay|summarize this chapter|analyze|calculate|prove|complete|homework|assignment|worksheet|quiz|test|exam|lab report|book report)\b/i.test(normalized);
+
+  return asksForAcademicWork && !asksForAppHelp;
+}
+
+function academicRefusal() {
+  return NextResponse.json({
+    answer:
+      "I can’t help with homework, test answers, essays, reading assignments, math/science problem solving, or anything that would look like cheating. I can still help you use StormHub — finding clubs, checking events, saving opportunities, understanding notifications, or drafting club announcements.",
+    suggestions: [
+      { label: "Browse Clubs", href: "/clubs" },
+      { label: "Open Calendar", href: "/calendar" },
+      { label: "View Opportunities", href: "/opportunities" },
+    ],
+    proposedActions: [],
+    remaining: null,
+  });
 }
 
 function sanitizeMessages(messages: unknown): ChatMessage[] {
@@ -166,6 +201,10 @@ export async function POST(request: NextRequest) {
   if (!messages.length || messages[messages.length - 1]?.role !== "user") {
     return NextResponse.json({ error: "Send a message first." }, { status: 400 });
   }
+  const latestUserMessage = messages[messages.length - 1]?.content ?? "";
+  if (shouldBlockAcademicHelp(latestUserMessage)) {
+    return academicRefusal();
+  }
 
   const systemPrompt = `
 You are StormHub Assistant, a conversational guide inside the StormHub school activity app.
@@ -186,6 +225,9 @@ Tone:
 Rules:
 - Do not invent clubs, events, deadlines, roles, notifications, or approvals.
 - If context is missing, say what you can infer and suggest where to check.
+- Academic integrity rule: do not answer homework, reading assignments, essays, math problems, science problems, coding homework, quiz/test prep that asks for answers, or anything that could help a student cheat. This includes solving equations, explaining specific homework problems, summarizing assigned reading, writing essays, lab reports, or completing assignments.
+- If a user asks for academic work, politely refuse in a conversational way and redirect to StormHub help: clubs, events, opportunities, notifications, or how to contact a teacher/sponsor.
+- You may discuss academic clubs only as StormHub activities. Example allowed: "What science clubs can I join?" Example disallowed: "Solve this chemistry problem."
 - Keep the assistant read-only. You cannot approve, delete, email, RSVP, promote users, or create content.
 - If asked to do an action, explain where the user can do it and include the page link.
 - You may propose safe actions, but the user must approve them before StormHub does anything.
