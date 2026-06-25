@@ -7,10 +7,19 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 
+type ProposedAction = {
+  type: "mark_notifications_read" | "rsvp_event" | "remove_rsvp" | "save_opportunity";
+  label: string;
+  eventId?: string;
+  opportunityId?: string;
+  reason?: string;
+};
+
 type Message = {
   role: "user" | "assistant";
   content: string;
   suggestions?: Array<{ label: string; href: string }>;
+  proposedActions?: ProposedAction[];
 };
 
 const starterPrompts = [
@@ -74,6 +83,7 @@ export function AssistantChat({ configured }: { configured: boolean }) {
           role: "assistant",
           content: data.answer,
           suggestions: Array.isArray(data.suggestions) ? data.suggestions : [],
+          proposedActions: Array.isArray(data.proposedActions) ? data.proposedActions : [],
         },
       ]);
     } catch (err) {
@@ -198,6 +208,13 @@ function MessageBubble({ message }: { message: Message }) {
       )}
       <div className={cn("max-w-[85%] rounded-2xl px-4 py-3 text-sm", isUser ? "bg-storm-electric text-white" : "bg-storm-light/50 text-storm-navy")}>
         <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+        {!!message.proposedActions?.length && (
+          <div className="mt-3 space-y-2">
+            {message.proposedActions.map((action, index) => (
+              <AssistantActionButton key={`${action.type}-${index}`} action={action} />
+            ))}
+          </div>
+        )}
         {!!message.suggestions?.length && (
           <div className="mt-3 flex flex-wrap gap-2">
             {message.suggestions.map((suggestion) => (
@@ -213,6 +230,50 @@ function MessageBubble({ message }: { message: Message }) {
           <User className="h-4 w-4" />
         </div>
       )}
+    </div>
+  );
+}
+
+function AssistantActionButton({ action }: { action: ProposedAction }) {
+  const [pending, setPending] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function approve() {
+    setPending(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/assistant/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error ?? "Could not complete action.");
+      setDone(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not complete action.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border bg-white p-3 text-storm-navy">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Proposed action</p>
+      <p className="mt-1 text-sm font-medium">{action.label}</p>
+      {action.reason && <p className="mt-1 text-xs text-muted-foreground">{action.reason}</p>}
+      {error && <p className="mt-2 text-xs text-red-700">{error}</p>}
+      <Button
+        type="button"
+        size="sm"
+        className="mt-3"
+        disabled={pending || done}
+        onClick={approve}
+      >
+        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+        {done ? "Approved" : "Approve"}
+      </Button>
     </div>
   );
 }

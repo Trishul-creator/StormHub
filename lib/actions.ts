@@ -201,7 +201,9 @@ export async function rsvpToEvent(eventId: string): Promise<{ success: boolean; 
     demoState.rsvps = rsvps;
     revalidatePath(`/events/${eventId}`);
     revalidatePath("/events");
+    revalidatePath("/calendar");
     revalidatePath("/dashboard");
+    revalidatePath("/");
     return { success: true };
   }
 
@@ -230,7 +232,9 @@ export async function rsvpToEvent(eventId: string): Promise<{ success: boolean; 
 
   revalidatePath(`/events/${eventId}`);
   revalidatePath("/events");
+  revalidatePath("/calendar");
   revalidatePath("/dashboard");
+  revalidatePath("/");
   return { success: true };
 }
 
@@ -247,6 +251,10 @@ export async function cancelRsvp(eventId: string): Promise<{ success: boolean; e
     cookieStore.set(DEMO_RSVPS_COOKIE, JSON.stringify([...rsvps]), { httpOnly: true, path: "/", maxAge: 60 * 60 * 24 * 30 });
     demoState.rsvps = rsvps;
     revalidatePath(`/events/${eventId}`);
+    revalidatePath("/events");
+    revalidatePath("/calendar");
+    revalidatePath("/dashboard");
+    revalidatePath("/");
     return { success: true };
   }
 
@@ -264,7 +272,9 @@ export async function cancelRsvp(eventId: string): Promise<{ success: boolean; e
   if (error) return { success: false, error: friendlyError(error, "Could not cancel RSVP.") };
   revalidatePath(`/events/${eventId}`);
   revalidatePath("/events");
+  revalidatePath("/calendar");
   revalidatePath("/dashboard");
+  revalidatePath("/");
   return { success: true };
 }
 
@@ -995,7 +1005,11 @@ export async function getUserRsvpIds(userId: string | null): Promise<Set<string>
   }
   const supabase = await createClient();
   if (!supabase) return new Set();
-  const { data } = await supabase.from("event_rsvps").select("event_id").eq("user_id", userId);
+  const { data } = await supabase
+    .from("event_rsvps")
+    .select("event_id")
+    .eq("user_id", userId)
+    .in("status", ["going", "interested"]);
   return new Set((data ?? []).map((r) => r.event_id).filter(Boolean) as string[]);
 }
 

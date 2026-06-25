@@ -21,10 +21,6 @@ export default async function DigestPage() {
         description="Preview newsletter content for school announcements. Copy and paste into your school newsletter."
       />
       <DigestPreview opportunities={opportunities} events={events} clubs={clubs} workshops={workshops} announcements={announcements} />
-      <p className="mt-4 text-sm text-muted-foreground">
-        {/* TODO: Configure email provider (Resend, SendGrid) for automated digest sending */}
-        Email sending requires an email provider. Configure RESEND_API_KEY or similar in production.
-      </p>
     </div>
   );
 }

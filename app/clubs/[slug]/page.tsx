@@ -16,6 +16,7 @@ import {
 import { getAuthContext } from "@/lib/auth";
 import { formatDateTime } from "@/lib/utils";
 import { canManageClub } from "@/lib/permissions";
+import { getUserRsvpIds } from "@/lib/actions";
 
 interface ClubPageProps {
   params: Promise<{ slug: string }>;
@@ -35,6 +36,7 @@ export default async function ClubPage({ params }: ClubPageProps) {
   ]);
   const isMember = !!membership;
   const canManage = canManageClub(profile, club, membership);
+  const rsvpIds = profile?.role === "student" ? await getUserRsvpIds(userId) : new Set<string>();
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -90,6 +92,7 @@ export default async function ClubPage({ params }: ClubPageProps) {
                     key={event.id}
                     event={event}
                     isLoggedIn={isLoggedIn}
+                    hasRsvp={rsvpIds.has(event.id)}
                     canParticipate={profile?.role === "student" || !profile}
                   />
                 ))}

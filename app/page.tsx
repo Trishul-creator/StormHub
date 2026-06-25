@@ -8,6 +8,7 @@ import { EventCard } from "@/components/events/event-card";
 import { getFeaturedClubs, getEvents, getManageableClubs, getStats } from "@/lib/data";
 import { SCHOOL_NAME } from "@/lib/utils";
 import { getAuthContext } from "@/lib/auth";
+import { getUserRsvpIds } from "@/lib/actions";
 
 export default async function HomePage() {
   const [featuredClubs, events, stats, auth] = await Promise.all([
@@ -18,6 +19,7 @@ export default async function HomePage() {
   ]);
   const manageable = auth.profile ? await getManageableClubs(auth.profile) : [];
   const manageableSlugs = new Set(manageable.map((club) => club.slug));
+  const rsvpIds = auth.profile?.role === "student" ? await getUserRsvpIds(auth.userId) : new Set<string>();
 
   const upcomingEvents = events.slice(0, 4);
 
@@ -104,6 +106,7 @@ export default async function HomePage() {
                 key={event.id}
                 event={event}
                 isLoggedIn={auth.isLoggedIn}
+                hasRsvp={rsvpIds.has(event.id)}
                 canParticipate={auth.profile?.role === "student" || !auth.profile}
               />
             ))}

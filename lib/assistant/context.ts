@@ -18,12 +18,12 @@ function list(items: string[], empty = "None"): string {
 }
 
 function eventLine(event: Event): string {
-  return `- ${event.title}${event.club?.name ? ` (${event.club.name})` : ""}: ${formatDateTime(event.starts_at)}${event.location ? ` at ${event.location}` : ""} → /events/${event.id}`;
+  return `- ${event.title}${event.club?.name ? ` (${event.club.name})` : ""}: ${formatDateTime(event.starts_at)}${event.location ? ` at ${event.location}` : ""}; eventId=${event.id} → /events/${event.id}`;
 }
 
 function opportunityLine(opportunity: Opportunity): string {
   const deadline = opportunity.deadline ? `, deadline ${formatDateTime(opportunity.deadline)}` : "";
-  return `- ${opportunity.title}${opportunity.category ? ` [${opportunity.category}]` : ""}${deadline} → /opportunities/${opportunity.slug}`;
+  return `- ${opportunity.title}${opportunity.category ? ` [${opportunity.category}]` : ""}${deadline}; opportunityId=${opportunity.id} → /opportunities/${opportunity.slug}`;
 }
 
 function membershipLine(membership: ClubMembership): string {
@@ -35,7 +35,7 @@ function clubLine(club: Club): string {
 }
 
 function notificationLine(notification: Notification): string {
-  return `- ${notification.title}: ${notification.message}${notification.link ? ` → ${notification.link}` : ""}`;
+  return `- ${notification.title}: ${notification.message}; notificationId=${notification.id}${notification.link ? ` → ${notification.link}` : ""}`;
 }
 
 function announcementLine(announcement: ClubAnnouncement & { club?: Club }): string {
