@@ -3,6 +3,7 @@ import { Shield, Zap, Users, BarChart3, CheckSquare, Mail } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireManager } from "@/lib/auth";
+import { getPendingApprovals } from "@/lib/data";
 import { canAccessAdmin, canAccessManageAnalytics, canApproveContent } from "@/lib/permissions";
 
 const manageLinks = [
@@ -17,12 +18,13 @@ const manageLinks = [
 
 export default async function ManagePage() {
   const { profile } = await requireManager();
+  const pendingApprovals = canApproveContent(profile) ? await getPendingApprovals() : [];
   const visibleLinks = manageLinks.filter((link) => {
     if (link.href === "/admin") return canAccessAdmin(profile);
     if (link.href === "/manage/opportunities") return canAccessAdmin(profile);
     if (link.href === "/manage/analytics") return canAccessManageAnalytics(profile);
     if (link.href === "/manage/email-outbox") return canAccessAdmin(profile);
-    if (link.href === "/manage/approvals") return canApproveContent(profile);
+    if (link.href === "/manage/approvals") return canAccessAdmin(profile) || pendingApprovals.length > 0;
     return true;
   });
 

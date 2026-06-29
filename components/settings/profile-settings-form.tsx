@@ -1,0 +1,66 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { updateProfileSettings } from "@/lib/actions";
+import { toast } from "@/hooks/use-toast";
+import type { Profile } from "@/types/database";
+
+export function ProfileSettingsForm({ profile }: { profile: Profile }) {
+  const [fullName, setFullName] = useState(profile.full_name ?? "");
+  const [gradeLevel, setGradeLevel] = useState(profile.grade_level?.toString() ?? "");
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+
+  function save() {
+    startTransition(async () => {
+      const result = await updateProfileSettings({
+        fullName,
+        gradeLevel: gradeLevel ? Number(gradeLevel) : null,
+      });
+      if (result.success) {
+        toast({ title: "Profile updated", description: "Your settings were saved." });
+        router.refresh();
+      } else {
+        toast({ title: "Could not update profile", description: result.error, variant: "destructive" });
+      }
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label htmlFor="fullName">Name</Label>
+        <Input id="fullName" value={fullName} onChange={(event) => setFullName(event.target.value)} className="mt-1" />
+      </div>
+      <div>
+        <Label htmlFor="gradeLevel">Grade</Label>
+        <select
+          id="gradeLevel"
+          value={gradeLevel}
+          onChange={(event) => setGradeLevel(event.target.value)}
+          className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+        >
+          <option value="">Not set</option>
+          {[6, 7, 8, 9, 10, 11, 12].map((grade) => (
+            <option key={grade} value={grade}>{grade}th grade</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <p className="text-sm font-medium text-muted-foreground">Email</p>
+        <p>{profile.email ?? "—"}</p>
+      </div>
+      <div>
+        <p className="text-sm font-medium text-muted-foreground">Role</p>
+        <p className="capitalize">{profile.role.replace(/_/g, " ")}</p>
+      </div>
+      <Button onClick={save} disabled={pending}>
+        {pending ? "Saving..." : "Save profile"}
+      </Button>
+    </div>
+  );
+}

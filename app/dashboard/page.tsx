@@ -52,7 +52,7 @@ export default async function DashboardPage() {
         <p className="mt-1 text-muted-foreground">Manage your assigned clubs, rosters, events, and announcements.</p>
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           <DashboardMetric label="Assigned clubs" value={manageableClubs.length} icon={Users} />
-          <DashboardMetric label="Pending approvals" value={pending.length} icon={CheckSquare} />
+          {pending.length > 0 && <DashboardMetric label="Pending approvals" value={pending.length} icon={CheckSquare} />}
         </div>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DashboardLink

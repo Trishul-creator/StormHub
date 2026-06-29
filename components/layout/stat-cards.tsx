@@ -21,7 +21,7 @@ export function StatCards({ clubsCount, eventsCount, opportunitiesCount, student
       {stats.map((s) => (
         <div key={s.label} className="rounded-xl bg-white/10 backdrop-blur p-6 text-center">
           <s.icon className="mx-auto mb-2 h-6 w-6 text-storm-electric" />
-          <div className="text-3xl font-bold text-white">{s.value > 0 ? `${s.value}+` : "0"}</div>
+          <div className="text-3xl font-bold text-white">{s.value}</div>
           <div className="text-sm text-storm-silver">{s.label}</div>
         </div>
       ))}

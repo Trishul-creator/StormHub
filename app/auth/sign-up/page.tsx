@@ -25,6 +25,8 @@ export default function SignUpPage() {
     const email = form.get("email") as string;
     const password = form.get("password") as string;
     const fullName = form.get("fullName") as string;
+    const gradeLevelRaw = String(form.get("gradeLevel") ?? "");
+    const accessCode = String(form.get("accessCode") ?? "");
     const website = String(form.get("website") ?? "");
     const formLoadedAt = Number(form.get("loadedAt") ?? 0);
     if (website) {
@@ -57,7 +59,13 @@ export default function SignUpPage() {
       return;
     }
 
-    const result = await supabaseSignUp(email, password, fullName);
+    const result = await supabaseSignUp(
+      email,
+      password,
+      fullName,
+      gradeLevelRaw ? Number(gradeLevelRaw) : null,
+      accessCode
+    );
     setLoading(false);
     if (result.success) {
       if (result.needsConfirmation) {
@@ -94,8 +102,26 @@ export default function SignUpPage() {
               <Input id="email" name="email" type="email" required placeholder="you@example.com" className="mt-1" />
             </div>
             <div>
+              <Label htmlFor="gradeLevel">Grade</Label>
+              <select
+                id="gradeLevel"
+                name="gradeLevel"
+                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                defaultValue=""
+              >
+                <option value="">Select grade</option>
+                {[6, 7, 8, 9, 10, 11, 12].map((grade) => (
+                  <option key={grade} value={grade}>{grade}th grade</option>
+                ))}
+              </select>
+            </div>
+            <div>
               <Label htmlFor="password">Password</Label>
               <Input id="password" name="password" type="password" required minLength={6} className="mt-1" />
+            </div>
+            <div>
+              <Label htmlFor="accessCode">School signup code</Label>
+              <Input id="accessCode" name="accessCode" placeholder="Only required if your school provides one" className="mt-1" />
             </div>
             <div className="hidden" aria-hidden="true">
               <Label htmlFor="website">Website</Label>

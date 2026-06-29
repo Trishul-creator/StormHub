@@ -123,6 +123,16 @@ export async function joinClub(clubSlug: string): Promise<{ success: boolean; er
     return { success: false, error: "This club is not currently open for students to join." };
   }
 
+  const { data: existingMembership } = await supabase
+    .from("club_memberships")
+    .select("status")
+    .eq("club_id", club.id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (existingMembership?.status === "rejected") {
+    return { success: false, error: "A teacher or administrator has blocked this account from rejoining this club." };
+  }
+
   const { error } = await supabase.from("club_memberships").upsert(
     { club_id: club.id, user_id: user.id, status: "active", role: "member" },
     { onConflict: "club_id,user_id" }
@@ -457,15 +467,87 @@ export async function submitWorkshop(data: {
   if (!supabase) return { success: false, error: "Database not configured." };
 
   const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Please sign in to host a workshop." };
+  const profile = await createProfileIfMissing(user.id, user.email ?? "");
+  if (!profile || profile.role !== "student") {
+    return { success: false, error: "Only student accounts can submit workshops." };
+  }
   const { data: school } = await supabase.from("schools").select("id").eq("slug", "elkhorn-south").maybeSingle();
 
   const { error } = await supabase.from("workshops").insert({
     school_id: school?.id ?? "a0000000-0000-4000-8000-000000000001",
-    host_user_id: user?.id,
+    host_user_id: user.id,
     ...data,
     status: "pending",
   });
   if (error) return { success: false, error: friendlyError(error) };
+  await createAdminAttentionNotification({
+    title: "Workshop needs review",
+    message: `${profile.full_name ?? profile.email ?? "A student"} submitted “${data.title}”.`,
+    link: "/manage/approvals",
+    importance: "important",
+    type: "approval_needed",
+  });
+  revalidatePath("/workshops");
+  revalidatePath("/manage/approvals");
+  return { success: true };
+}
+
+export async function submitClubProposal(data: {
+  name: string;
+  shortDescription: string;
+  category: string;
+  meetingTime?: string;
+  meetingLocation?: string;
+  sponsorName?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: false, error: "Club proposals are unavailable in demo mode." };
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  const profile = await getCurrentProfile();
+  if (!supabase || !admin || !profile) return { success: false, error: "Please sign in." };
+  if (profile.role !== "teacher" && !isAdminRole(profile.role)) {
+    return { success: false, error: "Only teachers and administrators can propose clubs." };
+  }
+  const name = data.name.trim();
+  if (name.length < 3) return { success: false, error: "Club name is required." };
+  const slugBase = slugify(name);
+  const slug = `${slugBase}-${Date.now().toString(36)}`;
+  const { data: school } = await supabase.from("schools").select("id").eq("slug", "elkhorn-south").maybeSingle();
+  const { data: club, error } = await admin.from("clubs").insert({
+    school_id: profile.school_id ?? school?.id ?? "a0000000-0000-4000-8000-000000000001",
+    name,
+    slug,
+    short_description: data.shortDescription.trim() || null,
+    category: data.category.trim() || "Other",
+    meeting_time: data.meetingTime?.trim() || null,
+    meeting_location: data.meetingLocation?.trim() || null,
+    sponsor_name: data.sponsorName?.trim() || profile.full_name || null,
+    sponsor_email: profile.email || null,
+    status: "draft",
+    visibility: "unlisted",
+    is_listed: false,
+    is_featured: false,
+    is_active: false,
+  }).select("id,slug").single();
+  if (error) return { success: false, error: friendlyError(error, "Could not submit club proposal.") };
+
+  if (profile.role === "teacher") {
+    await admin.from("club_memberships").upsert(
+      { club_id: club.id, user_id: profile.id, status: "active", role: "sponsor" },
+      { onConflict: "club_id,user_id" }
+    );
+  }
+
+  await createAdminAttentionNotification({
+    title: "Club proposal needs review",
+    message: `${profile.full_name ?? profile.email ?? "A teacher"} proposed “${name}”.`,
+    link: `/manage/clubs/${club.slug}`,
+    importance: "important",
+    type: "approval_needed",
+  });
+  revalidatePath("/manage/clubs");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -755,6 +837,7 @@ export async function updateClubMember(data: {
   userId: string;
   role?: MembershipRole;
   remove?: boolean;
+  ban?: boolean;
 }): Promise<{ success: boolean; error?: string }> {
   if (isDemoMode()) return { success: false, error: "Roster editing is unavailable in demo mode." };
   const supabase = await createClient();
@@ -783,17 +866,34 @@ export async function updateClubMember(data: {
     .eq("id", data.userId)
     .maybeSingle();
   const targetName = targetProfile?.full_name ?? targetProfile?.email ?? "A club member";
-  const nextRole = data.remove ? "member" : (data.role ?? "member");
+  const nextRole = data.remove || data.ban ? "member" : (data.role ?? "member");
 
-  const { error } = await supabase.rpc("manage_club_roster_member", {
-    target_club_id: data.clubId,
-    target_user_id: data.userId,
-    new_membership_role: nextRole,
-    remove_member: !!data.remove,
-  });
+  const { error } = data.ban
+    ? await supabase
+        .from("club_memberships")
+        .update({ status: "rejected", role: "member" })
+        .eq("club_id", data.clubId)
+        .eq("user_id", data.userId)
+    : await supabase.rpc("manage_club_roster_member", {
+        target_club_id: data.clubId,
+        target_user_id: data.userId,
+        new_membership_role: nextRole,
+        remove_member: !!data.remove,
+      });
   if (error) return { success: false, error: friendlyError(error, "Could not update the roster.") };
 
-  if (data.remove) {
+  if (data.ban) {
+    await createNotification({
+      recipientUserId: data.userId,
+      type: "system_message",
+      importance: "urgent",
+      title: `Blocked from ${club.name}`,
+      message: `A teacher or administrator blocked you from rejoining ${club.name}. Contact the club sponsor if this seems incorrect.`,
+      link: `/clubs/${club.slug}`,
+      clubId: club.id,
+      sendEmail: true,
+    });
+  } else if (data.remove) {
     await createNotification({
       recipientUserId: data.userId,
       type: "system_message",
@@ -918,15 +1018,22 @@ export async function supabaseSignIn(email: string, password: string) {
   return { success: true };
 }
 
-export async function supabaseSignUp(email: string, password: string, fullName: string) {
+export async function supabaseSignUp(email: string, password: string, fullName: string, gradeLevel?: number | null, accessCode?: string) {
   const normalizedEmail = email.trim().toLowerCase();
   const normalizedFullName = fullName.trim().replace(/\s+/g, " ");
+  const requiredAccessCode = process.env.SIGNUP_ACCESS_CODE?.trim();
   if (normalizedFullName.length < 3 || normalizedFullName.length > 120) {
     return { success: false, error: "Enter your full name." };
   }
   if (password.length < 6) {
     return { success: false, error: "Password must be at least 6 characters." };
   }
+  if (requiredAccessCode && accessCode?.trim() !== requiredAccessCode) {
+    return { success: false, error: "Enter the correct school signup code." };
+  }
+  const normalizedGrade = typeof gradeLevel === "number" && gradeLevel >= 6 && gradeLevel <= 12
+    ? gradeLevel
+    : null;
   const allowedDomains = (process.env.ALLOWED_SIGNUP_EMAIL_DOMAINS ?? "")
     .split(",")
     .map((domain) => domain.trim().toLowerCase())
@@ -950,13 +1057,40 @@ export async function supabaseSignUp(email: string, password: string, fullName: 
   const { data, error } = await supabase.auth.signUp({
     email: normalizedEmail,
     password,
-    options: { data: { full_name: normalizedFullName } },
+    options: { data: { full_name: normalizedFullName, grade_level: normalizedGrade } },
   });
   if (error) return { success: false, error: friendlyError(error, "Sign up failed.") };
   if (data.user) {
     await createProfileIfMissing(data.user.id, normalizedEmail, normalizedFullName);
+    await supabase
+      .from("profiles")
+      .update({ full_name: normalizedFullName, grade_level: normalizedGrade })
+      .eq("id", data.user.id);
   }
   return { success: true, needsConfirmation: !data.session };
+}
+
+export async function updateProfileSettings(data: {
+  fullName: string;
+  gradeLevel?: number | null;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: false, error: "Profile editing is unavailable in demo mode." };
+  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  if (!supabase || !profile) return { success: false, error: "Please sign in." };
+  const fullName = data.fullName.trim().replace(/\s+/g, " ");
+  if (fullName.length < 3 || fullName.length > 120) return { success: false, error: "Enter your full name." };
+  const gradeLevel = typeof data.gradeLevel === "number" && data.gradeLevel >= 6 && data.gradeLevel <= 12
+    ? data.gradeLevel
+    : null;
+  const { error } = await supabase
+    .from("profiles")
+    .update({ full_name: fullName, grade_level: gradeLevel })
+    .eq("id", profile.id);
+  if (error) return { success: false, error: friendlyError(error, "Could not update profile.") };
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  return { success: true };
 }
 
 export async function supabaseSignOut() {

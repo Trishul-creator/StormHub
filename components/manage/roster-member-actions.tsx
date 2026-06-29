@@ -48,6 +48,19 @@ export function RosterMemberActions({
     });
   }
 
+  function ban() {
+    if (!window.confirm("Ban this student from rejoining this club? Use this only for roster abuse or spam.")) return;
+    startTransition(async () => {
+      const result = await updateClubMember({ clubId, userId, ban: true });
+      if (result.success) {
+        toast({ title: "Member banned", description: "The student was removed and cannot rejoin this club." });
+        router.refresh();
+      } else {
+        toast({ title: "Could not ban member", description: result.error, variant: "destructive" });
+      }
+    });
+  }
+
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
       <select
@@ -66,6 +79,9 @@ export function RosterMemberActions({
       </Button>
       <Button size="sm" variant="destructive" onClick={remove} disabled={disabled || pending}>
         <Trash2 className="h-3 w-3" /> Remove
+      </Button>
+      <Button size="sm" variant="destructive" onClick={ban} disabled={disabled || pending}>
+        Ban
       </Button>
     </div>
   );

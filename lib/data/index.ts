@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isDemoMode } from "@/lib/supabase/mode";
 import { getCurrentProfile } from "@/lib/auth";
 import {
@@ -42,7 +43,7 @@ export async function getSchool(): Promise<School | null> {
     const { demoSchool } = await import("@/lib/data/demo-data");
     return demoSchool;
   }
-  const supabase = await createClient();
+  const supabase = createAdminClient() ?? await createClient();
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("schools")
@@ -58,14 +59,15 @@ export async function getSchool(): Promise<School | null> {
 
 async function attachMemberCounts(clubs: Club[]): Promise<Club[]> {
   if (isDemoMode() || clubs.length === 0) return clubs;
-  const supabase = await createClient();
+  const supabase = createAdminClient() ?? await createClient();
   if (!supabase) return clubs;
   const ids = clubs.map((c) => c.id);
   const { data } = await supabase
     .from("club_memberships")
     .select("club_id")
     .in("club_id", ids)
-    .eq("status", "active");
+    .eq("status", "active")
+    .neq("role", "sponsor");
   const counts: Record<string, number> = {};
   (data ?? []).forEach((m: { club_id: string }) => {
     counts[m.club_id] = (counts[m.club_id] ?? 0) + 1;
@@ -112,7 +114,7 @@ export async function getClubs(filters?: {
     );
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient() ?? await createClient();
   if (!supabase) return [];
 
   let query = supabase
@@ -169,7 +171,8 @@ export async function getClubMemberCount(clubId: string): Promise<number> {
     .from("club_memberships")
     .select("*", { count: "exact", head: true })
     .eq("club_id", clubId)
-    .eq("status", "active");
+    .eq("status", "active")
+    .neq("role", "sponsor");
   return count ?? 0;
 }
 
@@ -287,7 +290,8 @@ export async function getRecentAnnouncements(limit = 5): Promise<(ClubAnnounceme
     .from("club_announcements")
     .select("*, club:clubs(*)")
     .eq("status", "approved")
-    .order("published_at", { ascending: false })
+    .order("published_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
     .limit(limit);
   if (error) {
     console.error("[getRecentAnnouncements]", error.message);
@@ -606,12 +610,12 @@ export async function getAdminAnalytics(): Promise<AnalyticsSummary> {
   ] = await Promise.all([
     supabase.from("clubs").select("*", { count: "exact", head: true }),
     supabase.from("clubs").select("*", { count: "exact", head: true }).eq("status", "active"),
-    supabase.from("club_memberships").select("*", { count: "exact", head: true }).eq("status", "active"),
+    supabase.from("club_memberships").select("*", { count: "exact", head: true }).eq("status", "active").neq("role", "sponsor"),
     supabase.from("events").select("*", { count: "exact", head: true }).eq("status", "approved").gte("starts_at", new Date().toISOString()),
     supabase.from("opportunities").select("*", { count: "exact", head: true }).eq("status", "approved"),
     supabase.from("event_rsvps").select("*", { count: "exact", head: true }),
     supabase.from("bookmarks").select("*", { count: "exact", head: true }),
-    supabase.from("club_memberships").select("club_id, clubs(name, slug)").eq("status", "active"),
+    supabase.from("club_memberships").select("club_id, clubs(name, slug)").eq("status", "active").neq("role", "sponsor"),
     supabase.from("analytics_events").select("event_type, metadata, created_at").order("created_at", { ascending: false }).limit(10),
   ]);
 
@@ -1007,7 +1011,7 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
 
 export async function getClubRoster(clubId: string): Promise<ClubMembership[]> {
   if (isDemoMode()) return [];
-  const supabase = await createClient();
+  const supabase = createAdminClient() ?? await createClient();
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("club_memberships")

@@ -2,10 +2,10 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAuth } from "@/lib/auth";
 import { User } from "lucide-react";
-import { roleLabel } from "@/lib/permissions";
 import { Bell } from "lucide-react";
 import { NotificationPreferencesForm } from "@/components/notifications/preferences-form";
 import { getNotificationPreferences } from "@/lib/notifications";
+import { ProfileSettingsForm } from "@/components/settings/profile-settings-form";
 
 export default async function SettingsPage() {
   const { profile } = await requireAuth("/settings");
@@ -19,22 +19,7 @@ export default async function SettingsPage() {
           <CardTitle className="flex items-center gap-2"><User className="h-5 w-5" /> Profile</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Name</p>
-            <p>{profile.full_name ?? "—"}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Email</p>
-            <p>{profile.email ?? "—"}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Grade</p>
-            <p>{profile.grade_level ?? "Not set"}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Role</p>
-            <p>{roleLabel(profile.role)}</p>
-          </div>
+          <ProfileSettingsForm profile={profile} />
           <p className="text-xs text-muted-foreground">
             StormHub collects only what is needed for club participation. No grades or sensitive data is stored.
           </p>

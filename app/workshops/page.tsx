@@ -18,7 +18,7 @@ export default async function WorkshopsPage() {
         description="Student-led workshops and peer tutoring sessions at Elkhorn South."
       >
         <Button asChild>
-          <Link href="/auth/sign-in?redirect=/workshops/submit">Host a workshop</Link>
+          <Link href="/workshops/submit">Host a workshop</Link>
         </Button>
       </PageHeader>
 

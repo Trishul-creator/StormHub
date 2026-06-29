@@ -6,6 +6,7 @@ import { getManageableClubs } from "@/lib/data";
 import { requireManager } from "@/lib/auth";
 import { Settings } from "lucide-react";
 import { EmptyState } from "@/components/layout/empty-state";
+import { isAdminRole } from "@/lib/permissions";
 
 export default async function ManageClubsPage() {
   const { profile } = await requireManager();
@@ -13,7 +14,11 @@ export default async function ManageClubsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <PageHeader title="Manage Clubs" description="Clubs you can manage as an officer or sponsor." />
+      <PageHeader title="Manage Clubs" description="Clubs you can manage as an officer or sponsor.">
+        {(profile.role === "teacher" || isAdminRole(profile.role)) && (
+          <Button asChild><Link href="/manage/clubs/new">Propose club</Link></Button>
+        )}
+      </PageHeader>
       <div className="space-y-3">
         {clubs.map((club) => (
           <div key={club.id} className="flex items-center justify-between rounded-xl border p-4">

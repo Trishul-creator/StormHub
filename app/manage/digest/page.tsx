@@ -13,6 +13,11 @@ export default async function DigestPage() {
     getWorkshops(),
     getRecentAnnouncements(),
   ]);
+  const chronologicalAnnouncements = [...announcements].sort((a, b) => {
+    const aTime = new Date(a.published_at ?? a.created_at ?? 0).getTime();
+    const bTime = new Date(b.published_at ?? b.created_at ?? 0).getTime();
+    return aTime - bTime;
+  });
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
@@ -20,7 +25,7 @@ export default async function DigestPage() {
         title="Weekly Digest"
         description="Preview newsletter content for school announcements. Copy and paste into your school newsletter."
       />
-      <DigestPreview opportunities={opportunities} events={events} clubs={clubs} workshops={workshops} announcements={announcements} />
+      <DigestPreview opportunities={opportunities} events={events} clubs={clubs} workshops={workshops} announcements={chronologicalAnnouncements} />
     </div>
   );
 }
