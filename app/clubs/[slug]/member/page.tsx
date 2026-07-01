@@ -10,6 +10,7 @@ import { formatDateTime } from "@/lib/utils";
 import { LeaveClubButton } from "@/components/clubs/leave-club-button";
 import { MemberBlocked } from "@/components/clubs/member-blocked";
 import { canManageClub } from "@/lib/permissions";
+import { getSchoolById } from "@/lib/schools";
 
 interface MemberPageProps {
   params: Promise<{ slug: string }>;
@@ -27,6 +28,12 @@ export default async function MemberClubPage({ params }: MemberPageProps) {
   const club = await getClubBySlugSafe(slug);
 
   if (!club) notFound();
+  const school = await getSchoolById(club.school_id);
+  const publicHref = school ? `/s/${school.slug}/clubs/${club.slug}` : `/clubs/${slug}`;
+  const isPubliclyVisible =
+    club.is_listed &&
+    club.visibility === "public" &&
+    ["interest_open", "active"].includes(club.status);
   const isMember = auth.userId
     ? Boolean(await getUserClubMembershipSafe(auth.userId, club.id))
     : false;
@@ -36,7 +43,7 @@ export default async function MemberClubPage({ params }: MemberPageProps) {
     : null;
   const isManagerPreview = canManageClub(auth.profile, club, membership);
   if (!isMember && !isManagerPreview) {
-    return <MemberBlocked clubSlug={slug} clubName={club.name} isLoggedIn />;
+    return <MemberBlocked clubSlug={slug} clubName={club.name} isLoggedIn publicHref={publicHref} />;
   }
 
   const data = await getMemberClubData(slug, auth.userId, club);
@@ -48,7 +55,10 @@ export default async function MemberClubPage({ params }: MemberPageProps) {
   return (
     <div className="container mx-auto px-4 py-8">
       <Button variant="ghost" size="sm" asChild className="mb-4">
-        <Link href={`/clubs/${slug}`}><ArrowLeft className="h-4 w-4 mr-1" /> Public page</Link>
+        <Link href={isPubliclyVisible ? publicHref : `/manage/clubs/${slug}`}>
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          {isPubliclyVisible ? "Public page" : "Back to management"}
+        </Link>
       </Button>
 
       <div className="mb-8 rounded-2xl bg-storm-gradient p-6 text-white">

@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { getManagedClubBySlug, getClubManagedContent, getClubMemberCount } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
+import { getSchoolById } from "@/lib/schools";
 import { Users, Megaphone, Calendar, FileText, Pencil, Eye, ArrowRight } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import type { ClubAnnouncement, ClubResource, Event } from "@/types/database";
@@ -17,12 +18,18 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
   const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
   await requireClubManager(club);
-  const [memberCount, announcements, events, resources] = await Promise.all([
+  const [school, memberCount, announcements, events, resources] = await Promise.all([
+    getSchoolById(club.school_id),
     getClubMemberCount(club.id),
     getClubManagedContent(club.id, "announcement") as Promise<ClubAnnouncement[]>,
     getClubManagedContent(club.id, "event") as Promise<Event[]>,
     getClubManagedContent(club.id, "resource") as Promise<ClubResource[]>,
   ]);
+  const publicHref = school ? `/s/${school.slug}/clubs/${club.slug}` : `/clubs/${club.slug}`;
+  const isPubliclyVisible =
+    club.is_listed &&
+    club.visibility === "public" &&
+    ["interest_open", "active"].includes(club.status);
 
   const links = [
     { href: `/manage/clubs/${slug}/edit`, icon: Pencil, label: "Edit profile" },
@@ -41,9 +48,15 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
             <Eye className="h-4 w-4" /> View club dashboard
           </Link>
         </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/clubs/${slug}`}>View public page</Link>
-        </Button>
+        {isPubliclyVisible ? (
+          <Button variant="outline" size="sm" asChild>
+            <Link href={publicHref}>View public page</Link>
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" disabled>
+            Draft is not public
+          </Button>
+        )}
       </PageHeader>
 
       <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-6 text-white shadow-sm">

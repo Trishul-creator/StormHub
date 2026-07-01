@@ -7,16 +7,17 @@ import { JoinClubButton } from "@/components/clubs/join-club-button";
 import { EventCard } from "@/components/events/event-card";
 import { PageHeader } from "@/components/layout/page-header";
 import {
-  getClubBySlug,
+  getManagedClubBySlug,
   getClubAnnouncements,
   getClubEvents,
   getClubMemberCount,
-  getUserMembershipBySlug,
+  getUserClubMembership,
 } from "@/lib/data";
 import { getAuthContext } from "@/lib/auth";
 import { formatDateTime } from "@/lib/utils";
 import { canManageClub } from "@/lib/permissions";
 import { getUserRsvpIds } from "@/lib/actions";
+import { getSchoolById } from "@/lib/schools";
 
 interface ClubPageProps {
   params: Promise<{ slug: string }>;
@@ -24,24 +25,33 @@ interface ClubPageProps {
 
 export default async function ClubPage({ params }: ClubPageProps) {
   const { slug } = await params;
-  const club = await getClubBySlug(slug);
+  const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
 
   const { isLoggedIn, profile, userId } = await getAuthContext();
-  const [announcements, events, memberCount, membership] = await Promise.all([
+  const membership = await getUserClubMembership(userId, club.id);
+  const canManage = canManageClub(profile, club, membership);
+  const isPubliclyVisible =
+    club.is_listed &&
+    club.visibility === "public" &&
+    ["interest_open", "active"].includes(club.status);
+  if (!isPubliclyVisible && !canManage) notFound();
+
+  const school = await getSchoolById(club.school_id);
+  const schoolClubsHref = school ? `/s/${school.slug}/clubs` : "/clubs";
+  const clubHref = school ? `/s/${school.slug}/clubs/${club.slug}` : `/clubs/${club.slug}`;
+  const [announcements, events, memberCount] = await Promise.all([
     getClubAnnouncements(club.id, "public"),
     getClubEvents(club.id),
     getClubMemberCount(club.id),
-    getUserMembershipBySlug(userId, slug),
   ]);
   const isMember = !!membership;
-  const canManage = canManageClub(profile, club, membership);
   const rsvpIds = profile?.role === "student" ? await getUserRsvpIds(userId) : new Set<string>();
 
   return (
     <div className="container mx-auto px-4 py-8">
       <Button variant="ghost" size="sm" asChild className="mb-4">
-        <Link href="/clubs"><ArrowLeft className="h-4 w-4 mr-1" /> All clubs</Link>
+        <Link href={schoolClubsHref}><ArrowLeft className="h-4 w-4 mr-1" /> All clubs</Link>
       </Button>
 
       <div className="grid gap-8 lg:grid-cols-3">
@@ -110,6 +120,7 @@ export default async function ClubPage({ params }: ClubPageProps) {
               canJoin={profile?.role === "student"}
               canManage={canManage}
               joinLabel={club.status === "interest_open" ? "Join / Get Updates" : "Join Club"}
+              redirectHref={clubHref}
               className="w-full"
             />
             {isMember && (

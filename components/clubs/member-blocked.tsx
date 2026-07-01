@@ -7,9 +7,10 @@ interface MemberBlockedProps {
   clubSlug: string;
   clubName: string;
   isLoggedIn: boolean;
+  publicHref?: string;
 }
 
-export function MemberBlocked({ clubSlug, clubName, isLoggedIn }: MemberBlockedProps) {
+export function MemberBlocked({ clubSlug, clubName, isLoggedIn, publicHref }: MemberBlockedProps) {
   return (
     <div className="container mx-auto px-4 py-16 max-w-lg text-center">
       <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-storm-light">
@@ -22,7 +23,7 @@ export function MemberBlocked({ clubSlug, clubName, isLoggedIn }: MemberBlockedP
       <div className="mt-6 flex flex-col gap-3 items-center">
         <JoinClubButton clubSlug={clubSlug} isLoggedIn={isLoggedIn} size="lg" />
         <Button variant="ghost" asChild>
-          <Link href={`/clubs/${clubSlug}`}>Back to public club page</Link>
+          <Link href={publicHref || `/clubs/${clubSlug}`}>Back to public club page</Link>
         </Button>
       </div>
     </div>
