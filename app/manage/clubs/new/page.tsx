@@ -7,14 +7,19 @@ import { redirect } from "next/navigation";
 export default async function NewClubPage() {
   const { profile } = await requireAuth("/manage/clubs/new");
   if (profile.role !== "teacher" && !isAdminRole(profile.role)) redirect("/manage/clubs");
+  const requiresApproval = profile.role === "teacher";
 
   return (
     <div className="container mx-auto max-w-3xl px-4 py-8">
       <PageHeader
-        title="Propose a Club"
-        description="Teachers can submit a club for admin review. It starts as an unlisted draft until an admin approves and lists it."
+        title={requiresApproval ? "Propose a Club" : "Create Draft Club"}
+        description={
+          requiresApproval
+            ? "Submit a club idea for school admin review. It starts hidden until an admin publishes it."
+            : "Create a hidden draft club for your school. Students will not see it until you publish it."
+        }
       />
-      <ClubProposalForm />
+      <ClubProposalForm requiresApproval={requiresApproval} />
     </div>
   );
 }

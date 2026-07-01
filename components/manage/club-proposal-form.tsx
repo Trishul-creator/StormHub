@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { submitClubProposal } from "@/lib/actions";
 import { toast } from "@/hooks/use-toast";
 
-export function ClubProposalForm() {
+export function ClubProposalForm({ requiresApproval = true }: { requiresApproval?: boolean }) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -26,8 +26,13 @@ export function ClubProposalForm() {
         sponsorName: String(form.get("sponsorName") ?? ""),
       });
       if (result.success) {
-        toast({ title: "Club proposal submitted", description: "An admin can review and list it from Manage Clubs." });
-        router.push("/manage/clubs");
+        toast({
+          title: requiresApproval ? "Club proposal submitted" : "Draft club created",
+          description: result.message || (requiresApproval
+            ? "A school admin can review and publish it."
+            : "Review the draft details, then publish it when ready."),
+        });
+        router.push(requiresApproval ? "/manage/clubs" : "/manage/clubs/drafts");
         router.refresh();
       } else {
         toast({ title: "Could not submit club", description: result.error, variant: "destructive" });
@@ -65,7 +70,9 @@ export function ClubProposalForm() {
           <Input id="meetingLocation" name="meetingLocation" placeholder="Room 123" className="mt-1" />
         </div>
       </div>
-      <Button type="submit" disabled={pending}>{pending ? "Submitting..." : "Submit for admin review"}</Button>
+      <Button type="submit" disabled={pending}>
+        {pending ? "Submitting..." : requiresApproval ? "Submit proposal" : "Create draft club"}
+      </Button>
     </form>
   );
 }

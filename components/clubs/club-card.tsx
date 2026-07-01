@@ -12,15 +12,18 @@ interface ClubCardProps {
   isLoggedIn?: boolean;
   canJoin?: boolean;
   canManage?: boolean;
+  schoolSlug?: string;
 }
 
-export function ClubCard({ club, isMember, isLoggedIn, canJoin, canManage }: ClubCardProps) {
+export function ClubCard({ club, isMember, isLoggedIn, canJoin, canManage, schoolSlug }: ClubCardProps) {
+  const clubHref = schoolSlug ? `/s/${schoolSlug}/clubs/${club.slug}` : `/clubs/${club.slug}`;
+
   return (
     <Card className="flex flex-col hover:shadow-md transition-shadow border-storm-light/50">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-lg">
-            <Link href={`/clubs/${club.slug}`} className="hover:text-storm-electric transition-colors">
+            <Link href={clubHref} className="hover:text-storm-electric transition-colors">
               {club.name}
             </Link>
           </CardTitle>
@@ -54,7 +57,7 @@ export function ClubCard({ club, isMember, isLoggedIn, canJoin, canManage }: Clu
       </CardContent>
       <CardFooter className="gap-2 pt-0">
         <Button variant="outline" size="sm" asChild className="flex-1">
-          <Link href={`/clubs/${club.slug}`}>View</Link>
+          <Link href={clubHref}>View</Link>
         </Button>
         <JoinClubButton
           clubSlug={club.slug}
@@ -63,6 +66,7 @@ export function ClubCard({ club, isMember, isLoggedIn, canJoin, canManage }: Clu
           canJoin={canJoin}
           canManage={canManage}
           joinLabel={club.status === "interest_open" ? "Join / Get Updates" : "Join Club"}
+          redirectHref={clubHref}
           size="sm"
           className="flex-1"
         />

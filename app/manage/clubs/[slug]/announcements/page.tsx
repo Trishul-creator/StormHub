@@ -1,6 +1,6 @@
 import { ContentForm } from "@/components/forms/content-form";
 import { PageHeader } from "@/components/layout/page-header";
-import { getClubBySlug, getClubManagedContent } from "@/lib/data";
+import { getManagedClubBySlug, getClubManagedContent } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -18,7 +18,7 @@ interface PageProps {
 
 export default async function ManageAnnouncementsPage({ params }: PageProps) {
   const { slug } = await params;
-  const club = await getClubBySlug(slug);
+  const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
   const auth = await requireClubManager(club);
   const announcements = (await getClubManagedContent(club.id, "announcement")) as ClubAnnouncement[];

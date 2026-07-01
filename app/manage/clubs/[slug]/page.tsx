@@ -2,10 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { getClubBySlug, getClubMemberCount, getMemberClubData } from "@/lib/data";
+import { getManagedClubBySlug, getClubManagedContent, getClubMemberCount } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
 import { Users, Megaphone, Calendar, FileText, Pencil, Eye, ArrowRight } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import type { ClubAnnouncement, ClubResource, Event } from "@/types/database";
 
 interface ManageClubPageProps {
   params: Promise<{ slug: string }>;
@@ -13,12 +14,14 @@ interface ManageClubPageProps {
 
 export default async function ManageClubDashboard({ params }: ManageClubPageProps) {
   const { slug } = await params;
-  const club = await getClubBySlug(slug);
+  const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
-  const auth = await requireClubManager(club);
-  const [memberCount, dashboard] = await Promise.all([
+  await requireClubManager(club);
+  const [memberCount, announcements, events, resources] = await Promise.all([
     getClubMemberCount(club.id),
-    getMemberClubData(slug, auth.userId),
+    getClubManagedContent(club.id, "announcement") as Promise<ClubAnnouncement[]>,
+    getClubManagedContent(club.id, "event") as Promise<Event[]>,
+    getClubManagedContent(club.id, "resource") as Promise<ClubResource[]>,
   ]);
 
   const links = [
@@ -43,9 +46,20 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
         </Button>
       </PageHeader>
 
-      <div className="mb-6 rounded-xl bg-storm-gradient p-6 text-white">
-        <p className="text-3xl font-bold">{memberCount}</p>
-        <p className="text-storm-silver">Active members</p>
+      <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-6 text-white shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.25em] text-zinc-400">Club dashboard</p>
+            <h2 className="mt-2 text-3xl font-bold">{club.name}</h2>
+            <p className="mt-2 max-w-3xl text-sm text-zinc-300">
+              {club.short_description || club.long_description || "This draft has no description yet. Add details before publishing."}
+            </p>
+          </div>
+          <div className="rounded-xl border border-zinc-800 bg-white/5 px-5 py-4">
+            <p className="text-3xl font-bold">{memberCount}</p>
+            <p className="text-sm text-zinc-400">Active members</p>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -66,7 +80,7 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
             </Button>
           </div>
           <div className="space-y-3">
-            {dashboard?.announcements.slice(0, 3).map((announcement) => (
+            {announcements.slice(0, 3).map((announcement) => (
               <div key={announcement.id} className="rounded-lg border p-3">
                 <p className="text-sm font-medium">{announcement.title}</p>
                 {announcement.published_at && (
@@ -74,7 +88,7 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
                 )}
               </div>
             ))}
-            {!dashboard?.announcements.length && (
+            {!announcements.length && (
               <p className="text-sm text-muted-foreground">No announcements yet.</p>
             )}
           </div>
@@ -88,13 +102,13 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
             </Button>
           </div>
           <div className="space-y-3">
-            {dashboard?.events.slice(0, 3).map((event) => (
+            {events.slice(0, 3).map((event) => (
               <Link key={event.id} href={`/events/${event.id}`} className="block rounded-lg border p-3 hover:bg-storm-light/30">
                 <p className="text-sm font-medium">{event.title}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{formatDate(event.starts_at)}</p>
               </Link>
             ))}
-            {!dashboard?.events.length && (
+            {!events.length && (
               <p className="text-sm text-muted-foreground">No events scheduled.</p>
             )}
           </div>
@@ -108,7 +122,7 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
             </Button>
           </div>
           <div className="space-y-3">
-            {dashboard?.resources.slice(0, 3).map((resource) => (
+            {resources.slice(0, 3).map((resource) => (
               <div key={resource.id} className="rounded-lg border p-3">
                 <p className="text-sm font-medium">{resource.title}</p>
                 {resource.description && (
@@ -116,7 +130,7 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
                 )}
               </div>
             ))}
-            {!dashboard?.resources.length && (
+            {!resources.length && (
               <p className="text-sm text-muted-foreground">No resources posted.</p>
             )}
           </div>

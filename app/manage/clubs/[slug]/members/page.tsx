@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
-import { getClubBySlug, getClubMemberCount, getClubRoster } from "@/lib/data";
+import { getManagedClubBySlug, getClubMemberCount, getClubRoster } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
 import { canManageClubRoster } from "@/lib/permissions";
 import { RoleBadge } from "@/components/ui/badge";
@@ -10,7 +10,7 @@ interface PageProps { params: Promise<{ slug: string }> }
 
 export default async function ManageMembersPage({ params }: PageProps) {
   const { slug } = await params;
-  const club = await getClubBySlug(slug);
+  const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
   const { profile, membership } = await requireClubManager(club);
   const [count, roster] = await Promise.all([

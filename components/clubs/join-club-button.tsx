@@ -18,6 +18,7 @@ interface JoinClubButtonProps {
   canJoin?: boolean;
   canManage?: boolean;
   joinLabel?: string;
+  redirectHref?: string;
 }
 
 export function JoinClubButton({
@@ -29,6 +30,7 @@ export function JoinClubButton({
   canJoin = true,
   canManage = false,
   joinLabel = "Join Club",
+  redirectHref,
 }: JoinClubButtonProps) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -56,7 +58,7 @@ export function JoinClubButton({
   if (!isLoggedIn) {
     return (
       <Button size={size} asChild className={className}>
-        <Link href={`/auth/sign-in?redirect=/clubs/${clubSlug}`}>
+        <Link href={`/auth/sign-in?redirect=${encodeURIComponent(redirectHref || `/clubs/${clubSlug}`)}`}>
           <UserPlus className="h-4 w-4" /> Sign in to join
         </Link>
       </Button>

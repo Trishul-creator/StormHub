@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { ContentForm } from "@/components/forms/content-form";
 import { PageHeader } from "@/components/layout/page-header";
-import { getClubBySlug, getClubManagedContent } from "@/lib/data";
+import { getManagedClubBySlug, getClubManagedContent } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ interface PageProps { params: Promise<{ slug: string }> }
 
 export default async function ManageEventsPage({ params }: PageProps) {
   const { slug } = await params;
-  const club = await getClubBySlug(slug);
+  const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
   const auth = await requireClubManager(club);
   const events = (await getClubManagedContent(club.id, "event")) as Event[];

@@ -20,6 +20,7 @@ import {
 } from "@/lib/permissions";
 import type {
   ApprovalContentType,
+  Club,
   ClubMembership,
   MembershipRole,
   Profile,
@@ -27,7 +28,7 @@ import type {
   FeedbackStatus,
 } from "@/types/database";
 import { slugify } from "@/lib/utils";
-import { DEFAULT_SCHOOL_ID, SUPPORT_EMAIL, getCurrentSchool } from "@/lib/schools";
+import { DEFAULT_SCHOOL_ID, SUPPORT_EMAIL, getCurrentSchool, getSchoolById } from "@/lib/schools";
 import {
   createAdminAttentionNotification,
   createApprovalNeededNotifications,
@@ -58,6 +59,71 @@ function contentReviewLink(contentType: ApprovalContentType, content: Record<str
   if (club?.slug) return `/clubs/${club.slug}/member`;
   if (contentType === "workshop") return "/opportunities";
   return "/dashboard";
+}
+
+async function notifySchoolStudentsAboutPublishedClub(input: { club: Club }) {
+  const admin = createAdminClient();
+  if (!admin) return;
+
+  const [school, { data: students, error }] = await Promise.all([
+    getSchoolById(input.club.school_id),
+    admin
+      .from("profiles")
+      .select("id,email,full_name")
+      .eq("school_id", input.club.school_id)
+      .eq("role", "student")
+      .not("email", "is", null),
+  ]);
+
+  if (error) {
+    console.error("[notifySchoolStudentsAboutPublishedClub]", error.message);
+    return;
+  }
+
+  const schoolName = school?.short_name || school?.name || "your school";
+  const schoolSlug = school?.slug;
+  const relativeLink = schoolSlug ? `/s/${schoolSlug}/clubs/${input.club.slug}` : `/clubs/${input.club.slug}`;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || process.env.APP_URL?.replace(/\/$/, "") || "";
+  const absoluteLink = baseUrl ? `${baseUrl}${relativeLink}` : relativeLink;
+  const description = input.club.short_description || input.club.long_description || "A new club is now available on StormHub.";
+  const details = [
+    input.club.category ? `Category: ${input.club.category}` : null,
+    input.club.meeting_time ? `Meets: ${input.club.meeting_time}` : null,
+    input.club.meeting_location ? `Location: ${input.club.meeting_location}` : null,
+  ].filter(Boolean).join("\n");
+  const joinText = input.club.join_instructions || "Open StormHub to view the club and join or request updates.";
+  const title = `New club at ${schoolName}: ${input.club.name}`;
+  const message = `${input.club.name} is now open on StormHub. ${description}`;
+  const emailBody = [
+    `A new club just opened at ${schoolName}: ${input.club.name}.`,
+    description,
+    details,
+    joinText,
+    `Open in StormHub: ${absoluteLink}`,
+  ].filter(Boolean).join("\n\n");
+
+  await Promise.all(
+    ((students ?? []) as Array<{ id: string; email: string | null }>).map(async (student) => {
+      await createNotification({
+        recipientUserId: student.id,
+        type: "system_message",
+        importance: "important",
+        title,
+        message,
+        link: relativeLink,
+        clubId: input.club.id,
+      });
+      if (student.email) {
+        await createEmailOutboxItem({
+          recipientUserId: student.id,
+          recipientEmail: student.email,
+          subject: `[StormHub] ${input.club.name} is now open`,
+          body: emailBody,
+          type: "club_published",
+        });
+      }
+    })
+  );
 }
 
 async function getDemoMemberships(): Promise<Set<string>> {
@@ -118,7 +184,7 @@ export async function joinClub(clubSlug: string): Promise<{ success: boolean; er
     return { success: false, error: "Only student accounts can join clubs." };
   }
 
-  const club = await getClubBySlug(clubSlug);
+  const club = await getClubBySlug(clubSlug, profile.school_id);
   if (!club) return { success: false, error: "Club not found." };
   if (!profile.school_id || profile.school_id !== club.school_id) {
     return { success: false, error: "You can only join clubs in your own school." };
@@ -389,7 +455,7 @@ export async function submitFeedback(data: {
   email?: string;
   category: string;
   message: string;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{ success: boolean; error?: string; message?: string }> {
   if (isDemoMode()) return { success: true };
 
   const supabase = await createClient();
@@ -496,7 +562,7 @@ export async function submitWorkshop(data: {
   skill_level: string;
   starts_at?: string;
   location?: string;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{ success: boolean; error?: string; message?: string }> {
   if (isDemoMode()) return { success: true };
 
   const supabase = await createClient();
@@ -537,7 +603,7 @@ export async function submitClubProposal(data: {
   meetingTime?: string;
   meetingLocation?: string;
   sponsorName?: string;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{ success: boolean; error?: string; message?: string }> {
   if (isDemoMode()) return { success: false, error: "Club proposals are unavailable in demo mode." };
   const supabase = await createClient();
   const admin = createAdminClient();
@@ -576,17 +642,25 @@ export async function submitClubProposal(data: {
     );
   }
 
-  await createAdminAttentionNotification({
-    title: "Club proposal needs review",
-    message: `${profile.full_name ?? profile.email ?? "A teacher"} proposed “${name}”.`,
-    link: `/manage/clubs/${club.slug}`,
-    schoolId: profile.school_id ?? school?.id ?? DEFAULT_SCHOOL_ID,
-    importance: "important",
-    type: "approval_needed",
-  });
+  if (profile.role === "teacher") {
+    await createAdminAttentionNotification({
+      title: "Club proposal needs review",
+      message: `${profile.full_name ?? profile.email ?? "A teacher"} proposed “${name}”.`,
+      link: `/manage/clubs/${club.slug}`,
+      schoolId: profile.school_id ?? school?.id ?? DEFAULT_SCHOOL_ID,
+      importance: "important",
+      type: "approval_needed",
+    });
+  }
   revalidatePath("/manage/clubs");
+  revalidatePath("/manage/clubs/drafts");
   revalidatePath("/dashboard");
-  return { success: true };
+  return {
+    success: true,
+    message: profile.role === "teacher"
+      ? "A school admin can review and publish it."
+      : "The draft club was created and is hidden from students.",
+  };
 }
 
 export async function submitServiceHours(data: {
@@ -971,7 +1045,10 @@ export async function updateClubMember(data: {
 export async function updateClubSettings(data: {
   clubId: string;
   name: string;
+  category?: string;
   shortDescription: string;
+  longDescription?: string;
+  joinInstructions?: string;
   meetingTime: string;
   meetingLocation: string;
   sponsorName: string;
@@ -979,7 +1056,7 @@ export async function updateClubSettings(data: {
   visibility: "public" | "unlisted" | "private";
   isListed: boolean;
   isFeatured: boolean;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{ success: boolean; error?: string; message?: string }> {
   if (isDemoMode()) return { success: false, error: "Club editing is unavailable in demo mode." };
   const supabase = await createClient();
   const profile = await getCurrentProfile();
@@ -997,9 +1074,18 @@ export async function updateClubSettings(data: {
     return { success: false, error: "You do not have permission to edit this club." };
   }
 
+  const willPublish =
+    club.status === "draft" &&
+    ["interest_open", "active"].includes(data.status) &&
+    data.visibility === "public" &&
+    data.isListed;
+
   const { error } = await supabase.from("clubs").update({
     name: data.name,
+    category: data.category?.trim() || null,
     short_description: data.shortDescription,
+    long_description: data.longDescription?.trim() || null,
+    join_instructions: data.joinInstructions?.trim() || null,
     meeting_time: data.meetingTime || null,
     meeting_location: data.meetingLocation || null,
     sponsor_name: data.sponsorName || null,
@@ -1011,11 +1097,34 @@ export async function updateClubSettings(data: {
   }).eq("id", data.clubId);
   if (error) return { success: false, error: friendlyError(error, "Could not update the club.") };
 
+  if (willPublish) {
+    await notifySchoolStudentsAboutPublishedClub({
+      club: {
+        ...club,
+        name: data.name,
+        category: data.category?.trim() || club.category,
+        short_description: data.shortDescription,
+        long_description: data.longDescription?.trim() || club.long_description,
+        join_instructions: data.joinInstructions?.trim() || club.join_instructions,
+        meeting_time: data.meetingTime || null,
+        meeting_location: data.meetingLocation || null,
+        status: data.status,
+        visibility: data.visibility,
+        is_listed: data.isListed,
+        is_active: true,
+      },
+    });
+  }
+
   revalidatePath(`/manage/clubs/${club.slug}`);
   revalidatePath(`/manage/clubs/${club.slug}/edit`);
   revalidatePath(`/clubs/${club.slug}`);
   revalidatePath("/clubs");
-  return { success: true };
+  revalidatePath("/manage/clubs/drafts");
+  return {
+    success: true,
+    message: willPublish ? "The club is now live. Students at this school were notified by email." : undefined,
+  };
 }
 
 export async function deleteServiceHour(id: string): Promise<{ success: boolean; error?: string }> {

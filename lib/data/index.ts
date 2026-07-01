@@ -158,6 +158,20 @@ export async function getClubBySlug(slug: string, schoolId?: string | null): Pro
   return data as Club | null;
 }
 
+export async function getManagedClubBySlug(slug: string): Promise<Club | null> {
+  if (isDemoMode()) {
+    return demoClubs.find((c) => c.slug === slug) ?? null;
+  }
+  const supabase = createAdminClient() ?? await createClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase.from("clubs").select("*").eq("slug", slug).maybeSingle();
+  if (error) {
+    console.error("[getManagedClubBySlug]", error.message);
+    return null;
+  }
+  return data as Club | null;
+}
+
 export async function getClubMemberCount(clubId: string): Promise<number> {
   if (isDemoMode()) {
     const club = demoClubs.find((c) => c.id === clubId);

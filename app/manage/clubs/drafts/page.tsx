@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { FilePenLine, Settings } from "lucide-react";
+import { FilePenLine, Rocket, Settings } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -43,12 +43,20 @@ export default async function DraftClubsPage() {
                 <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{club.short_description}</p>
               )}
             </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/manage/clubs/${club.slug}/edit`}>
-                <Settings className="mr-1 h-4 w-4" />
-                Edit and publish
-              </Link>
-            </Button>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/manage/clubs/${club.slug}`}>
+                  <Settings className="mr-1 h-4 w-4" />
+                  Dashboard
+                </Link>
+              </Button>
+              <Button size="sm" asChild>
+                <Link href={`/manage/clubs/${club.slug}/edit?publish=1`}>
+                  <Rocket className="mr-1 h-4 w-4" />
+                  Publish
+                </Link>
+              </Button>
+            </div>
           </div>
         ))}
         {clubs.length === 0 && (

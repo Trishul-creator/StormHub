@@ -51,6 +51,7 @@ export default async function SchoolClubsPage({ params, searchParams }: SchoolCl
               isLoggedIn={auth.isLoggedIn}
               canJoin={canJoinClub(auth.profile, club)}
               canManage={canManageClub(auth.profile, club)}
+              schoolSlug={school.slug}
             />
           ))}
         </div>
