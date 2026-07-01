@@ -41,7 +41,7 @@ export default async function AdminSchoolPage({ params }: AdminSchoolPageProps) 
       </PageHeader>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Metric title="Visible clubs" value={clubs.length} icon={Users} />
+        <Metric title="Published clubs" value={clubs.length} icon={Users} />
         <Metric title="Opportunities" value={opportunities.length} icon={Zap} />
         <Metric title="Upcoming events" value={events.length} icon={Calendar} />
       </div>

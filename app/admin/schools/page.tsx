@@ -136,7 +136,8 @@ export default async function AdminSchoolsPage() {
 }
 
 const emptySchoolStats = {
-  clubs: 0,
+  visibleClubs: 0,
+  draftClubs: 0,
   students: 0,
   opportunities: 0,
   events: 0,
@@ -151,7 +152,7 @@ async function getSchoolStats(schoolIds: string[]): Promise<Record<string, Schoo
   if (!admin) return stats;
 
   const [clubs, students, opportunities, events] = await Promise.all([
-    admin.from("clubs").select("school_id").in("school_id", schoolIds),
+    admin.from("clubs").select("school_id,status,is_listed,visibility").in("school_id", schoolIds),
     admin.from("profiles").select("school_id").in("school_id", schoolIds).eq("role", "student"),
     admin.from("opportunities").select("school_id").in("school_id", schoolIds).eq("status", "approved"),
     admin
@@ -162,7 +163,14 @@ async function getSchoolStats(schoolIds: string[]): Promise<Record<string, Schoo
       .gte("starts_at", new Date().toISOString()),
   ]);
 
-  for (const row of clubs.data ?? []) stats[row.school_id as string].clubs++;
+  for (const row of clubs.data ?? []) {
+    const schoolStats = stats[row.school_id as string];
+    if (!schoolStats) continue;
+    if (row.status === "draft") schoolStats.draftClubs++;
+    if (row.is_listed === true && row.visibility === "public" && ["interest_open", "active"].includes(String(row.status))) {
+      schoolStats.visibleClubs++;
+    }
+  }
   for (const row of students.data ?? []) stats[row.school_id as string].students++;
   for (const row of opportunities.data ?? []) stats[row.school_id as string].opportunities++;
   for (const row of events.data ?? []) stats[row.school_id as string].events++;
@@ -196,8 +204,9 @@ function SchoolWorkspaceCard({ school, stats }: { school: School; stats: SchoolS
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 sm:grid-cols-4">
-          <SmallStat icon={Users} label="Clubs" value={stats.clubs} />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <SmallStat icon={Users} label="Published clubs" value={stats.visibleClubs} />
+          <SmallStat icon={Users} label="Draft clubs" value={stats.draftClubs} />
           <SmallStat icon={GraduationCap} label="Students" value={stats.students} />
           <SmallStat icon={Building2} label="Opportunities" value={stats.opportunities} />
           <SmallStat icon={Calendar} label="Upcoming events" value={stats.events} />
