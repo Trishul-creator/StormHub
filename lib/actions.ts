@@ -126,6 +126,65 @@ async function notifySchoolStudentsAboutPublishedClub(input: { club: Club }) {
   );
 }
 
+async function getValidTeacherSponsor(input: {
+  sponsorUserId?: string | null;
+  schoolId: string;
+}): Promise<{ id: string; full_name: string | null; email: string | null } | null> {
+  const sponsorUserId = input.sponsorUserId?.trim();
+  if (!sponsorUserId) return null;
+  const admin = createAdminClient();
+  if (!admin) return null;
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id,full_name,email,school_id,role")
+    .eq("id", sponsorUserId)
+    .eq("school_id", input.schoolId)
+    .eq("role", "teacher")
+    .maybeSingle();
+  if (error) {
+    console.error("[getValidTeacherSponsor]", error.message);
+    return null;
+  }
+  return data as { id: string; full_name: string | null; email: string | null } | null;
+}
+
+async function syncClubSponsorMembership(input: {
+  clubId: string;
+  sponsorUserId?: string | null;
+  schoolId: string;
+}) {
+  const admin = createAdminClient();
+  if (!admin) return null;
+  const sponsor = await getValidTeacherSponsor({
+    sponsorUserId: input.sponsorUserId,
+    schoolId: input.schoolId,
+  });
+
+  await admin
+    .from("club_memberships")
+    .update({ status: "left", role: "member" })
+    .eq("club_id", input.clubId)
+    .eq("role", "sponsor");
+
+  if (!sponsor) return null;
+
+  const { error } = await admin.from("club_memberships").upsert(
+    {
+      club_id: input.clubId,
+      user_id: sponsor.id,
+      status: "active",
+      role: "sponsor",
+    },
+    { onConflict: "club_id,user_id" }
+  );
+  if (error) {
+    console.error("[syncClubSponsorMembership]", error.message);
+    return null;
+  }
+
+  return sponsor;
+}
+
 async function getDemoMemberships(): Promise<Set<string>> {
   const cookieStore = await cookies();
   const raw = cookieStore.get(DEMO_MEMBERSHIPS_COOKIE)?.value;
@@ -602,7 +661,7 @@ export async function submitClubProposal(data: {
   category: string;
   meetingTime?: string;
   meetingLocation?: string;
-  sponsorName?: string;
+  sponsorUserId?: string;
 }): Promise<{ success: boolean; error?: string; message?: string }> {
   if (isDemoMode()) return { success: false, error: "Club proposals are unavailable in demo mode." };
   const supabase = await createClient();
@@ -617,16 +676,24 @@ export async function submitClubProposal(data: {
   const slugBase = slugify(name);
   const slug = `${slugBase}-${Date.now().toString(36)}`;
   const school = await getCurrentSchool(profile);
+  const schoolId = profile.school_id ?? school?.id ?? DEFAULT_SCHOOL_ID;
+  const sponsor = await getValidTeacherSponsor({
+    sponsorUserId: data.sponsorUserId || (profile.role === "teacher" ? profile.id : null),
+    schoolId,
+  });
+  if (data.sponsorUserId && !sponsor) {
+    return { success: false, error: "Choose a teacher from this school as the sponsor." };
+  }
   const { data: club, error } = await admin.from("clubs").insert({
-    school_id: profile.school_id ?? school?.id ?? DEFAULT_SCHOOL_ID,
+    school_id: schoolId,
     name,
     slug,
     short_description: data.shortDescription.trim() || null,
     category: data.category.trim() || "Other",
     meeting_time: data.meetingTime?.trim() || null,
     meeting_location: data.meetingLocation?.trim() || null,
-    sponsor_name: data.sponsorName?.trim() || profile.full_name || null,
-    sponsor_email: profile.email || null,
+    sponsor_name: sponsor?.full_name || sponsor?.email || null,
+    sponsor_email: sponsor?.email || null,
     status: "draft",
     visibility: "unlisted",
     is_listed: false,
@@ -635,11 +702,12 @@ export async function submitClubProposal(data: {
   }).select("id,slug").single();
   if (error) return { success: false, error: friendlyError(error, "Could not submit club proposal.") };
 
-  if (profile.role === "teacher") {
-    await admin.from("club_memberships").upsert(
-      { club_id: club.id, user_id: profile.id, status: "active", role: "sponsor" },
-      { onConflict: "club_id,user_id" }
-    );
+  if (sponsor) {
+    await syncClubSponsorMembership({
+      clubId: club.id,
+      sponsorUserId: sponsor.id,
+      schoolId,
+    });
   }
 
   if (profile.role === "teacher") {
@@ -878,10 +946,6 @@ export async function updateUserRoleAndClubs(data: {
   if (!canEditRole(actor, target, data.role)) {
     return { success: false, error: "You do not have permission to make this role change." };
   }
-  if (data.role === "teacher" && data.clubIds.length === 0) {
-    return { success: false, error: "Choose at least one club for the teacher." };
-  }
-
   const { error } = await supabase.rpc("admin_set_user_role_and_clubs", {
     target_user_id: data.targetUserId,
     new_role: data.role,
@@ -1051,7 +1115,7 @@ export async function updateClubSettings(data: {
   joinInstructions?: string;
   meetingTime: string;
   meetingLocation: string;
-  sponsorName: string;
+  sponsorUserId?: string;
   status: "draft" | "interest_open" | "active" | "paused" | "archived";
   visibility: "public" | "unlisted" | "private";
   isListed: boolean;
@@ -1079,6 +1143,13 @@ export async function updateClubSettings(data: {
     ["interest_open", "active"].includes(data.status) &&
     data.visibility === "public" &&
     data.isListed;
+  const sponsor = await getValidTeacherSponsor({
+    sponsorUserId: data.sponsorUserId,
+    schoolId: club.school_id,
+  });
+  if (data.sponsorUserId && !sponsor) {
+    return { success: false, error: "Choose a teacher from this school as the sponsor." };
+  }
 
   const { error } = await supabase.from("clubs").update({
     name: data.name,
@@ -1088,7 +1159,8 @@ export async function updateClubSettings(data: {
     join_instructions: data.joinInstructions?.trim() || null,
     meeting_time: data.meetingTime || null,
     meeting_location: data.meetingLocation || null,
-    sponsor_name: data.sponsorName || null,
+    sponsor_name: sponsor?.full_name || sponsor?.email || null,
+    sponsor_email: sponsor?.email || null,
     status: data.status,
     visibility: data.visibility,
     is_listed: data.isListed,
@@ -1096,6 +1168,12 @@ export async function updateClubSettings(data: {
     is_active: ["interest_open", "active"].includes(data.status),
   }).eq("id", data.clubId);
   if (error) return { success: false, error: friendlyError(error, "Could not update the club.") };
+
+  await syncClubSponsorMembership({
+    clubId: club.id,
+    sponsorUserId: sponsor?.id ?? null,
+    schoolId: club.school_id,
+  });
 
   if (willPublish) {
     await notifySchoolStudentsAboutPublishedClub({

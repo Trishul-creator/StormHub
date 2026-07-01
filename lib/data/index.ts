@@ -915,6 +915,23 @@ export async function getManageableClubs(profile: Profile, schoolId?: string | n
     .filter(Boolean) as Club[];
 }
 
+export async function getSchoolTeachers(schoolId: string | null | undefined): Promise<Profile[]> {
+  if (!schoolId || isDemoMode()) return [];
+  const supabase = createAdminClient() ?? await createClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id,school_id,full_name,email,grade_level,avatar_url,role,created_at,updated_at")
+    .eq("school_id", schoolId)
+    .eq("role", "teacher")
+    .order("full_name", { ascending: true, nullsFirst: false });
+  if (error) {
+    console.error("[getSchoolTeachers]", error.message);
+    return [];
+  }
+  return (data as Profile[]) ?? [];
+}
+
 export async function getMemberClubData(slug: string, userId: string | null) {
   const club = await getClubBySlug(slug);
   if (!club) return null;

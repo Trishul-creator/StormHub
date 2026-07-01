@@ -107,7 +107,7 @@ export function UserRoleEditor({
 
       {role === "teacher" && (
         <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2">
-          <p className="mb-1 text-xs font-medium">Assigned clubs</p>
+          <p className="mb-1 text-xs font-medium">Assigned clubs <span className="font-normal text-muted-foreground">(optional)</span></p>
           {clubs.map((club) => (
             <label key={club.id} className="flex items-center gap-2 text-xs">
               <input

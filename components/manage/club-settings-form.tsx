@@ -10,9 +10,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MeetingTimeInput } from "@/components/manage/meeting-time-input";
 import { toast } from "@/hooks/use-toast";
-import type { Club, ClubStatus } from "@/types/database";
+import type { Club, ClubStatus, Profile } from "@/types/database";
 
-export function ClubSettingsForm({ club, publishMode = false }: { club: Club; publishMode?: boolean }) {
+export function ClubSettingsForm({
+  club,
+  publishMode = false,
+  teachers = [],
+}: {
+  club: Club;
+  publishMode?: boolean;
+  teachers?: Profile[];
+}) {
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<ClubStatus>(publishMode ? "interest_open" : club.status);
   const [visibility, setVisibility] = useState<"public" | "unlisted" | "private">(
@@ -20,6 +28,7 @@ export function ClubSettingsForm({ club, publishMode = false }: { club: Club; pu
   );
   const [isListed, setIsListed] = useState(publishMode ? true : club.is_listed);
   const [isFeatured, setIsFeatured] = useState(club.is_featured);
+  const selectedSponsorUserId = teachers.find((teacher) => club.sponsor_email && teacher.email === club.sponsor_email)?.id ?? "";
   const router = useRouter();
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -35,7 +44,7 @@ export function ClubSettingsForm({ club, publishMode = false }: { club: Club; pu
         joinInstructions: String(form.get("join_instructions") ?? ""),
         meetingTime: String(form.get("meeting_time") ?? ""),
         meetingLocation: String(form.get("meeting_location") ?? ""),
-        sponsorName: String(form.get("sponsor_name") ?? ""),
+        sponsorUserId: String(form.get("sponsor_user_id") ?? ""),
         status,
         visibility,
         isListed,
@@ -73,7 +82,25 @@ export function ClubSettingsForm({ club, publishMode = false }: { club: Club; pu
         <MeetingTimeInput id="meeting_time" name="meeting_time" defaultValue={club.meeting_time} />
         <div><Label htmlFor="meeting_location">Meeting location</Label><Input id="meeting_location" name="meeting_location" defaultValue={club.meeting_location ?? ""} className="mt-1" /></div>
       </div>
-      <div><Label htmlFor="sponsor_name">Sponsor name</Label><Input id="sponsor_name" name="sponsor_name" defaultValue={club.sponsor_name ?? ""} className="mt-1" /></div>
+      <div>
+        <Label htmlFor="sponsor_user_id">Teacher sponsor</Label>
+        <select
+          id="sponsor_user_id"
+          name="sponsor_user_id"
+          defaultValue={selectedSponsorUserId}
+          className="mt-1 h-10 w-full rounded-lg border bg-white px-3 text-sm"
+        >
+          <option value="">No sponsor assigned yet</option>
+          {teachers.map((teacher) => (
+            <option key={teacher.id} value={teacher.id}>
+              {teacher.full_name || teacher.email || "Unnamed teacher"}
+            </option>
+          ))}
+        </select>
+        {club.sponsor_name && (
+          <p className="mt-1 text-xs text-muted-foreground">Current sponsor: {club.sponsor_name}</p>
+        )}
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <Label>Status</Label>

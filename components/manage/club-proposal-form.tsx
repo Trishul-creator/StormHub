@@ -9,8 +9,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { MeetingTimeInput } from "@/components/manage/meeting-time-input";
 import { submitClubProposal } from "@/lib/actions";
 import { toast } from "@/hooks/use-toast";
+import type { Profile } from "@/types/database";
 
-export function ClubProposalForm({ requiresApproval = true }: { requiresApproval?: boolean }) {
+export function ClubProposalForm({
+  requiresApproval = true,
+  teachers = [],
+  defaultSponsorUserId,
+}: {
+  requiresApproval?: boolean;
+  teachers?: Profile[];
+  defaultSponsorUserId?: string;
+}) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -24,7 +33,7 @@ export function ClubProposalForm({ requiresApproval = true }: { requiresApproval
         category: String(form.get("category") ?? ""),
         meetingTime: String(form.get("meetingTime") ?? ""),
         meetingLocation: String(form.get("meetingLocation") ?? ""),
-        sponsorName: String(form.get("sponsorName") ?? ""),
+        sponsorUserId: String(form.get("sponsorUserId") ?? ""),
       });
       if (result.success) {
         toast({
@@ -57,8 +66,20 @@ export function ClubProposalForm({ requiresApproval = true }: { requiresApproval
           <Input id="category" name="category" placeholder="STEM, Service, Arts..." required className="mt-1" />
         </div>
         <div>
-          <Label htmlFor="sponsorName">Sponsor name</Label>
-          <Input id="sponsorName" name="sponsorName" className="mt-1" />
+          <Label htmlFor="sponsorUserId">Teacher sponsor</Label>
+          <select
+            id="sponsorUserId"
+            name="sponsorUserId"
+            defaultValue={defaultSponsorUserId ?? ""}
+            className="mt-1 h-10 w-full rounded-lg border bg-white px-3 text-sm"
+          >
+            <option value="">No sponsor assigned yet</option>
+            {teachers.map((teacher) => (
+              <option key={teacher.id} value={teacher.id}>
+                {teacher.full_name || teacher.email || "Unnamed teacher"}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
