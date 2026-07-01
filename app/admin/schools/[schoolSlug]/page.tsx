@@ -47,10 +47,10 @@ export default async function AdminSchoolPage({ params }: AdminSchoolPageProps) 
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <ActionCard href="/manage/clubs" icon={Users} title="Manage clubs" description="Open club dashboards, edit club details, and manage rosters." />
+        <ActionCard href={`/admin/schools/${school.slug}/drafts`} icon={Users} title="Draft club catalog" description="Review prepared draft clubs before publishing them." />
         <ActionCard href="/manage/opportunities" icon={Zap} title="Manage opportunities" description="Create and review school opportunities." />
         <ActionCard href="/calendar" icon={Calendar} title="Preview calendar" description="View school calendar entries." />
-        <ActionCard href="/admin/users" icon={Settings} title="Users and roles" description="Assign school admins, teachers, and students." />
+        <ActionCard href={`/admin/users?school=${school.slug}`} icon={Settings} title="Users and roles" description="Assign school admins, teachers, and students for this school." />
         <ActionCard href="/manage/analytics" icon={BarChart3} title="Analytics" description="Review school participation metrics." />
         <ActionCard href="/manage/email-outbox" icon={Mail} title="Email status" description="Review controlled important and urgent email records." />
       </div>

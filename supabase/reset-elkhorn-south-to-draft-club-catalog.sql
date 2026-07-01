@@ -1,0 +1,160 @@
+-- StormHub one-time reset: make Elkhorn South publicly blank and replace
+-- existing club data with a hidden draft catalog.
+--
+-- Run only if you intentionally want to remove the current Elkhorn South clubs,
+-- memberships, club events, club opportunities, announcements, and resources.
+-- This does NOT delete users, schools, profiles, or super_admin accounts.
+
+BEGIN;
+
+DO $$
+DECLARE
+  target_school_id UUID;
+BEGIN
+  SELECT id INTO target_school_id
+  FROM public.schools
+  WHERE slug = 'elkhorn-south'
+  LIMIT 1;
+
+  IF target_school_id IS NULL THEN
+    RAISE EXCEPTION 'Elkhorn South school not found.';
+  END IF;
+
+  -- Remove school-owned club/action data first so club deletion is clean.
+  DELETE FROM public.approval_requests
+  WHERE school_id = target_school_id;
+
+  DELETE FROM public.interest_forms
+  WHERE school_id = target_school_id;
+
+  DELETE FROM public.event_rsvps
+  WHERE event_id IN (
+    SELECT id FROM public.events WHERE school_id = target_school_id
+  );
+
+  DELETE FROM public.bookmarks
+  WHERE club_id IN (SELECT id FROM public.clubs WHERE school_id = target_school_id)
+     OR event_id IN (SELECT id FROM public.events WHERE school_id = target_school_id)
+     OR opportunity_id IN (SELECT id FROM public.opportunities WHERE school_id = target_school_id);
+
+  DELETE FROM public.notifications
+  WHERE school_id = target_school_id
+     OR club_id IN (SELECT id FROM public.clubs WHERE school_id = target_school_id)
+     OR event_id IN (SELECT id FROM public.events WHERE school_id = target_school_id)
+     OR opportunity_id IN (SELECT id FROM public.opportunities WHERE school_id = target_school_id);
+
+  DELETE FROM public.club_announcements
+  WHERE club_id IN (SELECT id FROM public.clubs WHERE school_id = target_school_id);
+
+  DELETE FROM public.club_resources
+  WHERE club_id IN (SELECT id FROM public.clubs WHERE school_id = target_school_id);
+
+  DELETE FROM public.club_memberships
+  WHERE club_id IN (SELECT id FROM public.clubs WHERE school_id = target_school_id);
+
+  UPDATE public.service_hours
+  SET club_id = NULL,
+      opportunity_id = NULL
+  WHERE club_id IN (SELECT id FROM public.clubs WHERE school_id = target_school_id)
+     OR opportunity_id IN (SELECT id FROM public.opportunities WHERE school_id = target_school_id);
+
+  DELETE FROM public.opportunities
+  WHERE school_id = target_school_id;
+
+  DELETE FROM public.events
+  WHERE school_id = target_school_id;
+
+  UPDATE public.workshops
+  SET club_id = NULL,
+      status = 'archived'
+  WHERE school_id = target_school_id;
+
+  DELETE FROM public.clubs
+  WHERE school_id = target_school_id;
+
+  -- Hidden draft catalog. Admins can edit and publish only the clubs that
+  -- actually exist at the school.
+  INSERT INTO public.clubs (
+    school_id, name, slug, short_description, long_description, category, tags,
+    sponsor_name, meeting_time, meeting_location, join_instructions,
+    status, is_listed, is_featured, is_active, visibility
+  ) VALUES
+  (target_school_id, 'Art Club', 'elkhorn-south-art-club',
+    'A draft club for students interested in visual arts and creative projects.',
+    'Use this draft if the school confirms an Art Club. Update sponsor, meetings, and description before publishing.',
+    'Arts', ARRAY['art','creative','visual arts'], NULL, 'TBD', 'TBD',
+    'Details will be posted once the club is confirmed.', 'draft', FALSE, FALSE, TRUE, 'unlisted'),
+  (target_school_id, 'Band', 'elkhorn-south-band',
+    'A draft club/activity page for band-related announcements and resources.',
+    'Use this draft if band should be represented in StormHub. Update details before publishing.',
+    'Music', ARRAY['music','band','performance'], NULL, 'TBD', 'TBD',
+    'Details will be posted once the activity is confirmed.', 'draft', FALSE, FALSE, TRUE, 'unlisted'),
+  (target_school_id, 'Choir', 'elkhorn-south-choir',
+    'A draft club/activity page for choir updates and resources.',
+    'Use this draft if choir should be represented in StormHub. Update details before publishing.',
+    'Music', ARRAY['music','choir','performance'], NULL, 'TBD', 'TBD',
+    'Details will be posted once the activity is confirmed.', 'draft', FALSE, FALSE, TRUE, 'unlisted'),
+  (target_school_id, 'Drama Club', 'elkhorn-south-drama-club',
+    'A draft club for theatre, acting, production, and stage crew opportunities.',
+    'Confirm the sponsor and season details before publishing.',
+    'Arts', ARRAY['theatre','drama','stage'], NULL, 'TBD', 'TBD',
+    'Details will be posted once the club is confirmed.', 'draft', FALSE, FALSE, TRUE, 'unlisted'),
+  (target_school_id, 'DECA', 'elkhorn-south-deca',
+    'A draft club for business, marketing, leadership, and competition activities.',
+    'Confirm the school chapter and sponsor before publishing.',
+    'Business', ARRAY['business','marketing','leadership','competition'], NULL, 'TBD', 'TBD',
+    'Details will be posted once the club is confirmed.', 'draft', FALSE, FALSE, TRUE, 'unlisted'),
+  (target_school_id, 'FBLA', 'elkhorn-south-fbla',
+    'A draft club for business leadership and career preparation.',
+    'Confirm the school chapter and sponsor before publishing.',
+    'Business', ARRAY['business','leadership','career'], NULL, 'TBD', 'TBD',
+    'Details will be posted once the club is confirmed.', 'draft', FALSE, FALSE, TRUE, 'unlisted'),
+  (target_school_id, 'FCA', 'elkhorn-south-fca',
+    'A draft club for Fellowship of Christian Athletes if confirmed by the school.',
+    'Confirm sponsor, meeting information, and school approval before publishing.',
+    'Faith/Community', ARRAY['community','leadership'], NULL, 'TBD', 'TBD',
+    'Details will be posted once the club is confirmed.', 'draft', FALSE, FALSE, TRUE, 'unlisted'),
+  (target_school_id, 'Math Club', 'elkhorn-south-math-club',
+    'A draft club for math enrichment, contests, and problem-solving.',
+    'Update contest details, sponsor, and meeting schedule before publishing.',
+    'STEM', ARRAY['math','competition','stem'], NULL, 'TBD', 'TBD',
+    'Details will be posted once the club is confirmed.', 'draft', FALSE, FALSE, TRUE, 'unlisted'),
+  (target_school_id, 'National Honor Society', 'elkhorn-south-national-honor-society',
+    'A draft organization page for NHS announcements and resources.',
+    'Confirm eligibility rules, sponsor, and member-only visibility before publishing.',
+    'Leadership', ARRAY['honor society','leadership','service'], NULL, 'TBD', 'TBD',
+    'Details will be posted once the organization is confirmed.', 'draft', FALSE, FALSE, TRUE, 'unlisted'),
+  (target_school_id, 'Robotics Club', 'elkhorn-south-robotics-club',
+    'A draft club for robotics, engineering, and build team activities.',
+    'Confirm sponsor, team structure, and meeting schedule before publishing.',
+    'STEM', ARRAY['robotics','engineering','stem'], NULL, 'TBD', 'TBD',
+    'Details will be posted once the club is confirmed.', 'draft', FALSE, FALSE, TRUE, 'unlisted'),
+  (target_school_id, 'Science Bowl', 'elkhorn-south-science-bowl',
+    'A draft club for science competition practices and team updates.',
+    'Confirm sponsor, practice schedule, and competition details before publishing.',
+    'STEM', ARRAY['science','competition','stem'], NULL, 'TBD', 'TBD',
+    'Details will be posted once the club is confirmed.', 'draft', FALSE, FALSE, TRUE, 'unlisted'),
+  (target_school_id, 'Student Council', 'elkhorn-south-student-council',
+    'A draft page for student leadership, events, and school spirit initiatives.',
+    'Confirm sponsor and leadership details before publishing.',
+    'Leadership', ARRAY['leadership','student council','school spirit'], NULL, 'TBD', 'TBD',
+    'Details will be posted once the organization is confirmed.', 'draft', FALSE, FALSE, TRUE, 'unlisted')
+  ON CONFLICT (slug) DO UPDATE SET
+    school_id = EXCLUDED.school_id,
+    short_description = EXCLUDED.short_description,
+    long_description = EXCLUDED.long_description,
+    category = EXCLUDED.category,
+    tags = EXCLUDED.tags,
+    sponsor_name = EXCLUDED.sponsor_name,
+    meeting_time = EXCLUDED.meeting_time,
+    meeting_location = EXCLUDED.meeting_location,
+    join_instructions = EXCLUDED.join_instructions,
+    status = 'draft',
+    is_listed = FALSE,
+    is_featured = FALSE,
+    is_active = TRUE,
+    visibility = 'unlisted',
+    updated_at = NOW();
+END $$;
+
+COMMIT;

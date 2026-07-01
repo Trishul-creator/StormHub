@@ -32,6 +32,7 @@ interface NavbarProps {
   role?: UserRole;
   notifications?: Notification[];
   unreadNotificationCount?: number;
+  schoolSlug?: string | null;
 }
 
 export function Navbar({
@@ -42,6 +43,7 @@ export function Navbar({
   role,
   notifications = [],
   unreadNotificationCount = 0,
+  schoolSlug,
 }: NavbarProps) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -49,8 +51,21 @@ export function Navbar({
     role === "super_admin"
       ? platformNavLinks
       : role === "teacher"
-      ? baseNavLinks
-      : [...baseNavLinks, { href: "/opportunities", label: "Opportunities" }];
+      ? schoolSlug
+        ? [
+            { href: "/", label: "Home" },
+            { href: `/s/${schoolSlug}/clubs`, label: "Clubs" },
+            { href: `/s/${schoolSlug}/calendar`, label: "Calendar" },
+          ]
+        : baseNavLinks
+      : schoolSlug
+        ? [
+            { href: "/", label: "Home" },
+            { href: `/s/${schoolSlug}/clubs`, label: "Clubs" },
+            { href: `/s/${schoolSlug}/calendar`, label: "Calendar" },
+            { href: `/s/${schoolSlug}/opportunities`, label: "Opportunities" },
+          ]
+        : [...baseNavLinks, { href: "/opportunities", label: "Opportunities" }];
   const primaryHref = role === "super_admin" ? "/admin/schools" : role === "admin" || role === "teacher" ? "/manage" : "/dashboard";
   const primaryLabel = role === "super_admin" ? "Platform Admin" : role === "admin" || role === "teacher" ? "Manage" : "Dashboard";
 

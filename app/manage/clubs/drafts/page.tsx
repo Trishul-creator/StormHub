@@ -1,0 +1,65 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { FilePenLine, Settings } from "lucide-react";
+import { PageHeader } from "@/components/layout/page-header";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/layout/empty-state";
+import { CategoryBadge } from "@/components/ui/badge";
+import { requireManager } from "@/lib/auth";
+import { getManageableClubs } from "@/lib/data";
+
+export default async function DraftClubsPage() {
+  const { profile } = await requireManager();
+  if (profile.role === "super_admin") redirect("/admin/schools");
+
+  const clubs = (await getManageableClubs(profile)).filter((club) => club.status === "draft");
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <PageHeader
+        title="Draft Clubs"
+        description="Prepare clubs before publishing them. Draft clubs are hidden from students until they are listed and opened."
+      >
+        <Button asChild>
+          <Link href="/manage/clubs/new">Propose club</Link>
+        </Button>
+      </PageHeader>
+
+      <div className="space-y-3">
+        {clubs.map((club) => (
+          <div key={club.id} className="flex items-center justify-between rounded-xl border bg-white p-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <FilePenLine className="h-4 w-4 text-storm-electric" />
+                <p className="font-medium text-storm-navy">{club.name}</p>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                {club.category && <CategoryBadge category={club.category} />}
+                <span className="text-xs text-muted-foreground">
+                  Draft · hidden from students · {club.meeting_time || "meeting TBD"}
+                </span>
+              </div>
+              {club.short_description && (
+                <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{club.short_description}</p>
+              )}
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/manage/clubs/${club.slug}/edit`}>
+                <Settings className="mr-1 h-4 w-4" />
+                Edit and publish
+              </Link>
+            </Button>
+          </div>
+        ))}
+        {clubs.length === 0 && (
+          <EmptyState
+            title="No draft clubs"
+            description="Draft clubs will appear here while admins confirm details before publishing."
+            actionLabel="Propose club"
+            actionHref="/manage/clubs/new"
+          />
+        )}
+      </div>
+    </div>
+  );
+}

@@ -763,6 +763,8 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
       recentAnnouncements: [],
     };
   }
+  const profile = await getCurrentProfile();
+  const schoolId = profile?.school_id ?? DEFAULT_SCHOOL_ID;
 
   const { data: memberships } = await supabase
     .from("club_memberships")
@@ -770,8 +772,9 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
     .eq("user_id", userId)
     .eq("status", "active");
 
-  const clubIds = ((memberships as ClubMembership[]) ?? []).map((m) => m.club_id);
-  const categories = ((memberships as ClubMembership[]) ?? [])
+  const schoolMemberships = ((memberships as ClubMembership[]) ?? []).filter((m) => m.club?.school_id === schoolId);
+  const clubIds = schoolMemberships.map((m) => m.club_id);
+  const categories = schoolMemberships
     .map((m) => m.club?.category)
     .filter(Boolean) as string[];
 
@@ -781,6 +784,7 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
       .from("events")
       .select("*, club:clubs(*)")
       .in("club_id", clubIds)
+      .eq("school_id", schoolId)
       .eq("status", "approved")
       .gte("starts_at", new Date().toISOString())
       .order("starts_at")
@@ -797,6 +801,7 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
     .map((row) => Array.isArray(row.events) ? row.events[0] : row.events)
     .filter((event): event is Event =>
       !!event &&
+      event.school_id === schoolId &&
       event.status === "approved" &&
       new Date(event.starts_at) >= new Date()
     );
@@ -814,7 +819,7 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
 
   const savedOpportunities = ((bookmarks ?? []) as { opportunities: Opportunity | Opportunity[] | null }[])
     .map((b) => (Array.isArray(b.opportunities) ? b.opportunities[0] : b.opportunities))
-    .filter(Boolean) as Opportunity[];
+    .filter((opportunity): opportunity is Opportunity => !!opportunity && opportunity.school_id === schoolId);
 
   const bookmarkIds = new Set(savedOpportunities.map((o) => o.id));
 
@@ -823,6 +828,7 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
     const { data: recs } = await supabase
       .from("opportunities")
       .select("*, club:clubs(*)")
+      .eq("school_id", schoolId)
       .eq("status", "approved")
       .eq("visibility", "public")
       .in("category", categories)
@@ -846,7 +852,7 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
   }
 
   return {
-    memberships: (memberships as ClubMembership[]) || [],
+    memberships: schoolMemberships,
     upcomingEvents,
     savedOpportunities,
     recommendedOpportunities,
@@ -859,13 +865,15 @@ export async function getUserMemberships(userId: string | null): Promise<ClubMem
   return dashboard.memberships;
 }
 
-export async function getManageableClubs(profile: Profile): Promise<Club[]> {
+export async function getManageableClubs(profile: Profile, schoolId?: string | null): Promise<Club[]> {
   if (isDemoMode()) return isAdminRole(profile.role) ? demoClubs : [];
   const supabase = await createClient();
   if (!supabase) return [];
   if (isAdminRole(profile.role)) {
     let query = supabase.from("clubs").select("*").order("name");
-    if (profile.role !== "super_admin" && profile.school_id) {
+    if (profile.role === "super_admin" && schoolId) {
+      query = query.eq("school_id", schoolId);
+    } else if (profile.role !== "super_admin" && profile.school_id) {
       query = query.eq("school_id", profile.school_id);
     }
     const { data, error } = await query;
@@ -991,7 +999,7 @@ export async function getPendingApprovals(): Promise<PendingApprovalItem[]> {
   });
 }
 
-export async function getAdminUsers(): Promise<AdminUser[]> {
+export async function getAdminUsers(schoolId?: string | null): Promise<AdminUser[]> {
   if (isDemoMode()) {
     return [{
       id: "demo-student",
@@ -1008,8 +1016,11 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
   let query = supabase
     .from("profiles")
     .select("*, club_memberships(club_id,role,status,clubs(name,slug))")
+    .neq("role", "super_admin")
     .order("created_at", { ascending: false });
-  if (currentProfile?.role !== "super_admin" && currentProfile?.school_id) {
+  if (currentProfile?.role === "super_admin" && schoolId) {
+    query = query.eq("school_id", schoolId);
+  } else if (currentProfile?.role !== "super_admin" && currentProfile?.school_id) {
     query = query.eq("school_id", currentProfile.school_id);
   }
   const { data, error } = await query;
