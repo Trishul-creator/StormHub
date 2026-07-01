@@ -79,7 +79,7 @@ export function ClubSettingsForm({
       <div><Label htmlFor="long_description">Full description</Label><Textarea id="long_description" name="long_description" defaultValue={club.long_description ?? ""} rows={5} className="mt-1" /></div>
       <div><Label htmlFor="join_instructions">Join instructions</Label><Textarea id="join_instructions" name="join_instructions" defaultValue={club.join_instructions ?? ""} rows={3} className="mt-1" placeholder="Example: Click Join Club, attend the next meeting, or contact the sponsor." /></div>
       <div className="grid gap-4 md:grid-cols-2">
-        <MeetingTimeInput id="meeting_time" name="meeting_time" defaultValue={club.meeting_time} />
+        <MeetingTimeInput id="meeting_time" name="meeting_time" defaultValue={club.meeting_time} className="md:col-span-2" />
         <div><Label htmlFor="meeting_location">Meeting location</Label><Input id="meeting_location" name="meeting_location" defaultValue={club.meeting_location ?? ""} className="mt-1" /></div>
       </div>
       <div>

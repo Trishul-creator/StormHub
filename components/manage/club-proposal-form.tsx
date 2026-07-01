@@ -83,7 +83,7 @@ export function ClubProposalForm({
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <MeetingTimeInput id="meetingTime" name="meetingTime" />
+        <MeetingTimeInput id="meetingTime" name="meetingTime" className="md:col-span-2" />
         <div>
           <Label htmlFor="meetingLocation">Meeting location</Label>
           <Input id="meetingLocation" name="meetingLocation" placeholder="Room 123" className="mt-1" />

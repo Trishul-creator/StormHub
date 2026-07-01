@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/cn";
 
 function parseMeetingTime(value?: string | null) {
   const normalized = value?.trim();
@@ -54,9 +55,10 @@ interface MeetingTimeInputProps {
   name: string;
   label?: string;
   defaultValue?: string | null;
+  className?: string;
 }
 
-export function MeetingTimeInput({ id, name, label = "Meeting time", defaultValue }: MeetingTimeInputProps) {
+export function MeetingTimeInput({ id, name, label = "Meeting time", defaultValue, className }: MeetingTimeInputProps) {
   const parsed = useMemo(() => parseMeetingTime(defaultValue), [defaultValue]);
   const [mode, setMode] = useState<"tbd" | "time">(parsed.mode);
   const [startHour, setStartHour] = useState(parsed.startHour);
@@ -70,7 +72,7 @@ export function MeetingTimeInput({ id, name, label = "Meeting time", defaultValu
   const minutes = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
 
   return (
-    <div>
+    <div className={cn("min-w-0", className)}>
       <Label htmlFor={`${id}_mode`}>{label}</Label>
       <input type="hidden" id={id} name={name} value={value} />
       <div className="mt-1 space-y-2">
@@ -84,9 +86,9 @@ export function MeetingTimeInput({ id, name, label = "Meeting time", defaultValu
           <option value="time">Set time</option>
         </select>
         {mode === "time" && (
-          <div className="grid gap-3 rounded-lg border bg-storm-light/20 p-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-            <div>
-              <p className="mb-1 text-xs font-medium text-muted-foreground">Start</p>
+          <div className="space-y-3 rounded-lg border bg-storm-light/20 p-3">
+            <div className="grid gap-2 md:grid-cols-[4rem_minmax(0,1fr)] md:items-end">
+              <p className="pb-2 text-xs font-medium text-muted-foreground md:pb-3">Start</p>
               <div className="grid grid-cols-3 gap-2">
                 <select
                   aria-label="Start hour"
@@ -115,9 +117,8 @@ export function MeetingTimeInput({ id, name, label = "Meeting time", defaultValu
                 </select>
               </div>
             </div>
-            <div className="hidden self-end pb-2 text-sm text-muted-foreground lg:block">to</div>
-            <div>
-              <p className="mb-1 text-xs font-medium text-muted-foreground">End</p>
+            <div className="grid gap-2 md:grid-cols-[4rem_minmax(0,1fr)] md:items-end">
+              <p className="pb-2 text-xs font-medium text-muted-foreground md:pb-3">End</p>
               <div className="grid grid-cols-3 gap-2">
                 <select
                   aria-label="End hour"
