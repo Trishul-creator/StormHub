@@ -78,7 +78,7 @@ export function ClubSettingsForm({
       <div><Label htmlFor="short_description">Short description</Label><Textarea id="short_description" name="short_description" defaultValue={club.short_description ?? ""} className="mt-1" /></div>
       <div><Label htmlFor="long_description">Full description</Label><Textarea id="long_description" name="long_description" defaultValue={club.long_description ?? ""} rows={5} className="mt-1" /></div>
       <div><Label htmlFor="join_instructions">Join instructions</Label><Textarea id="join_instructions" name="join_instructions" defaultValue={club.join_instructions ?? ""} rows={3} className="mt-1" placeholder="Example: Click Join Club, attend the next meeting, or contact the sponsor." /></div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <MeetingTimeInput id="meeting_time" name="meeting_time" defaultValue={club.meeting_time} />
         <div><Label htmlFor="meeting_location">Meeting location</Label><Input id="meeting_location" name="meeting_location" defaultValue={club.meeting_location ?? ""} className="mt-1" /></div>
       </div>
@@ -101,7 +101,7 @@ export function ClubSettingsForm({
           <p className="mt-1 text-xs text-muted-foreground">Current sponsor: {club.sponsor_name}</p>
         )}
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <div>
           <Label>Status</Label>
           <select value={status} onChange={(e) => setStatus(e.target.value as ClubStatus)} className="mt-1 h-10 w-full rounded-lg border bg-white px-3 text-sm">

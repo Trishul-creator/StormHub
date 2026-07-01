@@ -60,7 +60,7 @@ export function ClubProposalForm({
         <Label htmlFor="shortDescription">Short description</Label>
         <Textarea id="shortDescription" name="shortDescription" required rows={3} className="mt-1" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <div>
           <Label htmlFor="category">Category</Label>
           <Input id="category" name="category" placeholder="STEM, Service, Arts..." required className="mt-1" />
@@ -82,7 +82,7 @@ export function ClubProposalForm({
           </select>
         </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <MeetingTimeInput id="meetingTime" name="meetingTime" />
         <div>
           <Label htmlFor="meetingLocation">Meeting location</Label>
