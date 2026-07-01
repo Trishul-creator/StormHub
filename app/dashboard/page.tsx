@@ -12,37 +12,14 @@ import {
 import { requireAuth } from "@/lib/auth";
 import { formatDate } from "@/lib/utils";
 import { isAdminRole } from "@/lib/permissions";
+import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
   const { userId, profile } = await requireAuth("/dashboard");
   const manageableClubs = await getManageableClubs(profile);
 
-  if (isAdminRole(profile.role)) {
-    const [analytics, pending] = await Promise.all([
-      getAdminAnalytics(),
-      getPendingApprovals(),
-    ]);
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-storm-navy">Administrator Dashboard</h1>
-        <p className="mt-1 text-muted-foreground">School-wide clubs, users, content, and approvals.</p>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <DashboardMetric label="All clubs" value={analytics.totalClubs} icon={Users} />
-          <DashboardMetric label="Active clubs" value={analytics.activeClubs} icon={Settings} />
-          <DashboardMetric label="Pending approvals" value={pending.length} icon={CheckSquare} />
-          <DashboardMetric label="Upcoming events" value={analytics.upcomingEvents} icon={Calendar} />
-        </div>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <DashboardLink href="/admin/users" title="Users & roles" description="Assign teachers, admins, and club responsibilities." />
-          <DashboardLink href="/manage/clubs" title="Manage clubs" description="Open any club dashboard or roster." />
-          <DashboardLink href="/opportunities" title="All opportunities" description="Review every opportunity without student participation actions." />
-          <DashboardLink href="/manage/opportunities" title="Create opportunity" description="Publish a new school-wide signup or application." />
-          <DashboardLink href="/manage/approvals" title="Approval queue" description="Review student officer submissions." />
-          <DashboardLink href="/manage/analytics" title="Analytics" description="View school-wide participation metrics." />
-        </div>
-      </div>
-    );
-  }
+  if (profile.role === "super_admin") redirect("/admin/schools");
+  if (isAdminRole(profile.role)) redirect("/manage");
 
   if (profile.role === "teacher") {
     const pending = await getPendingApprovals();

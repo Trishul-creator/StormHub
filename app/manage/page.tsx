@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { requireManager } from "@/lib/auth";
 import { getPendingApprovals } from "@/lib/data";
 import { canAccessAdmin, canAccessManageAnalytics, canApproveContent } from "@/lib/permissions";
+import { redirect } from "next/navigation";
 
 const manageLinks = [
   { href: "/manage/clubs", icon: Users, title: "Manage Clubs", description: "Edit club profiles and view members" },
@@ -17,6 +18,7 @@ const manageLinks = [
 
 export default async function ManagePage() {
   const { profile } = await requireManager();
+  if (profile.role === "super_admin") redirect("/admin/schools");
   const pendingApprovals = canApproveContent(profile) ? await getPendingApprovals() : [];
   const visibleLinks = manageLinks.filter((link) => {
     if (link.href === "/admin") return canAccessAdmin(profile);

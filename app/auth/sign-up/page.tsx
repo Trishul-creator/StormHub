@@ -1,146 +1,26 @@
-"use client";
+import { SignUpForm } from "@/components/auth/sign-up-form";
+import { getAllSchools } from "@/lib/schools";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { demoSignIn, supabaseSignUp } from "@/lib/actions";
-import { isSupabaseConfigured } from "@/lib/supabase/client";
-import { toast } from "@/hooks/use-toast";
-import { Zap } from "lucide-react";
+interface SignUpPageProps {
+  searchParams: Promise<{ school?: string }>;
+}
 
-export default function SignUpPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [loadedAt] = useState(() => Date.now());
-  const isDemo = !isSupabaseConfigured();
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setLoading(true);
-    const form = new FormData(e.currentTarget);
-    const email = form.get("email") as string;
-    const password = form.get("password") as string;
-    const fullName = form.get("fullName") as string;
-    const gradeLevelRaw = String(form.get("gradeLevel") ?? "");
-    const accessCode = String(form.get("accessCode") ?? "");
-    const website = String(form.get("website") ?? "");
-    const formLoadedAt = Number(form.get("loadedAt") ?? 0);
-    if (website) {
-      setLoading(false);
-      toast({ title: "Sign up failed", description: "Please try again.", variant: "destructive" });
-      return;
-    }
-    if (!formLoadedAt || Date.now() - formLoadedAt < 1500) {
-      setLoading(false);
-      toast({ title: "Sign up failed", description: "Please try again.", variant: "destructive" });
-      return;
-    }
-    if (fullName.trim().length < 3) {
-      setLoading(false);
-      toast({ title: "Sign up failed", description: "Enter your full name.", variant: "destructive" });
-      return;
-    }
-
-    if (isDemo) {
-      const { demoSignIn: signIn } = await import("@/lib/actions");
-      const result = await signIn(email, password);
-      setLoading(false);
-      if (result.success) {
-        toast({ title: "Welcome to StormHub!", description: "Your account has been created." });
-        router.push("/dashboard");
-        router.refresh();
-      } else {
-        toast({ title: "Sign up failed", description: result.error, variant: "destructive" });
-      }
-      return;
-    }
-
-    const result = await supabaseSignUp(
-      email,
-      password,
-      fullName,
-      gradeLevelRaw ? Number(gradeLevelRaw) : null,
-      accessCode
-    );
-    setLoading(false);
-    if (result.success) {
-      if (result.needsConfirmation) {
-        toast({ title: "Check your email", description: "Confirm your email address to complete signup." });
-      } else {
-        toast({ title: "Welcome to StormHub!", description: "Your account has been created." });
-        router.push("/dashboard");
-        router.refresh();
-      }
-      if (result.needsConfirmation) router.push("/auth/sign-in");
-    } else {
-      toast({ title: "Sign up failed", description: result.error, variant: "destructive" });
-    }
-  }
+export default async function SignUpPage({ searchParams }: SignUpPageProps) {
+  const params = await searchParams;
+  const schools = (await getAllSchools()).filter((school) => school.is_active !== false && school.is_public !== false);
+  const preselectedSchool = schools.find((school) => school.slug === params.school);
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12 bg-storm-subtle">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-storm-gradient">
-            <Zap className="h-5 w-5 text-white" />
-          </div>
-          <CardTitle>Join StormHub</CardTitle>
-          <CardDescription>Create your account to join clubs and track opportunities</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="fullName">Full name</Label>
-              <Input id="fullName" name="fullName" required placeholder="Your name" className="mt-1" />
-            </div>
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" required placeholder="you@example.com" className="mt-1" />
-            </div>
-            <div>
-              <Label htmlFor="gradeLevel">Grade</Label>
-              <select
-                id="gradeLevel"
-                name="gradeLevel"
-                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                defaultValue=""
-              >
-                <option value="">Select grade</option>
-                {[6, 7, 8, 9, 10, 11, 12].map((grade) => (
-                  <option key={grade} value={grade}>{grade}th grade</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" name="password" type="password" required minLength={6} className="mt-1" />
-            </div>
-            <div>
-              <Label htmlFor="accessCode">School signup code</Label>
-              <Input id="accessCode" name="accessCode" placeholder="Only required if your school provides one" className="mt-1" />
-            </div>
-            <div className="hidden" aria-hidden="true">
-              <Label htmlFor="website">Website</Label>
-              <Input id="website" name="website" tabIndex={-1} autoComplete="off" />
-            </div>
-            <input type="hidden" name="loadedAt" value={loadedAt} />
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account..." : "Create account"}
-            </Button>
-          </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link href="/auth/sign-in" className="text-storm-electric hover:underline">Sign in</Link>
-          </p>
-          <p className="mt-3 text-xs text-muted-foreground text-center">
-            To reduce spam, StormHub may restrict signups to approved school email domains.
-          </p>
-        </CardContent>
-      </Card>
+    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-storm-subtle px-4 py-12">
+      <SignUpForm
+        schools={schools.map((school) => ({
+          id: school.id,
+          name: school.name,
+          short_name: school.short_name,
+          slug: school.slug,
+        }))}
+        preselectedSchoolId={preselectedSchool?.id}
+      />
     </div>
   );
 }

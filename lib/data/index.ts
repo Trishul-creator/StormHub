@@ -43,6 +43,12 @@ export async function getSchool(): Promise<School | null> {
   return getCurrentSchool();
 }
 
+async function resolveSchoolId(explicitSchoolId?: string | null, profile?: Profile | null): Promise<string | null> {
+  if (explicitSchoolId) return explicitSchoolId;
+  const school = await getCurrentSchool(profile);
+  return school?.id ?? DEFAULT_SCHOOL_ID;
+}
+
 async function attachMemberCounts(clubs: Club[]): Promise<Club[]> {
   if (isDemoMode() || clubs.length === 0) return clubs;
   const supabase = createAdminClient() ?? await createClient();
@@ -66,6 +72,7 @@ export async function getClubs(filters?: {
   featured?: boolean;
   search?: string;
   filterGroup?: string;
+  schoolId?: string | null;
 }): Promise<Club[]> {
   if (isDemoMode()) {
     let clubs = [...demoClubs];
@@ -102,7 +109,7 @@ export async function getClubs(filters?: {
 
   const supabase = createAdminClient() ?? await createClient();
   if (!supabase) return [];
-  const school = await getCurrentSchool();
+  const schoolId = await resolveSchoolId(filters?.schoolId);
 
   let query = supabase
     .from("clubs")
@@ -110,7 +117,7 @@ export async function getClubs(filters?: {
     .eq("is_listed", true)
     .eq("visibility", "public")
     .in("status", ["interest_open", "active"]);
-  if (school?.id) query = query.eq("school_id", school.id);
+  if (schoolId) query = query.eq("school_id", schoolId);
   if (filters?.featured) query = query.eq("is_featured", true);
   if (filters?.category) query = query.eq("category", filters.category);
   if (filters?.filterGroup) {
@@ -130,19 +137,19 @@ export async function getClubs(filters?: {
   return attachMemberCounts((data as Club[]) || []);
 }
 
-export async function getFeaturedClubs(): Promise<Club[]> {
-  return getClubs({ featured: true });
+export async function getFeaturedClubs(schoolId?: string | null): Promise<Club[]> {
+  return getClubs({ featured: true, schoolId });
 }
 
-export async function getClubBySlug(slug: string): Promise<Club | null> {
+export async function getClubBySlug(slug: string, schoolId?: string | null): Promise<Club | null> {
   if (isDemoMode()) {
     return demoClubs.find((c) => c.slug === slug) ?? null;
   }
   const supabase = await createClient();
   if (!supabase) return null;
-  const school = await getCurrentSchool();
+  const resolvedSchoolId = schoolId ?? (await resolveSchoolId());
   let query = supabase.from("clubs").select("*").eq("slug", slug);
-  if (school?.id) query = query.eq("school_id", school.id);
+  if (resolvedSchoolId) query = query.eq("school_id", resolvedSchoolId);
   const { data, error } = await query.single();
   if (error) {
     console.error("[getClubBySlug]", error.message);
@@ -328,6 +335,7 @@ export async function getOpportunities(filters?: {
   category?: string;
   search?: string;
   closingSoon?: boolean;
+  schoolId?: string | null;
 }): Promise<Opportunity[]> {
   const profile = await getCurrentProfile();
   const adminView = isAdminRole(profile?.role);
@@ -355,12 +363,12 @@ export async function getOpportunities(filters?: {
   }
   const supabase = await createClient();
   if (!supabase) return [];
-  const school = await getCurrentSchool(profile);
+  const schoolId = await resolveSchoolId(filters?.schoolId, profile);
   let query = supabase
     .from("opportunities")
     .select("*")
     .neq("category", "Volunteering");
-  if (school?.id) query = query.eq("school_id", school.id);
+  if (schoolId) query = query.eq("school_id", schoolId);
   if (!adminView) {
     query = query.eq("status", "approved").eq("visibility", "public");
   }
@@ -381,11 +389,11 @@ export async function getOpportunities(filters?: {
   return (data as Opportunity[]) || [];
 }
 
-export async function getOpportunityCategories(): Promise<string[]> {
+export async function getOpportunityCategories(schoolId?: string | null): Promise<string[]> {
   if (isDemoMode()) {
     return [...new Set(demoOpportunities.map((opportunity) => opportunity.category).filter(Boolean) as string[])].sort();
   }
-  const opportunities = await getOpportunities();
+  const opportunities = await getOpportunities({ schoolId });
   return [...new Set(opportunities.map((opportunity) => opportunity.category).filter(Boolean) as string[])].sort();
 }
 
@@ -424,6 +432,7 @@ export async function getOpportunityBySlug(slug: string): Promise<Opportunity | 
 export async function getEvents(filters?: {
   eventType?: string;
   upcoming?: boolean;
+  schoolId?: string | null;
 }): Promise<Event[]> {
   if (isDemoMode()) {
     let events = attachClubToItems(
@@ -440,14 +449,14 @@ export async function getEvents(filters?: {
   }
   const supabase = await createClient();
   if (!supabase) return [];
-  const school = await getCurrentSchool();
+  const schoolId = await resolveSchoolId(filters?.schoolId);
   let query = supabase
     .from("events")
     .select("*, club:clubs(*)")
     .eq("status", "approved")
     .eq("visibility", "public")
     .neq("event_type", "volunteer");
-  if (school?.id) query = query.eq("school_id", school.id);
+  if (schoolId) query = query.eq("school_id", schoolId);
   if (filters?.eventType) query = query.eq("event_type", filters.eventType);
   if (filters?.upcoming !== false) query = query.gte("starts_at", new Date().toISOString());
   const { data, error } = await query.order("starts_at");
@@ -458,7 +467,7 @@ export async function getEvents(filters?: {
   return (data as Event[]) || [];
 }
 
-export async function getCalendarEvents(userId: string | null): Promise<Event[]> {
+export async function getCalendarEvents(userId: string | null, schoolId?: string | null): Promise<Event[]> {
   if (isDemoMode()) {
     const joinedClubIds = new Set(
       demoClubs
@@ -481,7 +490,7 @@ export async function getCalendarEvents(userId: string | null): Promise<Event[]>
 
   const supabase = await createClient();
   if (!supabase) return [];
-  const school = await getCurrentSchool();
+  const resolvedSchoolId = await resolveSchoolId(schoolId);
 
   const rangeStart = new Date();
   rangeStart.setFullYear(rangeStart.getFullYear() - 1);
@@ -495,7 +504,7 @@ export async function getCalendarEvents(userId: string | null): Promise<Event[]>
     .select("*, club:clubs(*)")
     .eq("status", "approved")
     .neq("event_type", "volunteer")
-    .eq("school_id", school?.id ?? DEFAULT_SCHOOL_ID)
+    .eq("school_id", resolvedSchoolId ?? DEFAULT_SCHOOL_ID)
     .gte("starts_at", rangeStart.toISOString())
     .lte("starts_at", rangeEnd.toISOString())
     .order("starts_at");

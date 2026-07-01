@@ -28,6 +28,13 @@ export interface AuthContext {
   isDemo: boolean;
 }
 
+export function defaultPathForProfile(profile: Pick<Profile, "role"> | null | undefined): string {
+  if (!profile) return "/dashboard";
+  if (profile.role === "super_admin") return "/admin/schools";
+  if (profile.role === "admin" || profile.role === "teacher") return "/manage";
+  return "/dashboard";
+}
+
 export async function getDemoUserId(): Promise<string | null> {
   const cookieStore = await cookies();
   return cookieStore.get(DEMO_USER_COOKIE)?.value ?? null;

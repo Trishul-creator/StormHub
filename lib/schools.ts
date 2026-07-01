@@ -11,6 +11,10 @@ export const DEFAULT_SCHOOL_SLUG =
 export const SUPPORT_EMAIL =
   process.env.SUPPORT_EMAIL?.trim() || "stormhubsupport@gmail.com";
 
+export function getDefaultSchoolSlug() {
+  return DEFAULT_SCHOOL_SLUG;
+}
+
 export interface SchoolSettings {
   school_id: string;
   announcements_enabled: boolean;
@@ -33,7 +37,8 @@ export const defaultSchoolSettings = (schoolId: string): SchoolSettings => ({
   email_sending_enabled: true,
 });
 
-export async function getSchoolBySlug(slug = DEFAULT_SCHOOL_SLUG): Promise<School | null> {
+export async function getSchoolBySlug(slug: string): Promise<School | null> {
+  if (!slug) return null;
   if (isDemoMode()) {
     const { demoSchool } = await import("@/lib/data/demo-data");
     return demoSchool;
@@ -56,7 +61,7 @@ export async function getSchoolBySlug(slug = DEFAULT_SCHOOL_SLUG): Promise<Schoo
 }
 
 export async function getSchoolById(schoolId: string | null | undefined): Promise<School | null> {
-  if (!schoolId) return getSchoolBySlug();
+  if (!schoolId) return null;
   if (isDemoMode()) {
     const { demoSchool } = await import("@/lib/data/demo-data");
     return demoSchool;
@@ -78,8 +83,51 @@ export async function getSchoolById(schoolId: string | null | undefined): Promis
   return data as School | null;
 }
 
+export async function getDefaultSchool(): Promise<School | null> {
+  return getSchoolBySlug(DEFAULT_SCHOOL_SLUG);
+}
+
+export async function getSchoolForProfile(profile?: Profile | null): Promise<School | null> {
+  if (!profile) return null;
+  if (profile.role === "super_admin") return null;
+  return profile.school_id ? getSchoolById(profile.school_id) : null;
+}
+
+export async function requireUserSchool(profile: Profile): Promise<School> {
+  const school = await getSchoolForProfile(profile);
+  if (!school) {
+    throw new Error("This account is not assigned to a school.");
+  }
+  return school;
+}
+
+export async function requireSchoolBySlug(slug: string): Promise<School> {
+  const school = await getSchoolBySlug(slug);
+  if (!school) {
+    throw new Error("School not found.");
+  }
+  return school;
+}
+
+/**
+ * Legacy fallback for old /clubs, /calendar, and /opportunities routes.
+ * New code should use route/profile-specific helpers instead.
+ */
 export async function getCurrentSchool(profile?: Profile | null): Promise<School | null> {
-  return profile?.school_id ? getSchoolById(profile.school_id) : getSchoolBySlug();
+  if (profile) return getSchoolForProfile(profile);
+  return getDefaultSchool();
+}
+
+export function getSchoolWorkspaceUrl(school: Pick<School, "slug">) {
+  return `/s/${school.slug}`;
+}
+
+export function getSchoolManageUrl(school: Pick<School, "slug">) {
+  return `/admin/schools/${school.slug}`;
+}
+
+export function getSchoolPublicUrl(school: Pick<School, "slug">) {
+  return `/s/${school.slug}`;
 }
 
 export async function getSchoolSettings(schoolId: string | null | undefined): Promise<SchoolSettings> {

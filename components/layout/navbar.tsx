@@ -19,6 +19,11 @@ const baseNavLinks = [
   { href: "/calendar", label: "Calendar" },
 ];
 
+const platformNavLinks = [
+  { href: "/", label: "Home" },
+  { href: "/admin/schools", label: "Schools" },
+];
+
 interface NavbarProps {
   isLoggedIn?: boolean;
   userEmail?: string;
@@ -41,9 +46,13 @@ export function Navbar({
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const navLinks =
-    role === "teacher"
+    role === "super_admin"
+      ? platformNavLinks
+      : role === "teacher"
       ? baseNavLinks
       : [...baseNavLinks, { href: "/opportunities", label: "Opportunities" }];
+  const primaryHref = role === "super_admin" ? "/admin/schools" : role === "admin" || role === "teacher" ? "/manage" : "/dashboard";
+  const primaryLabel = role === "super_admin" ? "Platform Admin" : role === "admin" || role === "teacher" ? "Manage" : "Dashboard";
 
   async function handleSignOut() {
     if (isDemoMode) await demoSignOut();
@@ -78,12 +87,12 @@ export function Navbar({
           {isLoggedIn ? (
             <>
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/dashboard"><LayoutDashboard className="h-4 w-4 mr-1" />Dashboard</Link>
+                <Link href={primaryHref}><LayoutDashboard className="h-4 w-4 mr-1" />{primaryLabel}</Link>
               </Button>
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/assistant"><Bot className="h-4 w-4 mr-1" />Assistant</Link>
               </Button>
-              {canManage && (
+              {canManage && role !== "super_admin" && primaryHref !== "/manage" && (
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/manage"><Shield className="h-4 w-4 mr-1" />Manage</Link>
                 </Button>
@@ -124,9 +133,9 @@ export function Navbar({
             <hr className="my-2" />
             {isLoggedIn ? (
               <>
-                <Link href="/dashboard" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Dashboard</Link>
+                <Link href={primaryHref} className="text-sm font-medium py-2" onClick={() => setOpen(false)}>{primaryLabel}</Link>
                 <Link href="/assistant" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Assistant</Link>
-                {canManage && <Link href="/manage" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Manage</Link>}
+                {canManage && role !== "super_admin" && primaryHref !== "/manage" && <Link href="/manage" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Manage</Link>}
                 <Link href="/notifications" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>
                   Notifications{unreadNotificationCount > 0 ? ` (${unreadNotificationCount})` : ""}
                 </Link>

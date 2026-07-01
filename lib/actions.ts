@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDemoMode } from "@/lib/supabase/mode";
-import { createProfileIfMissing, getAuthUserId, getCurrentProfile } from "@/lib/auth";
+import { createProfileIfMissing, defaultPathForProfile, getAuthUserId, getCurrentProfile } from "@/lib/auth";
 import { demoState } from "@/lib/data/demo-data";
 import { getClubBySlug } from "@/lib/data";
 import { friendlyError } from "@/lib/errors";
@@ -120,6 +120,9 @@ export async function joinClub(clubSlug: string): Promise<{ success: boolean; er
 
   const club = await getClubBySlug(clubSlug);
   if (!club) return { success: false, error: "Club not found." };
+  if (!profile.school_id || profile.school_id !== club.school_id) {
+    return { success: false, error: "You can only join clubs in your own school." };
+  }
   if (!["interest_open", "active"].includes(club.status) || !club.is_listed || club.visibility !== "public") {
     return { success: false, error: "This club is not currently open for students to join." };
   }
@@ -229,6 +232,15 @@ export async function rsvpToEvent(eventId: string): Promise<{ success: boolean; 
     return { success: false, error: "Only student accounts can RSVP to events." };
   }
 
+  const { data: event } = await supabase
+    .from("events")
+    .select("id, school_id")
+    .eq("id", eventId)
+    .maybeSingle();
+  if (!event || event.school_id !== profile.school_id) {
+    return { success: false, error: "You can only RSVP to events in your own school." };
+  }
+
   const { error } = await supabase.from("event_rsvps").upsert(
     { event_id: eventId, user_id: user.id, status: "going" },
     { onConflict: "event_id,user_id" }
@@ -278,6 +290,14 @@ export async function cancelRsvp(eventId: string): Promise<{ success: boolean; e
   if (profile?.role !== "student") {
     return { success: false, error: "Only student accounts can manage RSVPs." };
   }
+  const { data: event } = await supabase
+    .from("events")
+    .select("id, school_id")
+    .eq("id", eventId)
+    .maybeSingle();
+  if (!event || event.school_id !== profile.school_id) {
+    return { success: false, error: "You can only manage RSVPs in your own school." };
+  }
 
   const { error } = await supabase.from("event_rsvps").delete().eq("event_id", eventId).eq("user_id", user.id);
   if (error) return { success: false, error: friendlyError(error, "Could not cancel RSVP.") };
@@ -321,6 +341,19 @@ export async function bookmarkEntity(
   const profile = await getCurrentProfile();
   if (type === "opportunity" && profile?.role !== "student") {
     return { success: false, error: "Only student accounts can save opportunities." };
+  }
+  if (!profile?.school_id) {
+    return { success: false, error: "Your account is not assigned to a school." };
+  }
+
+  const table = type === "opportunity" ? "opportunities" : type === "event" ? "events" : "clubs";
+  const { data: targetItem, error: targetError } = await supabase
+    .from(table)
+    .select("id, school_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (targetError || !targetItem || targetItem.school_id !== profile.school_id) {
+    return { success: false, error: "You can only save items from your own school." };
   }
 
   const field = type === "opportunity" ? "opportunity_id" : type === "event" ? "event_id" : "club_id";
@@ -1018,12 +1051,20 @@ export async function supabaseSignIn(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { success: false, error: friendlyError(error, "Sign in failed.") };
   if (data.user) {
-    await createProfileIfMissing(data.user.id, data.user.email ?? "", data.user.user_metadata?.full_name as string);
+    const profile = await createProfileIfMissing(data.user.id, data.user.email ?? "", data.user.user_metadata?.full_name as string);
+    return { success: true, redirectTo: defaultPathForProfile(profile) };
   }
   return { success: true };
 }
 
-export async function supabaseSignUp(email: string, password: string, fullName: string, gradeLevel?: number | null, accessCode?: string) {
+export async function supabaseSignUp(
+  email: string,
+  password: string,
+  fullName: string,
+  gradeLevel?: number | null,
+  accessCode?: string,
+  schoolId?: string | null
+) {
   const normalizedEmail = email.trim().toLowerCase();
   const normalizedFullName = fullName.trim().replace(/\s+/g, " ");
   const requiredAccessCode = process.env.SIGNUP_ACCESS_CODE?.trim();
@@ -1035,6 +1076,20 @@ export async function supabaseSignUp(email: string, password: string, fullName: 
   }
   if (requiredAccessCode && accessCode?.trim() !== requiredAccessCode) {
     return { success: false, error: "Enter the correct school signup code." };
+  }
+  if (!schoolId) {
+    return { success: false, error: "Choose your school." };
+  }
+  const admin = createAdminClient();
+  const db = admin ?? await createClient();
+  if (!db) return { success: false, error: "Database not configured." };
+  const { data: school, error: schoolError } = await db
+    .from("schools")
+    .select("id, is_active")
+    .eq("id", schoolId)
+    .maybeSingle();
+  if (schoolError || !school || school.is_active === false) {
+    return { success: false, error: "Choose an active school." };
   }
   const normalizedGrade = typeof gradeLevel === "number" && gradeLevel >= 6 && gradeLevel <= 12
     ? gradeLevel
@@ -1062,14 +1117,14 @@ export async function supabaseSignUp(email: string, password: string, fullName: 
   const { data, error } = await supabase.auth.signUp({
     email: normalizedEmail,
     password,
-    options: { data: { full_name: normalizedFullName, grade_level: normalizedGrade } },
+    options: { data: { full_name: normalizedFullName, grade_level: normalizedGrade, school_id: schoolId } },
   });
   if (error) return { success: false, error: friendlyError(error, "Sign up failed.") };
   if (data.user) {
     await createProfileIfMissing(data.user.id, normalizedEmail, normalizedFullName);
     await supabase
       .from("profiles")
-      .update({ full_name: normalizedFullName, grade_level: normalizedGrade })
+      .update({ full_name: normalizedFullName, grade_level: normalizedGrade, school_id: schoolId })
       .eq("id", data.user.id);
   }
   return { success: true, needsConfirmation: !data.session };
@@ -1103,7 +1158,7 @@ export async function supabaseSignOut() {
   if (supabase) await supabase.auth.signOut();
 }
 
-export async function checkMembership(slug: string): Promise<boolean> {
+export async function checkMembership(slug: string, schoolId?: string | null): Promise<boolean> {
   if (isDemoMode()) {
     const memberships = await getDemoMemberships();
     return memberships.has(slug);
@@ -1115,7 +1170,7 @@ export async function checkMembership(slug: string): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
 
-  const club = await getClubBySlug(slug);
+  const club = await getClubBySlug(slug, schoolId);
   if (!club) return false;
 
   const { data } = await supabase

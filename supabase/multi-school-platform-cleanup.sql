@@ -16,6 +16,9 @@ ALTER TABLE public.schools ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL D
 ALTER TABLE public.schools ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE public.schools ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
+-- Super admins are platform-level accounts and may not belong to one school.
+ALTER TABLE public.profiles ALTER COLUMN school_id DROP NOT NULL;
+
 INSERT INTO public.schools (
   id, name, short_name, slug, city, state, mascot, is_active, is_public
 ) VALUES (
@@ -134,6 +137,59 @@ RETURNS BOOLEAN AS $$
       AND (role = 'super_admin' OR school_id = school_uuid)
   );
 $$ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public;
+
+-- Normal auth signups are school-specific. Super admin accounts should be
+-- promoted intentionally after creation and can have school_id cleared.
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+DECLARE
+  target_school_id UUID;
+  raw_school_id TEXT;
+  raw_grade TEXT;
+  parsed_grade INT;
+BEGIN
+  raw_school_id := NEW.raw_user_meta_data->>'school_id';
+  IF raw_school_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+    SELECT id INTO target_school_id
+    FROM public.schools
+    WHERE id = raw_school_id::UUID
+      AND is_active = TRUE
+    LIMIT 1;
+  END IF;
+
+  IF target_school_id IS NULL THEN
+    SELECT id INTO target_school_id
+    FROM public.schools
+    WHERE slug = 'elkhorn-south'
+      AND is_active = TRUE
+    LIMIT 1;
+  END IF;
+
+  raw_grade := NEW.raw_user_meta_data->>'grade_level';
+  IF raw_grade ~ '^[0-9]+$' THEN
+    parsed_grade := raw_grade::INT;
+  END IF;
+  IF parsed_grade NOT BETWEEN 9 AND 12 THEN
+    parsed_grade := NULL;
+  END IF;
+
+  INSERT INTO public.profiles (
+    id, email, full_name, role, school_id, grade_level, created_at, updated_at
+  )
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NULLIF(NEW.raw_user_meta_data->>'full_name', ''), NEW.email, 'New user'),
+    'student',
+    target_school_id,
+    parsed_grade,
+    NOW(),
+    NOW()
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Public club visibility also requires an active/public school.
 DROP POLICY IF EXISTS "clubs_public_read" ON public.clubs;

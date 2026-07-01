@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { createProfileIfMissing } from "@/lib/auth";
+import { createProfileIfMissing, defaultPathForProfile } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -12,12 +12,13 @@ export async function GET(request: Request) {
     if (supabase) {
       const { data, error } = await supabase.auth.exchangeCodeForSession(code);
       if (!error && data.user) {
-        await createProfileIfMissing(
+        const profile = await createProfileIfMissing(
           data.user.id,
           data.user.email ?? "",
           data.user.user_metadata?.full_name as string | undefined
         );
-        return NextResponse.redirect(`${origin}${next}`);
+        const destination = next === "/dashboard" ? defaultPathForProfile(profile) : next;
+        return NextResponse.redirect(`${origin}${destination}`);
       }
     }
   }

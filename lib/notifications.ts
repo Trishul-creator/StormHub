@@ -11,7 +11,7 @@ import type {
   NotificationType,
 } from "@/types/database";
 import { cookies } from "next/headers";
-import { isEmailDeliveryEnabled, sendEmailOutboxItem } from "@/lib/email";
+import { isEmailDeliveryEnabled, isEmailOutboxEnabled, sendEmailOutboxItem } from "@/lib/email";
 
 const defaultPreferences = (userId: string): NotificationPreferences => ({
   user_id: userId,
@@ -159,7 +159,7 @@ export async function createEmailOutboxItem(input: {
   type: string;
 }): Promise<void> {
   if (isDemoMode()) return;
-  if (!isEmailDeliveryEnabled()) return;
+  if (!isEmailOutboxEnabled()) return;
   const admin = createAdminClient();
   if (!admin) {
     console.warn("[createEmailOutboxItem] SUPABASE_SERVICE_ROLE_KEY is required for trusted queue writes.");
@@ -181,7 +181,7 @@ export async function createEmailOutboxItem(input: {
     console.error("[createEmailOutboxItem]", error.message);
     return;
   }
-  if (data) await sendEmailOutboxItem(data);
+  if (data && isEmailDeliveryEnabled()) await sendEmailOutboxItem(data);
 }
 
 export async function maybeQueueEmailForNotification(

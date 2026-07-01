@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth";
 import { Users, School, FileText, BarChart3 } from "lucide-react";
+import { redirect } from "next/navigation";
 
 const adminLinks = [
   { href: "/admin/users", icon: Users, title: "Users & Roles", description: "Manage student and staff accounts" },
@@ -13,6 +14,7 @@ const adminLinks = [
 
 export default async function AdminPage() {
   const { profile } = await requireAdmin();
+  if (profile.role === "super_admin") redirect("/admin/schools");
   const visibleLinks = adminLinks.filter((link) => {
     if (link.href === "/admin/schools") return profile.role === "super_admin";
     return true;

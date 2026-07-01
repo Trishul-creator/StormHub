@@ -32,7 +32,8 @@ export default function SignInPage() {
     if (result.success) {
       toast({ title: "Welcome back!", description: "You're signed in to StormHub." });
       const params = new URLSearchParams(window.location.search);
-      router.push(params.get("redirect") || "/dashboard");
+      const redirectTo = "redirectTo" in result && typeof result.redirectTo === "string" ? result.redirectTo : undefined;
+      router.push(params.get("redirect") || redirectTo || "/dashboard");
       router.refresh();
     } else {
       toast({ title: "Sign in failed", description: result.error, variant: "destructive" });

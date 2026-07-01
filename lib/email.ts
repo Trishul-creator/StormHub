@@ -18,10 +18,21 @@ interface SendEmailResult {
 const deliveryMode = () =>
   process.env.EMAIL_DELIVERY_MODE?.trim().toLowerCase() ||
   process.env.EMAIL_PROVIDER?.trim().toLowerCase() ||
-  (process.env.RESEND_API_KEY ? "resend" : "in_app_only");
+  (process.env.RESEND_API_KEY ? "send" : "outbox_only");
+
+export function getEmailDeliveryMode(): "disabled" | "outbox_only" | "send" {
+  const mode = deliveryMode();
+  if (mode === "send" || mode === "resend") return "send";
+  if (mode === "disabled" || mode === "none" || mode === "in_app_only") return "disabled";
+  return "outbox_only";
+}
 
 export function isEmailDeliveryEnabled(): boolean {
-  return deliveryMode() === "resend";
+  return getEmailDeliveryMode() === "send";
+}
+
+export function isEmailOutboxEnabled(): boolean {
+  return getEmailDeliveryMode() !== "disabled";
 }
 
 const appUrl = () =>
@@ -52,6 +63,7 @@ function toHtml(body: string) {
 async function sendWithResend(input: SendEmailInput): Promise<SendEmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
+  const replyTo = process.env.EMAIL_REPLY_TO;
   if (!apiKey || !from) {
     return { success: false, error: "Missing RESEND_API_KEY or EMAIL_FROM." };
   }
@@ -70,6 +82,7 @@ async function sendWithResend(input: SendEmailInput): Promise<SendEmailResult> {
       subject: input.subject,
       text,
       html: toHtml(text),
+      ...(replyTo ? { reply_to: replyTo } : {}),
     }),
   });
 
@@ -90,8 +103,11 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   if (isDemoMode()) return { success: true };
 
   switch (deliveryMode()) {
+    case "send":
     case "resend":
       return sendWithResend(input);
+    case "outbox_only":
+      return { success: true };
     case "disabled":
     case "none":
     case "in_app_only":
