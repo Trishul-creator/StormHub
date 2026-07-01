@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { MeetingTimeInput } from "@/components/manage/meeting-time-input";
 import { submitClubProposal } from "@/lib/actions";
 import { toast } from "@/hooks/use-toast";
 
@@ -61,10 +62,7 @@ export function ClubProposalForm({ requiresApproval = true }: { requiresApproval
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="meetingTime">Meeting time</Label>
-          <Input id="meetingTime" name="meetingTime" placeholder="Tuesdays after school" className="mt-1" />
-        </div>
+        <MeetingTimeInput id="meetingTime" name="meetingTime" />
         <div>
           <Label htmlFor="meetingLocation">Meeting location</Label>
           <Input id="meetingLocation" name="meetingLocation" placeholder="Room 123" className="mt-1" />

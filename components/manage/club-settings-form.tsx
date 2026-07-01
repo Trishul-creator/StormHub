@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { MeetingTimeInput } from "@/components/manage/meeting-time-input";
 import { toast } from "@/hooks/use-toast";
 import type { Club, ClubStatus } from "@/types/database";
 
@@ -69,7 +70,7 @@ export function ClubSettingsForm({ club, publishMode = false }: { club: Club; pu
       <div><Label htmlFor="long_description">Full description</Label><Textarea id="long_description" name="long_description" defaultValue={club.long_description ?? ""} rows={5} className="mt-1" /></div>
       <div><Label htmlFor="join_instructions">Join instructions</Label><Textarea id="join_instructions" name="join_instructions" defaultValue={club.join_instructions ?? ""} rows={3} className="mt-1" placeholder="Example: Click Join Club, attend the next meeting, or contact the sponsor." /></div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div><Label htmlFor="meeting_time">Meeting time</Label><Input id="meeting_time" name="meeting_time" defaultValue={club.meeting_time ?? ""} className="mt-1" /></div>
+        <MeetingTimeInput id="meeting_time" name="meeting_time" defaultValue={club.meeting_time} />
         <div><Label htmlFor="meeting_location">Meeting location</Label><Input id="meeting_location" name="meeting_location" defaultValue={club.meeting_location ?? ""} className="mt-1" /></div>
       </div>
       <div><Label htmlFor="sponsor_name">Sponsor name</Label><Input id="sponsor_name" name="sponsor_name" defaultValue={club.sponsor_name ?? ""} className="mt-1" /></div>
