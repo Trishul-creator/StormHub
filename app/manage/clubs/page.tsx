@@ -4,19 +4,30 @@ import { CategoryBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getManageableClubs } from "@/lib/data";
 import { requireManager } from "@/lib/auth";
-import { Settings } from "lucide-react";
+import { FilePenLine, Settings } from "lucide-react";
 import { EmptyState } from "@/components/layout/empty-state";
 import { isAdminRole } from "@/lib/permissions";
 
 export default async function ManageClubsPage() {
   const { profile } = await requireManager();
-  const clubs = await getManageableClubs(profile);
+  const clubs = (await getManageableClubs(profile)).filter(
+    (club) => club.status !== "draft" && club.status !== "archived" && club.is_listed
+  );
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <PageHeader title="Manage Clubs" description="Clubs you can manage as an officer or sponsor.">
+      <PageHeader title="Manage Clubs" description="Published clubs you can manage as an officer, sponsor, or administrator.">
         {(profile.role === "teacher" || isAdminRole(profile.role)) && (
-          <Button asChild><Link href="/manage/clubs/new">Propose club</Link></Button>
+          <Button variant="outline" asChild>
+            <Link href="/manage/clubs/drafts">
+              <FilePenLine className="h-4 w-4" /> Draft Clubs
+            </Link>
+          </Button>
+        )}
+        {(profile.role === "teacher" || isAdminRole(profile.role)) && (
+          <Button asChild>
+            <Link href="/manage/clubs/new">{isAdminRole(profile.role) ? "Create draft club" : "Propose club"}</Link>
+          </Button>
         )}
       </PageHeader>
       <div className="space-y-3">
@@ -41,7 +52,9 @@ export default async function ManageClubsPage() {
         {clubs.length === 0 && (
           <EmptyState
             title="No clubs to manage"
-            description="Officer and sponsor access is based on your active club membership role."
+            description="Published clubs will appear here. Draft clubs stay in the draft catalog until they are published."
+            actionLabel={(profile.role === "teacher" || isAdminRole(profile.role)) ? "Open draft clubs" : undefined}
+            actionHref={(profile.role === "teacher" || isAdminRole(profile.role)) ? "/manage/clubs/drafts" : undefined}
           />
         )}
       </div>
