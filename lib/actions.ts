@@ -88,8 +88,6 @@ async function notifySchoolStudentsAboutPublishedClub(input: { club: Club }) {
   const description = input.club.short_description || input.club.long_description || "A new club is now available on StormHub.";
   const details = [
     input.club.category ? `Category: ${input.club.category}` : null,
-    input.club.meeting_time ? `Meets: ${input.club.meeting_time}` : null,
-    input.club.meeting_location ? `Location: ${input.club.meeting_location}` : null,
   ].filter(Boolean).join("\n");
   const joinText = input.club.join_instructions || "Open StormHub to view the club and join or request updates.";
   const title = `New club at ${schoolName}: ${input.club.name}`;
@@ -659,8 +657,6 @@ export async function submitClubProposal(data: {
   name: string;
   shortDescription: string;
   category: string;
-  meetingTime?: string;
-  meetingLocation?: string;
   sponsorUserId?: string;
 }): Promise<{ success: boolean; error?: string; message?: string }> {
   if (isDemoMode()) return { success: false, error: "Club proposals are unavailable in demo mode." };
@@ -690,8 +686,8 @@ export async function submitClubProposal(data: {
     slug,
     short_description: data.shortDescription.trim() || null,
     category: data.category.trim() || "Other",
-    meeting_time: data.meetingTime?.trim() || null,
-    meeting_location: data.meetingLocation?.trim() || null,
+    meeting_time: null,
+    meeting_location: null,
     sponsor_name: sponsor?.full_name || sponsor?.email || null,
     sponsor_email: sponsor?.email || null,
     status: "draft",
@@ -1113,8 +1109,6 @@ export async function updateClubSettings(data: {
   shortDescription: string;
   longDescription?: string;
   joinInstructions?: string;
-  meetingTime: string;
-  meetingLocation: string;
   sponsorUserId?: string;
   status: "draft" | "interest_open" | "active" | "paused" | "archived";
   visibility: "public" | "unlisted" | "private";
@@ -1157,8 +1151,8 @@ export async function updateClubSettings(data: {
     short_description: data.shortDescription,
     long_description: data.longDescription?.trim() || null,
     join_instructions: data.joinInstructions?.trim() || null,
-    meeting_time: data.meetingTime || null,
-    meeting_location: data.meetingLocation || null,
+    meeting_time: null,
+    meeting_location: null,
     sponsor_name: sponsor?.full_name || sponsor?.email || null,
     sponsor_email: sponsor?.email || null,
     status: data.status,
@@ -1184,8 +1178,8 @@ export async function updateClubSettings(data: {
         short_description: data.shortDescription,
         long_description: data.longDescription?.trim() || club.long_description,
         join_instructions: data.joinInstructions?.trim() || club.join_instructions,
-        meeting_time: data.meetingTime || null,
-        meeting_location: data.meetingLocation || null,
+        meeting_time: null,
+        meeting_location: null,
         status: data.status,
         visibility: data.visibility,
         is_listed: data.isListed,

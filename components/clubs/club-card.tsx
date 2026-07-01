@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Users, Clock, MapPin } from "lucide-react";
+import { Users } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { CategoryBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,9 +47,6 @@ export function ClubCard({ club, isMember, isLoggedIn, canJoin, canManage, schoo
           </div>
         )}
         <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-          {club.meeting_time && (
-            <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{club.meeting_time}</span>
-          )}
           {club.member_count !== undefined && (
             <span className="flex items-center gap-1"><Users className="h-3 w-3" />{club.member_count} members</span>
           )}

@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MeetingTimeInput } from "@/components/manage/meeting-time-input";
 import { toast } from "@/hooks/use-toast";
 import type { Club, ClubStatus, Profile } from "@/types/database";
 
@@ -42,8 +41,6 @@ export function ClubSettingsForm({
         shortDescription: String(form.get("short_description") ?? ""),
         longDescription: String(form.get("long_description") ?? ""),
         joinInstructions: String(form.get("join_instructions") ?? ""),
-        meetingTime: String(form.get("meeting_time") ?? ""),
-        meetingLocation: String(form.get("meeting_location") ?? ""),
         sponsorUserId: String(form.get("sponsor_user_id") ?? ""),
         status,
         visibility,
@@ -78,10 +75,9 @@ export function ClubSettingsForm({
       <div><Label htmlFor="short_description">Short description</Label><Textarea id="short_description" name="short_description" defaultValue={club.short_description ?? ""} className="mt-1" /></div>
       <div><Label htmlFor="long_description">Full description</Label><Textarea id="long_description" name="long_description" defaultValue={club.long_description ?? ""} rows={5} className="mt-1" /></div>
       <div><Label htmlFor="join_instructions">Join instructions</Label><Textarea id="join_instructions" name="join_instructions" defaultValue={club.join_instructions ?? ""} rows={3} className="mt-1" placeholder="Example: Click Join Club, attend the next meeting, or contact the sponsor." /></div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <MeetingTimeInput id="meeting_time" name="meeting_time" defaultValue={club.meeting_time} className="md:col-span-2" />
-        <div><Label htmlFor="meeting_location">Meeting location</Label><Input id="meeting_location" name="meeting_location" defaultValue={club.meeting_location ?? ""} className="mt-1" /></div>
-      </div>
+      <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+        Create dated meetings from the club dashboard using Create Event. Club profile settings do not control meeting dates.
+      </p>
       <div>
         <Label htmlFor="sponsor_user_id">Teacher sponsor</Label>
         <select

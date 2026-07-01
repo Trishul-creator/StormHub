@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MeetingTimeInput } from "@/components/manage/meeting-time-input";
 import { submitClubProposal } from "@/lib/actions";
 import { toast } from "@/hooks/use-toast";
 import type { Profile } from "@/types/database";
@@ -31,8 +30,6 @@ export function ClubProposalForm({
         name: String(form.get("name") ?? ""),
         shortDescription: String(form.get("shortDescription") ?? ""),
         category: String(form.get("category") ?? ""),
-        meetingTime: String(form.get("meetingTime") ?? ""),
-        meetingLocation: String(form.get("meetingLocation") ?? ""),
         sponsorUserId: String(form.get("sponsorUserId") ?? ""),
       });
       if (result.success) {
@@ -82,13 +79,9 @@ export function ClubProposalForm({
           </select>
         </div>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <MeetingTimeInput id="meetingTime" name="meetingTime" className="md:col-span-2" />
-        <div>
-          <Label htmlFor="meetingLocation">Meeting location</Label>
-          <Input id="meetingLocation" name="meetingLocation" placeholder="Room 123" className="mt-1" />
-        </div>
-      </div>
+      <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+        Add dated meetings later from the club dashboard using Create Event. Club setup only creates the club profile.
+      </p>
       <Button type="submit" disabled={pending}>
         {pending ? "Submitting..." : requiresApproval ? "Submit proposal" : "Create draft club"}
       </Button>

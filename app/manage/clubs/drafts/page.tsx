@@ -36,7 +36,7 @@ export default async function DraftClubsPage() {
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 {club.category && <CategoryBadge category={club.category} />}
                 <span className="text-xs text-muted-foreground">
-                  Draft · hidden from students · {club.meeting_time || "meeting TBD"}
+                  Draft · hidden from students
                 </span>
               </div>
               {club.short_description && (

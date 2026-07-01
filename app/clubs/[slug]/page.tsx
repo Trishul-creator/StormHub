@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Clock, MapPin, Users, ArrowLeft } from "lucide-react";
+import { Users, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryBadge } from "@/components/ui/badge";
 import { JoinClubButton } from "@/components/clubs/join-club-button";
@@ -136,18 +136,6 @@ export default async function ClubPage({ params }: ClubPageProps) {
                 <Users className="h-4 w-4 text-muted-foreground" />
                 <span>{memberCount} members</span>
               </div>
-              {club.meeting_time && (
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span>{club.meeting_time}</span>
-                </div>
-              )}
-              {club.meeting_location && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span>{club.meeting_location}</span>
-                </div>
-              )}
             </dl>
 
             {club.sponsor_name && (

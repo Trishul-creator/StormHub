@@ -129,18 +129,6 @@ export default async function SchoolClubPage({ params }: SchoolClubPageProps) {
               </p>
             )}
             <div className="mt-5 space-y-3 text-sm">
-              {club.meeting_time && (
-                <div>
-                  <p className="font-medium text-storm-navy">Meeting time</p>
-                  <p className="text-muted-foreground">{club.meeting_time}</p>
-                </div>
-              )}
-              {club.meeting_location && (
-                <div>
-                  <p className="font-medium text-storm-navy">Location</p>
-                  <p className="text-muted-foreground">{club.meeting_location}</p>
-                </div>
-              )}
               {club.sponsor_name && (
                 <div>
                   <p className="font-medium text-storm-navy">Sponsor</p>
