@@ -1,17 +1,18 @@
 import { DigestPreview } from "@/components/manage/digest-preview";
 import { PageHeader } from "@/components/layout/page-header";
-import { getOpportunities, getEvents, getFeaturedClubs, getWorkshops, getRecentAnnouncements } from "@/lib/data";
+import { getOpportunities, getEvents, getFeaturedClubs, getRecentAnnouncements } from "@/lib/data";
 import { requireManager } from "@/lib/auth";
+import { getCurrentSchool } from "@/lib/schools";
 
 export default async function DigestPage() {
-  await requireManager();
+  const { profile } = await requireManager();
 
-  const [opportunities, events, clubs, workshops, announcements] = await Promise.all([
+  const [opportunities, events, clubs, announcements, school] = await Promise.all([
     getOpportunities(),
     getEvents(),
     getFeaturedClubs(),
-    getWorkshops(),
     getRecentAnnouncements(),
+    getCurrentSchool(profile),
   ]);
   const chronologicalAnnouncements = [...announcements].sort((a, b) => {
     const aTime = new Date(a.published_at ?? a.created_at ?? 0).getTime();
@@ -25,7 +26,13 @@ export default async function DigestPage() {
         title="Weekly Digest"
         description="Preview newsletter content for school announcements. Copy and paste into your school newsletter."
       />
-      <DigestPreview opportunities={opportunities} events={events} clubs={clubs} workshops={workshops} announcements={chronologicalAnnouncements} />
+      <DigestPreview
+        opportunities={opportunities}
+        events={events}
+        clubs={clubs}
+        announcements={chronologicalAnnouncements}
+        schoolName={school?.name ?? "Your school"}
+      />
     </div>
   );
 }

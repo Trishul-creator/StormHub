@@ -51,13 +51,20 @@ export interface School {
   id: string;
   name: string;
   slug: string;
+  short_name?: string | null;
   address?: string | null;
   city?: string | null;
   state?: string | null;
   zip?: string | null;
   website_url?: string | null;
+  logo_url?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
   mascot?: string | null;
+  is_active?: boolean;
+  is_public?: boolean;
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface Profile {

@@ -15,8 +15,14 @@ interface SendEmailResult {
   error?: string;
 }
 
-const provider = () =>
-  process.env.EMAIL_PROVIDER?.trim().toLowerCase() || (process.env.RESEND_API_KEY ? "resend" : "");
+const deliveryMode = () =>
+  process.env.EMAIL_DELIVERY_MODE?.trim().toLowerCase() ||
+  process.env.EMAIL_PROVIDER?.trim().toLowerCase() ||
+  (process.env.RESEND_API_KEY ? "resend" : "in_app_only");
+
+export function isEmailDeliveryEnabled(): boolean {
+  return deliveryMode() === "resend";
+}
 
 const appUrl = () =>
   process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || process.env.APP_URL?.replace(/\/$/, "") || "";
@@ -83,16 +89,16 @@ async function sendWithResend(input: SendEmailInput): Promise<SendEmailResult> {
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   if (isDemoMode()) return { success: true };
 
-  switch (provider()) {
+  switch (deliveryMode()) {
     case "resend":
       return sendWithResend(input);
+    case "disabled":
+    case "none":
+    case "in_app_only":
     case "":
-      return {
-        success: false,
-        error: "No EMAIL_PROVIDER configured. Set EMAIL_PROVIDER=resend, RESEND_API_KEY, and EMAIL_FROM.",
-      };
+      return { success: true };
     default:
-      return { success: false, error: `Unsupported EMAIL_PROVIDER: ${provider()}.` };
+      return { success: false, error: `Unsupported EMAIL_DELIVERY_MODE: ${deliveryMode()}.` };
   }
 }
 
@@ -124,6 +130,7 @@ export async function sendEmailOutboxItem(
 
 export async function processEmailOutbox(limit = 50): Promise<{ attempted: number; sent: number; failed: number }> {
   if (isDemoMode()) return { attempted: 0, sent: 0, failed: 0 };
+  if (!isEmailDeliveryEnabled()) return { attempted: 0, sent: 0, failed: 0 };
   const admin = createAdminClient();
   if (!admin) return { attempted: 0, sent: 0, failed: 0 };
 

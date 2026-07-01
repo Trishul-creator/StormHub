@@ -3,21 +3,21 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
-import type { Club, ClubAnnouncement, Event, Opportunity, Workshop } from "@/types/database";
+import type { Club, ClubAnnouncement, Event, Opportunity } from "@/types/database";
 import { Copy, Check } from "lucide-react";
 
 interface DigestPreviewProps {
   opportunities: Opportunity[];
   events: Event[];
   clubs: Club[];
-  workshops: Workshop[];
   announcements: (ClubAnnouncement & { club?: Club })[];
+  schoolName: string;
 }
 
-export function DigestPreview({ opportunities, events, clubs, workshops, announcements }: DigestPreviewProps) {
+export function DigestPreview({ opportunities, events, clubs, announcements, schoolName }: DigestPreviewProps) {
   const [copied, setCopied] = useState(false);
 
-  const digest = `STORMHUB WEEKLY DIGEST — Elkhorn South High School
+  const digest = `STORMHUB WEEKLY DIGEST — ${schoolName}
 Generated: ${formatDate(new Date())}
 
 📌 NEW OPPORTUNITIES
@@ -31,9 +31,6 @@ ${events.slice(0, 5).map((e) => `• ${e.title} — ${formatDate(e.starts_at)}`)
 
 ⭐ FEATURED CLUBS
 ${clubs.map((c) => `• ${c.name}: ${c.short_description}`).join("\n")}
-
-🎓 WORKSHOPS & TUTORING
-${workshops.map((w) => `• ${w.title} (${w.subject_area})`).join("\n")}
 
 Discover more at StormHub — your student opportunity hub.
 `;

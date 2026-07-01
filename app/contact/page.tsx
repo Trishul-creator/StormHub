@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { submitFeedback } from "@/lib/actions";
 import { toast } from "@/hooks/use-toast";
 
+const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "stormhubsupport@gmail.com";
+
 export default function ContactPage() {
   const [loading, setLoading] = useState(false);
 
@@ -37,6 +39,18 @@ export default function ContactPage() {
         title="Contact & Feedback"
         description="Share feedback, report issues, or suggest improvements for StormHub."
       />
+      <div className="mb-6 rounded-xl border border-storm-light bg-storm-light/30 p-4 text-sm text-muted-foreground">
+        <p>
+          Need help with a bug, account issue, or something urgent? Email{" "}
+          <a className="font-medium text-storm-electric underline-offset-4 hover:underline" href={`mailto:${SUPPORT_EMAIL}`}>
+            {SUPPORT_EMAIL}
+          </a>
+          .
+        </p>
+        <p className="mt-2">
+          You can also use the form below. Messages are emailed to StormHub support.
+        </p>
+      </div>
       <form onSubmit={handleSubmit} className="rounded-xl border bg-white p-6 space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -51,7 +65,7 @@ export default function ContactPage() {
         <div>
           <Label htmlFor="category">Category</Label>
           <select id="category" name="category" required className="mt-1 flex h-10 w-full rounded-lg border border-input bg-white px-3 py-2 text-sm">
-            <option value="feedback">General feedback</option>
+            <option value="app-feedback">App feedback / support</option>
             <option value="bug">Bug report</option>
             <option value="feature">Feature request</option>
             <option value="club">Club-related</option>

@@ -3,14 +3,18 @@ import { StatCard } from "@/components/layout/stat-cards";
 import { getAdminAnalytics } from "@/lib/data";
 import { requireAnalyticsAccess } from "@/lib/auth";
 import { Users, Calendar, Briefcase, Bookmark } from "lucide-react";
+import { getCurrentSchool } from "@/lib/schools";
 
 export default async function AnalyticsPage() {
-  await requireAnalyticsAccess();
-  const analytics = await getAdminAnalytics();
+  const { profile } = await requireAnalyticsAccess();
+  const [analytics, school] = await Promise.all([
+    getAdminAnalytics(),
+    getCurrentSchool(profile),
+  ]);
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <PageHeader title="Analytics" description="Platform metrics for Elkhorn South High School." />
+      <PageHeader title="Analytics" description={`Platform metrics for ${school?.name ?? "your school"}.`} />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         <StatCard label="Total clubs" value={analytics.totalClubs} icon={Users} />

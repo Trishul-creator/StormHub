@@ -6,16 +6,17 @@ import { StatCards } from "@/components/layout/stat-cards";
 import { ClubCard } from "@/components/clubs/club-card";
 import { EventCard } from "@/components/events/event-card";
 import { getFeaturedClubs, getEvents, getManageableClubs, getStats } from "@/lib/data";
-import { SCHOOL_NAME } from "@/lib/utils";
 import { getAuthContext } from "@/lib/auth";
 import { getUserRsvpIds } from "@/lib/actions";
+import { getCurrentSchool } from "@/lib/schools";
 
 export default async function HomePage() {
-  const [featuredClubs, events, stats, auth] = await Promise.all([
+  const [featuredClubs, events, stats, auth, school] = await Promise.all([
     getFeaturedClubs(),
     getEvents({ upcoming: true }),
     getStats(),
     getAuthContext(),
+    getCurrentSchool(),
   ]);
   const manageable = auth.profile ? await getManageableClubs(auth.profile) : [];
   const manageableSlugs = new Set(manageable.map((club) => club.slug));
@@ -31,13 +32,13 @@ export default async function HomePage() {
           <div className="max-w-3xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-sm backdrop-blur">
               <Zap className="h-4 w-4 text-storm-electric" />
-              Student-built opportunity hub · {SCHOOL_NAME}
+              Student-built opportunity hub · {school?.name ?? "Your school"}
             </div>
             <h1 className="text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl text-balance">
-              Find your next opportunity at Elkhorn South.
+              Find your next opportunity at {school?.short_name ?? school?.name ?? "your school"}.
             </h1>
             <p className="mt-6 text-lg text-storm-silver md:text-xl max-w-2xl">
-              StormHub brings clubs, meetings, events, applications, tryouts, auditions, workshops, and deadlines into one clear place.
+              StormHub brings clubs, meetings, events, applications, tryouts, auditions, and deadlines into one clear place.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button size="lg" variant="secondary" asChild>

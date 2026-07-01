@@ -11,7 +11,7 @@ import type {
   NotificationType,
 } from "@/types/database";
 import { cookies } from "next/headers";
-import { sendEmailOutboxItem } from "@/lib/email";
+import { isEmailDeliveryEnabled, sendEmailOutboxItem } from "@/lib/email";
 
 const defaultPreferences = (userId: string): NotificationPreferences => ({
   user_id: userId,
@@ -159,6 +159,7 @@ export async function createEmailOutboxItem(input: {
   type: string;
 }): Promise<void> {
   if (isDemoMode()) return;
+  if (!isEmailDeliveryEnabled()) return;
   const admin = createAdminClient();
   if (!admin) {
     console.warn("[createEmailOutboxItem] SUPABASE_SERVICE_ROLE_KEY is required for trusted queue writes.");
@@ -365,13 +366,16 @@ export async function createAdminAttentionNotification(input: {
   title: string;
   message: string;
   link: string;
+  schoolId?: string | null;
   importance?: NotificationImportance;
   type?: NotificationType;
 }): Promise<void> {
   if (isDemoMode()) return;
   const admin = createAdminClient();
   if (!admin) return;
-  const { data } = await admin.from("profiles").select("id").in("role", ["admin", "super_admin"]);
+  let query = admin.from("profiles").select("id").eq("role", "admin");
+  if (input.schoolId) query = query.eq("school_id", input.schoolId);
+  const { data } = await query;
   await Promise.all(
     (data ?? []).map((profile: { id: string }) =>
       createNotification({
@@ -404,7 +408,7 @@ export async function createApprovalNeededNotifications(input: {
     .from("profiles")
     .select("id")
     .eq("school_id", input.schoolId)
-    .in("role", ["admin", "super_admin"]);
+    .eq("role", "admin");
 
   if (adminError) {
     console.error("[createApprovalNeededNotifications admins]", adminError.message);

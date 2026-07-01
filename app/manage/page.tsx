@@ -12,7 +12,6 @@ const manageLinks = [
   { href: "/manage/approvals", icon: CheckSquare, title: "Approval Queue", description: "Review pending content" },
   { href: "/manage/analytics", icon: BarChart3, title: "Analytics", description: "View platform metrics" },
   { href: "/manage/digest", icon: Mail, title: "Weekly Digest", description: "Generate newsletter content" },
-  { href: "/manage/email-outbox", icon: Mail, title: "Email Outbox", description: "Review queued important and urgent emails" },
   { href: "/admin", icon: Shield, title: "Admin Panel", description: "School-wide administration" },
 ];
 
@@ -23,7 +22,6 @@ export default async function ManagePage() {
     if (link.href === "/admin") return canAccessAdmin(profile);
     if (link.href === "/manage/opportunities") return canAccessAdmin(profile);
     if (link.href === "/manage/analytics") return canAccessManageAnalytics(profile);
-    if (link.href === "/manage/email-outbox") return canAccessAdmin(profile);
     if (link.href === "/manage/approvals") return canAccessAdmin(profile) || pendingApprovals.length > 0;
     return true;
   });

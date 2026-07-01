@@ -40,7 +40,7 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
         description={
           profile && ["admin", "super_admin"].includes(profile.role)
             ? "Review all school-wide opportunities. Administrator accounts can create and manage listings but cannot participate."
-            : "Signups, applications, tryouts, auditions, competitions, workshops, interest forms, and deadlines."
+            : "Signups, applications, tryouts, auditions, competitions, interest forms, and deadlines."
         }
       >
         {profile && ["admin", "super_admin"].includes(profile.role) && (

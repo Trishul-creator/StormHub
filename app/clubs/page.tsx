@@ -7,6 +7,7 @@ import { getClubs, getManageableClubs } from "@/lib/data";
 import { checkMembership } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
 import { CLUB_FILTER_GROUPS } from "@/lib/utils";
+import { getCurrentSchool } from "@/lib/schools";
 
 interface ClubsPageProps {
   searchParams: Promise<{ q?: string; category?: string; featured?: string; filter?: string }>;
@@ -14,6 +15,7 @@ interface ClubsPageProps {
 
 export default async function ClubsPage({ searchParams }: ClubsPageProps) {
   const params = await searchParams;
+  const school = await getCurrentSchool();
   const featuredOnly = params.featured === "true" || params.filter === "featured";
   const clubs = await getClubs({
     search: params.q,
@@ -43,7 +45,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
     <div className="container mx-auto px-4 py-8">
       <PageHeader
         title="Club Directory"
-        description="Discover clubs and activities at Elkhorn South High School. Join to access member resources, announcements, and events."
+        description={`Discover clubs and activities at ${school?.name ?? "your school"}. Join to access member resources, announcements, and events.`}
       />
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row">

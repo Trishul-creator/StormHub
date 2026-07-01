@@ -19,7 +19,7 @@ export default async function CalendarPage() {
         description={
           isLoggedIn
             ? "Your school calendar, including events from every club you belong to."
-            : "School-wide meetings, workshops, competitions, auditions, deadlines, and other scheduled activities."
+            : "School-wide meetings, competitions, auditions, deadlines, and other scheduled activities."
         }
       />
       <EventsPageClient

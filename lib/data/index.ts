@@ -31,6 +31,7 @@ import type {
 } from "@/types/database";
 import { isAdminRole } from "@/lib/permissions";
 import { CLUB_FILTER_GROUPS } from "@/lib/utils";
+import { DEFAULT_SCHOOL_ID, getCurrentSchool } from "@/lib/schools";
 
 export { isDemoMode } from "@/lib/supabase/mode";
 
@@ -39,22 +40,7 @@ export async function getCurrentUser(): Promise<Profile | null> {
 }
 
 export async function getSchool(): Promise<School | null> {
-  if (isDemoMode()) {
-    const { demoSchool } = await import("@/lib/data/demo-data");
-    return demoSchool;
-  }
-  const supabase = createAdminClient() ?? await createClient();
-  if (!supabase) return null;
-  const { data, error } = await supabase
-    .from("schools")
-    .select("*")
-    .eq("slug", "elkhorn-south")
-    .maybeSingle();
-  if (error) {
-    console.error("[getSchool]", error.message);
-    return null;
-  }
-  return data as School | null;
+  return getCurrentSchool();
 }
 
 async function attachMemberCounts(clubs: Club[]): Promise<Club[]> {
@@ -116,6 +102,7 @@ export async function getClubs(filters?: {
 
   const supabase = createAdminClient() ?? await createClient();
   if (!supabase) return [];
+  const school = await getCurrentSchool();
 
   let query = supabase
     .from("clubs")
@@ -123,6 +110,7 @@ export async function getClubs(filters?: {
     .eq("is_listed", true)
     .eq("visibility", "public")
     .in("status", ["interest_open", "active"]);
+  if (school?.id) query = query.eq("school_id", school.id);
   if (filters?.featured) query = query.eq("is_featured", true);
   if (filters?.category) query = query.eq("category", filters.category);
   if (filters?.filterGroup) {
@@ -152,7 +140,10 @@ export async function getClubBySlug(slug: string): Promise<Club | null> {
   }
   const supabase = await createClient();
   if (!supabase) return null;
-  const { data, error } = await supabase.from("clubs").select("*").eq("slug", slug).single();
+  const school = await getCurrentSchool();
+  let query = supabase.from("clubs").select("*").eq("slug", slug);
+  if (school?.id) query = query.eq("school_id", school.id);
+  const { data, error } = await query.single();
   if (error) {
     console.error("[getClubBySlug]", error.message);
     return null;
@@ -286,10 +277,12 @@ export async function getRecentAnnouncements(limit = 5): Promise<(ClubAnnounceme
   }
   const supabase = await createClient();
   if (!supabase) return [];
+  const school = await getCurrentSchool();
   const { data, error } = await supabase
     .from("club_announcements")
-    .select("*, club:clubs(*)")
+    .select("*, club:clubs!inner(*)")
     .eq("status", "approved")
+    .eq("club.school_id", school?.id ?? DEFAULT_SCHOOL_ID)
     .order("published_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -362,10 +355,12 @@ export async function getOpportunities(filters?: {
   }
   const supabase = await createClient();
   if (!supabase) return [];
+  const school = await getCurrentSchool(profile);
   let query = supabase
     .from("opportunities")
     .select("*")
     .neq("category", "Volunteering");
+  if (school?.id) query = query.eq("school_id", school.id);
   if (!adminView) {
     query = query.eq("status", "approved").eq("visibility", "public");
   }
@@ -408,11 +403,13 @@ export async function getOpportunityBySlug(slug: string): Promise<Opportunity | 
   }
   const supabase = await createClient();
   if (!supabase) return null;
+  const school = await getCurrentSchool(profile);
   let query = supabase
     .from("opportunities")
     .select("*")
     .eq("slug", slug)
     .neq("category", "Volunteering");
+  if (school?.id) query = query.eq("school_id", school.id);
   if (!adminView) {
     query = query.eq("status", "approved").eq("visibility", "public");
   }
@@ -443,12 +440,14 @@ export async function getEvents(filters?: {
   }
   const supabase = await createClient();
   if (!supabase) return [];
+  const school = await getCurrentSchool();
   let query = supabase
     .from("events")
     .select("*, club:clubs(*)")
     .eq("status", "approved")
     .eq("visibility", "public")
     .neq("event_type", "volunteer");
+  if (school?.id) query = query.eq("school_id", school.id);
   if (filters?.eventType) query = query.eq("event_type", filters.eventType);
   if (filters?.upcoming !== false) query = query.gte("starts_at", new Date().toISOString());
   const { data, error } = await query.order("starts_at");
@@ -482,6 +481,7 @@ export async function getCalendarEvents(userId: string | null): Promise<Event[]>
 
   const supabase = await createClient();
   if (!supabase) return [];
+  const school = await getCurrentSchool();
 
   const rangeStart = new Date();
   rangeStart.setFullYear(rangeStart.getFullYear() - 1);
@@ -495,6 +495,7 @@ export async function getCalendarEvents(userId: string | null): Promise<Event[]>
     .select("*, club:clubs(*)")
     .eq("status", "approved")
     .neq("event_type", "volunteer")
+    .eq("school_id", school?.id ?? DEFAULT_SCHOOL_ID)
     .gte("starts_at", rangeStart.toISOString())
     .lte("starts_at", rangeEnd.toISOString())
     .order("starts_at");
@@ -515,12 +516,14 @@ export async function getEventById(id: string): Promise<Event | null> {
   }
   const supabase = await createClient();
   if (!supabase) return null;
+  const school = await getCurrentSchool();
   const { data, error } = await supabase
     .from("events")
     .select("*, club:clubs(*)")
     .eq("id", id)
     .eq("status", "approved")
     .neq("event_type", "volunteer")
+    .eq("school_id", school?.id ?? DEFAULT_SCHOOL_ID)
     .single();
   if (error) {
     console.error("[getEventById]", error.message);
@@ -597,6 +600,21 @@ export async function getAdminAnalytics(): Promise<AnalyticsSummary> {
     };
   }
 
+  const currentProfile = await getCurrentProfile();
+  const schoolScopeId = currentProfile?.role === "super_admin" ? null : currentProfile?.school_id;
+  let totalClubsQuery = supabase.from("clubs").select("*", { count: "exact", head: true });
+  let activeClubsQuery = supabase.from("clubs").select("*", { count: "exact", head: true }).eq("status", "active");
+  let upcomingEventsQuery = supabase.from("events").select("*", { count: "exact", head: true }).eq("status", "approved").gte("starts_at", new Date().toISOString());
+  let opportunitiesQuery = supabase.from("opportunities").select("*", { count: "exact", head: true }).eq("status", "approved");
+  let recentActivityQuery = supabase.from("analytics_events").select("event_type, metadata, created_at").order("created_at", { ascending: false }).limit(10);
+  if (schoolScopeId) {
+    totalClubsQuery = totalClubsQuery.eq("school_id", schoolScopeId);
+    activeClubsQuery = activeClubsQuery.eq("school_id", schoolScopeId);
+    upcomingEventsQuery = upcomingEventsQuery.eq("school_id", schoolScopeId);
+    opportunitiesQuery = opportunitiesQuery.eq("school_id", schoolScopeId);
+    recentActivityQuery = recentActivityQuery.eq("school_id", schoolScopeId);
+  }
+
   const [
     { count: totalClubs },
     { count: activeClubs },
@@ -608,15 +626,15 @@ export async function getAdminAnalytics(): Promise<AnalyticsSummary> {
     { data: topClubs },
     { data: recentActivity },
   ] = await Promise.all([
-    supabase.from("clubs").select("*", { count: "exact", head: true }),
-    supabase.from("clubs").select("*", { count: "exact", head: true }).eq("status", "active"),
+    totalClubsQuery,
+    activeClubsQuery,
     supabase.from("club_memberships").select("*", { count: "exact", head: true }).eq("status", "active").neq("role", "sponsor"),
-    supabase.from("events").select("*", { count: "exact", head: true }).eq("status", "approved").gte("starts_at", new Date().toISOString()),
-    supabase.from("opportunities").select("*", { count: "exact", head: true }).eq("status", "approved"),
+    upcomingEventsQuery,
+    opportunitiesQuery,
     supabase.from("event_rsvps").select("*", { count: "exact", head: true }),
     supabase.from("bookmarks").select("*", { count: "exact", head: true }),
     supabase.from("club_memberships").select("club_id, clubs(name, slug)").eq("status", "active").neq("role", "sponsor"),
-    supabase.from("analytics_events").select("event_type, metadata, created_at").order("created_at", { ascending: false }).limit(10),
+    recentActivityQuery,
   ]);
 
   type MembershipClubRow = { club_id: string; clubs: { name: string; slug: string } | { name: string; slug: string }[] | null };
@@ -837,7 +855,11 @@ export async function getManageableClubs(profile: Profile): Promise<Club[]> {
   const supabase = await createClient();
   if (!supabase) return [];
   if (isAdminRole(profile.role)) {
-    const { data, error } = await supabase.from("clubs").select("*").order("name");
+    let query = supabase.from("clubs").select("*").order("name");
+    if (profile.role !== "super_admin" && profile.school_id) {
+      query = query.eq("school_id", profile.school_id);
+    }
+    const { data, error } = await query;
     if (error) {
       console.error("[getManageableClubs]", error.message);
       return [];
@@ -883,7 +905,7 @@ export async function trackAnalytics(
   if (!supabase) return;
   const user = await getCurrentUser();
   await supabase.from("analytics_events").insert({
-    school_id: "a0000000-0000-4000-8000-000000000001",
+    school_id: user?.school_id ?? DEFAULT_SCHOOL_ID,
     user_id: user?.id,
     event_type: eventType,
     entity_type: entityType,
@@ -913,16 +935,14 @@ export async function getPendingApprovals(): Promise<PendingApprovalItem[]> {
     events,
     resources,
     opportunities,
-    workshops,
   ] = await Promise.all([
     supabase.from("club_announcements").select("id,title,created_at,clubs(name)").eq("status", "pending"),
     supabase.from("events").select("id,title,created_at,clubs(name)").eq("status", "pending"),
     supabase.from("club_resources").select("id,title,created_at,clubs(name)").eq("status", "pending"),
     supabase.from("opportunities").select("id,title,created_at,clubs(name)").eq("status", "pending"),
-    supabase.from("workshops").select("id,title,created_at").eq("status", "pending"),
   ]);
 
-  const results = [announcements, events, resources, opportunities, workshops];
+  const results = [announcements, events, resources, opportunities];
   const queryError = results.find((result) => result.error)?.error;
   if (queryError) {
     console.error("[getPendingApprovals]", queryError.message);
@@ -953,9 +973,6 @@ export async function getPendingApprovals(): Promise<PendingApprovalItem[]> {
     ...((opportunities.data ?? []) as ClubRow[]).map((row) => ({
       id: row.id, type: "opportunity" as const, title: row.title, context: clubName(row), submitted_at: row.created_at,
     })),
-    ...((workshops.data ?? []) as ClubRow[]).map((row) => ({
-      id: row.id, type: "workshop" as const, title: row.title, context: "Workshop", submitted_at: row.created_at,
-    })),
   ];
 
   return items.sort((a, b) => {
@@ -972,16 +989,21 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
       email: "student@example.com",
       full_name: "Demo Student",
       role: "student",
-      school_id: "a0000000-0000-4000-8000-000000000001",
+      school_id: DEFAULT_SCHOOL_ID,
       club_assignments: [],
     }];
   }
   const supabase = await createClient();
   if (!supabase) return [];
-  const { data, error } = await supabase
+  const currentProfile = await getCurrentProfile();
+  let query = supabase
     .from("profiles")
     .select("*, club_memberships(club_id,role,status,clubs(name,slug))")
     .order("created_at", { ascending: false });
+  if (currentProfile?.role !== "super_admin" && currentProfile?.school_id) {
+    query = query.eq("school_id", currentProfile.school_id);
+  }
+  const { data, error } = await query;
   if (error) {
     console.error("[getAdminUsers]", error.message);
     return [];

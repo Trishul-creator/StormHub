@@ -8,7 +8,8 @@ import {
   getStudentDashboard,
 } from "@/lib/data";
 import { getUserNotifications } from "@/lib/notifications";
-import { formatDateTime, SCHOOL_NAME } from "@/lib/utils";
+import { getCurrentSchool } from "@/lib/schools";
+import { formatDateTime } from "@/lib/utils";
 import { isAdminRole } from "@/lib/permissions";
 import type { AuthContext } from "@/lib/auth";
 import type { Club, ClubAnnouncement, ClubMembership, Event, Notification, Opportunity } from "@/types/database";
@@ -47,12 +48,13 @@ export async function getAssistantContext(): Promise<{ auth: AuthContext; contex
   const profile = auth.profile;
   if (!auth.userId || !profile) return { auth, context: "" };
 
-  const [dashboard, manageableClubs, notifications, publicClubs, publicOpportunities] = await Promise.all([
+  const [dashboard, manageableClubs, notifications, publicClubs, publicOpportunities, school] = await Promise.all([
     getStudentDashboard(auth.userId),
     hasManagementAccess(profile).then((canManage) => canManage ? getManageableClubs(profile) : Promise.resolve([])),
     getUserNotifications(auth.userId, 8),
     getManageablePublicClubs(),
     getOpportunities({}),
+    getCurrentSchool(profile),
   ]);
 
   const pendingApprovals =
@@ -62,13 +64,13 @@ export async function getAssistantContext(): Promise<{ auth: AuthContext; contex
 
   const roleNotes =
     profile.role === "student"
-      ? "Students can join clubs, RSVP to events, save/sign up for opportunities, read notifications, and send feedback. If they are a club officer or president, they can create club announcements, events, and resources."
+      ? "Students can join clubs, RSVP to events, save/sign up for opportunities, read notifications, and contact support. If they are a club officer or president, they can create club announcements, events, and resources."
       : profile.role === "teacher"
         ? "Teachers can manage assigned clubs, rosters, events, announcements, resources, and archive/delete club content for clubs they sponsor."
-        : "Admins can manage users, clubs, opportunities, feedback, notifications, and school-wide settings.";
+        : "Admins can manage users, clubs, opportunities, notifications, and school-wide settings. Super admins can access the portal and create school workspaces, but should not receive school-specific task notifications.";
 
   const context = `
-StormHub context for ${SCHOOL_NAME}
+StormHub context for ${school?.name ?? "the current school"}
 
 Current user:
 - Name: ${profile.full_name ?? "Unknown"}
@@ -116,10 +118,9 @@ Known StormHub pages:
 - /saved: saved/sign-up opportunity list
 - /my-clubs: joined clubs
 - /notifications: notifications
-- /contact: support/feedback form
+- /contact: support form
 - /dashboard: role-specific dashboard
 - /manage: club/content management for officers, presidents, teachers, and admins
-- /admin/feedback: admin feedback inbox
 `.trim();
 
   return { auth, context };

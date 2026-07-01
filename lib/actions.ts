@@ -27,6 +27,7 @@ import type {
   FeedbackStatus,
 } from "@/types/database";
 import { slugify } from "@/lib/utils";
+import { DEFAULT_SCHOOL_ID, SUPPORT_EMAIL, getCurrentSchool } from "@/lib/schools";
 import {
   createAdminAttentionNotification,
   createApprovalNeededNotifications,
@@ -55,7 +56,7 @@ function contentReviewLink(contentType: ApprovalContentType, content: Record<str
   if (contentType === "event" && typeof content?.id === "string") return `/events/${content.id}`;
   if (contentType === "opportunity" && typeof content?.slug === "string") return `/opportunities/${content.slug}`;
   if (club?.slug) return `/clubs/${club.slug}/member`;
-  if (contentType === "workshop") return "/workshops";
+  if (contentType === "workshop") return "/opportunities";
   return "/dashboard";
 }
 
@@ -362,24 +363,26 @@ export async function submitFeedback(data: {
   if (!supabase) return { success: false, error: "Database not configured." };
 
   const { data: { user } } = await supabase.auth.getUser();
-
-  const { data: school } = await supabase.from("schools").select("id").eq("slug", "elkhorn-south").maybeSingle();
-
-  const { error } = await supabase.from("feedback").insert({
-    school_id: school?.id ?? "a0000000-0000-4000-8000-000000000001",
-    user_id: user?.id ?? null,
-    name: data.name,
-    email: data.email,
-    category: data.category,
-    message: data.message,
-  });
-  if (error) return { success: false, error: friendlyError(error) };
-  await createAdminAttentionNotification({
-    title: "New feedback requires review",
-    message: `${data.category}: ${data.message.slice(0, 160)}`,
-    link: "/admin/feedback",
-    importance: "important",
-    type: "system_message",
+  const normalizedCategory = data.category.trim().toLowerCase();
+  await createEmailOutboxItem({
+    recipientEmail: SUPPORT_EMAIL,
+    subject: `[StormHub Support] ${
+      normalizedCategory === "bug"
+        ? "Bug report"
+        : normalizedCategory === "feature"
+          ? "Feature request"
+          : normalizedCategory === "club"
+            ? "Club-related message"
+            : "App feedback"
+    }`,
+    body: [
+      `Category: ${data.category}`,
+      `From: ${data.name?.trim() || "Anonymous"}`,
+      `Reply email: ${data.email?.trim() || user?.email || "Not provided"}`,
+      "",
+      data.message,
+    ].join("\n"),
+    type: "support_message",
   });
   return { success: true };
 }
@@ -399,7 +402,7 @@ export async function updateFeedbackStatus(
   }
   const { error } = await supabase.from("feedback").update({ status }).eq("id", id);
   if (error) return { success: false, error: friendlyError(error, "Could not update feedback.") };
-  revalidatePath("/admin/feedback");
+  revalidatePath("/admin");
   return { success: true };
 }
 
@@ -449,7 +452,7 @@ export async function respondToFeedback(
 
   const { error } = await supabase.from("feedback").update({ status: "resolved" }).eq("id", id);
   if (error) return { success: false, error: friendlyError(error, "Could not mark feedback resolved.") };
-  revalidatePath("/admin/feedback");
+  revalidatePath("/admin");
   return { success: true };
 }
 
@@ -472,10 +475,10 @@ export async function submitWorkshop(data: {
   if (!profile || profile.role !== "student") {
     return { success: false, error: "Only student accounts can submit workshops." };
   }
-  const { data: school } = await supabase.from("schools").select("id").eq("slug", "elkhorn-south").maybeSingle();
+  const school = await getCurrentSchool(profile);
 
   const { error } = await supabase.from("workshops").insert({
-    school_id: school?.id ?? "a0000000-0000-4000-8000-000000000001",
+    school_id: school?.id ?? DEFAULT_SCHOOL_ID,
     host_user_id: user.id,
     ...data,
     status: "pending",
@@ -485,6 +488,7 @@ export async function submitWorkshop(data: {
     title: "Workshop needs review",
     message: `${profile.full_name ?? profile.email ?? "A student"} submitted “${data.title}”.`,
     link: "/manage/approvals",
+    schoolId: profile.school_id ?? school?.id ?? DEFAULT_SCHOOL_ID,
     importance: "important",
     type: "approval_needed",
   });
@@ -513,9 +517,9 @@ export async function submitClubProposal(data: {
   if (name.length < 3) return { success: false, error: "Club name is required." };
   const slugBase = slugify(name);
   const slug = `${slugBase}-${Date.now().toString(36)}`;
-  const { data: school } = await supabase.from("schools").select("id").eq("slug", "elkhorn-south").maybeSingle();
+  const school = await getCurrentSchool(profile);
   const { data: club, error } = await admin.from("clubs").insert({
-    school_id: profile.school_id ?? school?.id ?? "a0000000-0000-4000-8000-000000000001",
+    school_id: profile.school_id ?? school?.id ?? DEFAULT_SCHOOL_ID,
     name,
     slug,
     short_description: data.shortDescription.trim() || null,
@@ -543,6 +547,7 @@ export async function submitClubProposal(data: {
     title: "Club proposal needs review",
     message: `${profile.full_name ?? profile.email ?? "A teacher"} proposed “${name}”.`,
     link: `/manage/clubs/${club.slug}`,
+    schoolId: profile.school_id ?? school?.id ?? DEFAULT_SCHOOL_ID,
     importance: "important",
     type: "approval_needed",
   });
@@ -1432,6 +1437,6 @@ export async function retryEmailOutbox(): Promise<{ success: boolean; attempted?
   const profile = await getCurrentProfile();
   if (!profile || !isAdminRole(profile.role)) return { success: false, error: "Administrator access required." };
   const result = await processEmailOutbox();
-  revalidatePath("/manage/email-outbox");
+  revalidatePath("/manage");
   return { success: true, ...result };
 }

@@ -1,5 +1,6 @@
 import { isDemoMode, isSupabaseMode } from "@/lib/supabase/mode";
 import { createClient } from "@/lib/supabase/server";
+import { DEFAULT_SCHOOL_SLUG } from "@/lib/schools";
 
 export async function SetupBanner() {
   if (!isSupabaseMode()) return null;
@@ -8,7 +9,7 @@ export async function SetupBanner() {
   const { data, error } = await supabase
     .from("schools")
     .select("id")
-    .eq("slug", "elkhorn-south")
+    .eq("slug", DEFAULT_SCHOOL_SLUG)
     .maybeSingle();
   if (!error && data) return null;
   return (
@@ -24,7 +25,7 @@ export function SetupRequiredMessage() {
   return (
     <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
       <strong>Database setup needed.</strong> Open your Supabase SQL Editor and run{" "}
-      <code className="rounded bg-amber-100 px-1">supabase/setup.sql</code> to create tables and seed Elkhorn South data.
+      <code className="rounded bg-amber-100 px-1">supabase/setup.sql</code> to create tables and seed the default school data.
     </div>
   );
 }

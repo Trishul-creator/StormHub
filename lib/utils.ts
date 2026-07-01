@@ -100,6 +100,4 @@ export const EVENT_TYPES = [
   "other",
 ] as const;
 
-export const SCHOOL_NAME = "Elkhorn South High School";
-export const SCHOOL_SLUG = "elkhorn-south";
 export const APP_NAME = "StormHub";

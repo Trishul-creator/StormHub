@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isDemoMode } from "@/lib/supabase/mode";
 import type { Profile, UserRole } from "@/types/database";
-import { SCHOOL_SLUG } from "@/lib/utils";
+import { DEFAULT_SCHOOL_ID, DEFAULT_SCHOOL_SLUG } from "@/lib/schools";
 import {
   canAccessAdmin,
   canAccessManage,
@@ -67,7 +67,7 @@ export async function createProfileIfMissing(
   const { data: school } = await supabase
     .from("schools")
     .select("id")
-    .eq("slug", SCHOOL_SLUG)
+    .eq("slug", DEFAULT_SCHOOL_SLUG)
     .maybeSingle();
 
   const { data: created, error } = await supabase
@@ -100,7 +100,7 @@ export async function getCurrentProfile(): Promise<Profile | null> {
       email: email ?? "demo@example.com",
       full_name: email?.split("@")[0] ?? "Demo Student",
       role: demoRoleForEmail(email),
-      school_id: "a0000000-0000-4000-8000-000000000001",
+      school_id: DEFAULT_SCHOOL_ID,
     };
   }
 
@@ -141,7 +141,7 @@ export async function getAuthContext(): Promise<AuthContext> {
           email: email ?? "demo@example.com",
           full_name: email?.split("@")[0] ?? "Demo Student",
           role: demoRoleForEmail(email),
-          school_id: "a0000000-0000-4000-8000-000000000001",
+          school_id: DEFAULT_SCHOOL_ID,
         }
       : null;
     return { userId, profile, isLoggedIn: !!userId, email: email ?? null, isDemo: true };

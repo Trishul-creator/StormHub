@@ -12,8 +12,8 @@ import { getUnreadNotificationCount, getUserNotifications } from "@/lib/notifica
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "StormHub — Elkhorn South High School",
-  description: "Discover clubs, events, applications, tryouts, workshops, and deadlines at Elkhorn South High School.",
+  title: "StormHub — Student Opportunity Hub",
+  description: "Discover clubs, events, applications, tryouts, auditions, and deadlines at your school.",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

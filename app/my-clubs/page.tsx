@@ -5,15 +5,19 @@ import { requireAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { ArrowRight } from "lucide-react";
+import { getCurrentSchool } from "@/lib/schools";
 
 export default async function MyClubsPage() {
-  const { userId } = await requireAuth("/my-clubs");
+  const { userId, profile } = await requireAuth("/my-clubs");
 
-  const memberships = await getUserMemberships(userId);
+  const [memberships, school] = await Promise.all([
+    getUserMemberships(userId),
+    getCurrentSchool(profile),
+  ]);
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <PageHeader title="My Clubs" description="Clubs you've joined at Elkhorn South." />
+      <PageHeader title="My Clubs" description={`Clubs you've joined at ${school?.name ?? "your school"}.`} />
       {memberships.length === 0 ? (
         <EmptyState title="No clubs yet" description="Browse the club directory and join activities that interest you." actionLabel="Browse clubs" actionHref="/clubs" />
       ) : (

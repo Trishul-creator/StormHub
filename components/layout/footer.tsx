@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { APP_NAME, SCHOOL_NAME } from "@/lib/utils";
+import { SUPPORT_EMAIL } from "@/lib/schools";
+import { APP_NAME } from "@/lib/utils";
 import type { UserRole } from "@/types/database";
 
 export function Footer({ role }: { role?: UserRole }) {
@@ -10,13 +11,13 @@ export function Footer({ role }: { role?: UserRole }) {
           <div className="md:col-span-2">
             <h3 className="text-lg font-bold text-white">{APP_NAME}</h3>
             <p className="mt-2 text-sm max-w-md">
-              Student-built opportunity hub for {SCHOOL_NAME}. Discover clubs, opportunities, and everything happening on the school calendar.
+              Student-built opportunity hub for school communities. Discover clubs, opportunities, and everything happening on the school calendar.
             </p>
             <p className="mt-4 text-xs text-storm-silver/70">
               Student-built platform. Not an official school system unless approved by school administration.
             </p>
             <p className="mt-2 text-xs text-storm-silver/70">
-              Need help? Use the contact form or email support@stormhubapp.com.
+              Need help? Use the contact form or email {SUPPORT_EMAIL}.
             </p>
           </div>
           <div>
@@ -27,7 +28,6 @@ export function Footer({ role }: { role?: UserRole }) {
                 <li><Link href="/opportunities" className="hover:text-white transition-colors">Opportunities</Link></li>
               )}
               <li><Link href="/calendar" className="hover:text-white transition-colors">Calendar</Link></li>
-              <li><Link href="/workshops" className="hover:text-white transition-colors">Workshops</Link></li>
             </ul>
           </div>
           <div>
@@ -40,7 +40,7 @@ export function Footer({ role }: { role?: UserRole }) {
           </div>
         </div>
         <div className="mt-8 border-t border-storm-blue pt-8 text-center text-xs text-storm-silver/60">
-          © {new Date().getFullYear()} {APP_NAME} · Privacy-first · Built for ESHS students
+          © {new Date().getFullYear()} {APP_NAME} · Privacy-first · Built for students
         </div>
       </div>
     </footer>

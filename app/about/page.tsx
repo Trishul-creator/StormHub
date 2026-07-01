@@ -1,21 +1,23 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { Shield, Users, Zap, Heart } from "lucide-react";
-import { APP_NAME, SCHOOL_NAME } from "@/lib/utils";
+import { APP_NAME } from "@/lib/utils";
+import { getCurrentSchool } from "@/lib/schools";
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const school = await getCurrentSchool();
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <PageHeader
         title={`About ${APP_NAME}`}
-        description="A student-built opportunity hub designed to help ESHS students find their next step."
+        description="A student-built opportunity hub designed to help students find their next step."
       />
 
       <div className="prose prose-storm max-w-none space-y-8">
         <section>
           <h2 className="text-xl font-semibold text-storm-navy">Our mission</h2>
           <p className="text-muted-foreground leading-relaxed mt-2">
-            {APP_NAME} brings clubs, scheduled events, applications, tryouts, auditions, workshops, and deadlines into one clean place.
-            Built for {SCHOOL_NAME} students, sponsors, and club leaders — designed to help students discover opportunities
+            {APP_NAME} brings clubs, scheduled events, applications, tryouts, auditions, and deadlines into one clean place.
+            Built for {school?.name ?? "school"} students, sponsors, and club leaders — designed to help students discover opportunities
             that could shape their high school experience.
           </p>
         </section>
