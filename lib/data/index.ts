@@ -320,12 +320,19 @@ export async function getClubResources(clubSlug: string): Promise<ClubResource[]
   }
   const club = await getClubBySlug(clubSlug);
   if (!club) return [];
+  return getClubResourcesByClubId(club.id);
+}
+
+export async function getClubResourcesByClubId(clubId: string): Promise<ClubResource[]> {
+  if (isDemoMode()) {
+    return Object.values(demoMemberResources).flat().filter((resource) => resource.club_id === clubId);
+  }
   const supabase = await createClient();
   if (!supabase) return [];
   const { data } = await supabase
     .from("club_resources")
     .select("*")
-    .eq("club_id", club.id)
+    .eq("club_id", clubId)
     .eq("status", "approved")
     .order("title");
   return (data as ClubResource[]) || [];
@@ -932,12 +939,12 @@ export async function getSchoolTeachers(schoolId: string | null | undefined): Pr
   return (data as Profile[]) ?? [];
 }
 
-export async function getMemberClubData(slug: string, userId: string | null) {
-  const club = await getClubBySlug(slug);
+export async function getMemberClubData(slug: string, userId: string | null, clubOverride?: Club | null) {
+  const club = clubOverride ?? await getClubBySlug(slug);
   if (!club) return null;
   const membership = await getUserClubMembership(userId, club.id);
   const announcements = await getClubAnnouncements(club.id, "members");
-  const resources = await getClubResources(slug);
+  const resources = await getClubResourcesByClubId(club.id);
   const events = await getClubEvents(club.id, true);
   return { club, membership, announcements, resources, events };
 }

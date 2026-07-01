@@ -4,7 +4,7 @@ import { ArrowLeft, FileText, Link as LinkIcon, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EventCard } from "@/components/events/event-card";
 import { getMemberClubData } from "@/lib/data";
-import { checkMembership, getUserRsvpIds } from "@/lib/actions";
+import { getUserRsvpIds } from "@/lib/actions";
 import { requireAuth } from "@/lib/auth";
 import { formatDateTime } from "@/lib/utils";
 import { LeaveClubButton } from "@/components/clubs/leave-club-button";
@@ -24,10 +24,12 @@ export default async function MemberClubPage({ params }: MemberPageProps) {
     redirect(`/auth/sign-in?redirect=/clubs/${slug}/member`);
   }
 
-  const isMember = await checkMembership(slug);
   const club = await getClubBySlugSafe(slug);
 
   if (!club) notFound();
+  const isMember = auth.userId
+    ? Boolean(await getUserClubMembershipSafe(auth.userId, club.id))
+    : false;
 
   const membership = auth.userId
     ? await getUserClubMembershipSafe(auth.userId, club.id)
@@ -37,7 +39,7 @@ export default async function MemberClubPage({ params }: MemberPageProps) {
     return <MemberBlocked clubSlug={slug} clubName={club.name} isLoggedIn />;
   }
 
-  const data = await getMemberClubData(slug, auth.userId);
+  const data = await getMemberClubData(slug, auth.userId, club);
   if (!data) notFound();
 
   const { announcements, resources, events } = data;
@@ -168,8 +170,8 @@ async function getAuthContextSafe() {
 }
 
 async function getClubBySlugSafe(slug: string) {
-  const { getClubBySlug } = await import("@/lib/data");
-  return getClubBySlug(slug);
+  const { getManagedClubBySlug } = await import("@/lib/data");
+  return getManagedClubBySlug(slug);
 }
 
 async function getUserClubMembershipSafe(userId: string, clubId: string) {
