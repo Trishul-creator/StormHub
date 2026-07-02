@@ -928,6 +928,11 @@ export async function submitContent(data: {
   if (club) {
     revalidatePath(`/clubs/${club.slug}`);
     revalidatePath(`/clubs/${club.slug}/member`);
+    const school = await getSchoolById(club.school_id);
+    if (school?.slug) {
+      revalidatePath(`/s/${school.slug}/calendar`);
+      revalidatePath(`/s/${school.slug}/clubs/${club.slug}`);
+    }
   }
   revalidatePath("/events");
   revalidatePath("/calendar");
@@ -1475,6 +1480,12 @@ export async function archiveClubContent(
   revalidatePath(`/manage/clubs/${club.slug}`);
   revalidatePath(`/manage/clubs/${club.slug}/${contentType === "announcement" ? "announcements" : `${contentType}s`}`);
   revalidatePath(`/clubs/${club.slug}/member`);
+  if (contentType === "event") revalidatePath(`/events/${id}`);
+  const school = await getSchoolById(club.school_id);
+  if (school?.slug) {
+    revalidatePath(`/s/${school.slug}/calendar`);
+    revalidatePath(`/s/${school.slug}/clubs/${club.slug}`);
+  }
   revalidatePath("/calendar");
   return { success: true };
 }

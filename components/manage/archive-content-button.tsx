@@ -10,9 +10,11 @@ import { toast } from "@/hooks/use-toast";
 export function ArchiveContentButton({
   id,
   type,
+  redirectHref,
 }: {
   id: string;
   type: "announcement" | "event" | "resource";
+  redirectHref?: string;
 }) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -23,7 +25,8 @@ export function ArchiveContentButton({
       const result = await archiveClubContent(id, type);
       if (result.success) {
         toast({ title: "Deleted", description: `The ${type} was removed from the club.` });
-        router.refresh();
+        if (redirectHref) router.push(redirectHref);
+        else router.refresh();
       } else {
         toast({ title: "Could not delete", description: result.error, variant: "destructive" });
       }

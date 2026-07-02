@@ -546,15 +546,13 @@ export async function getEventById(id: string): Promise<Event | null> {
   }
   const supabase = await createClient();
   if (!supabase) return null;
-  const school = await getCurrentSchool();
   const { data, error } = await supabase
     .from("events")
     .select("*, club:clubs(*)")
     .eq("id", id)
     .eq("status", "approved")
     .neq("event_type", "volunteer")
-    .eq("school_id", school?.id ?? DEFAULT_SCHOOL_ID)
-    .single();
+    .maybeSingle();
   if (error) {
     console.error("[getEventById]", error.message);
     return null;
