@@ -42,6 +42,7 @@ export default async function ManageEventsPage({ params }: PageProps) {
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {formatDateTime(event.starts_at)}
+                    {event.ends_at ? ` → ${formatDateTime(event.ends_at)}` : ""}
                     {event.location ? ` · ${event.location}` : ""}
                   </p>
                 </div>

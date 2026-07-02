@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +20,7 @@ export function ContentForm({ type, clubSlug }: ContentFormProps) {
   const [loading, setLoading] = useState(false);
   const [importance, setImportance] = useState<NotificationImportance>("normal");
   const [sendEmail, setSendEmail] = useState(false);
+  const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -30,6 +32,7 @@ export function ContentForm({ type, clubSlug }: ContentFormProps) {
       title: String(form.get("title") ?? ""),
       body: String(form.get("body") ?? ""),
       starts_at: String(form.get("starts_at") ?? "") || undefined,
+      ends_at: String(form.get("ends_at") ?? "") || undefined,
       location: String(form.get("location") ?? "") || undefined,
       category: String(form.get("category") ?? "") || undefined,
       deadline: String(form.get("deadline") ?? "") || undefined,
@@ -54,6 +57,7 @@ export function ContentForm({ type, clubSlug }: ContentFormProps) {
         : `Your ${type} has been submitted and is pending review.`,
     });
     (e.target as HTMLFormElement).reset();
+    router.refresh();
   }
 
   return (
@@ -96,12 +100,17 @@ export function ContentForm({ type, clubSlug }: ContentFormProps) {
         </div>
       )}
       {type === "event" && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="min-w-0">
             <Label htmlFor="starts_at">Start date/time</Label>
-            <Input id="starts_at" name="starts_at" type="datetime-local" className="mt-1" />
+            <Input id="starts_at" name="starts_at" type="datetime-local" required className="mt-1" />
           </div>
-          <div>
+          <div className="min-w-0">
+            <Label htmlFor="ends_at">End date/time</Label>
+            <Input id="ends_at" name="ends_at" type="datetime-local" className="mt-1" />
+            <p className="mt-1 text-xs text-muted-foreground">Optional, but recommended for meetings.</p>
+          </div>
+          <div className="min-w-0 md:col-span-2">
             <Label htmlFor="location">Location</Label>
             <Input id="location" name="location" className="mt-1" />
           </div>

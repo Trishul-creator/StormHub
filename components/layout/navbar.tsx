@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import {
-  Bot, Menu, X, Zap, LogOut, LayoutDashboard, Settings, Shield,
+  Bot, Menu, X, Zap, LogOut, Settings, Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/utils";
@@ -17,11 +17,6 @@ const baseNavLinks = [
   { href: "/", label: "Home" },
   { href: "/clubs", label: "Clubs" },
   { href: "/calendar", label: "Calendar" },
-];
-
-const platformNavLinks = [
-  { href: "/", label: "Home" },
-  { href: "/admin/schools", label: "Schools" },
 ];
 
 interface NavbarProps {
@@ -47,27 +42,29 @@ export function Navbar({
 }: NavbarProps) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const navLinks =
-    role === "super_admin"
-      ? platformNavLinks
-      : role === "teacher"
-      ? schoolSlug
-        ? [
-            { href: "/", label: "Home" },
-            { href: `/s/${schoolSlug}/clubs`, label: "Clubs" },
-            { href: `/s/${schoolSlug}/calendar`, label: "Calendar" },
-          ]
-        : baseNavLinks
-      : schoolSlug
-        ? [
-            { href: "/", label: "Home" },
-            { href: `/s/${schoolSlug}/clubs`, label: "Clubs" },
-            { href: `/s/${schoolSlug}/calendar`, label: "Calendar" },
-            { href: `/s/${schoolSlug}/opportunities`, label: "Opportunities" },
-          ]
-        : [...baseNavLinks, { href: "/opportunities", label: "Opportunities" }];
   const primaryHref = role === "super_admin" ? "/admin/schools" : role === "admin" || role === "teacher" ? "/manage" : "/dashboard";
   const primaryLabel = role === "super_admin" ? "Platform Admin" : role === "admin" || role === "teacher" ? "Manage" : "Dashboard";
+  const schoolClubHref = schoolSlug ? `/s/${schoolSlug}/clubs` : "/clubs";
+  const schoolCalendarHref = schoolSlug ? `/s/${schoolSlug}/calendar` : "/calendar";
+  const schoolOpportunitiesHref = schoolSlug ? `/s/${schoolSlug}/opportunities` : "/opportunities";
+  const navLinks = !isLoggedIn
+    ? baseNavLinks
+    : role === "super_admin"
+      ? [{ href: primaryHref, label: primaryLabel }]
+      : role === "admin" || role === "teacher"
+        ? [
+            { href: primaryHref, label: primaryLabel },
+            { href: schoolClubHref, label: "Clubs" },
+            { href: schoolCalendarHref, label: "Calendar" },
+            ...(role === "admin" ? [{ href: schoolOpportunitiesHref, label: "Opportunities" }] : []),
+          ]
+        : [
+            { href: primaryHref, label: primaryLabel },
+            { href: schoolClubHref, label: "Clubs" },
+            { href: schoolCalendarHref, label: "Calendar" },
+            { href: schoolOpportunitiesHref, label: "Opportunities" },
+          ];
+  const brandHref = isLoggedIn ? primaryHref : "/";
 
   async function handleSignOut() {
     if (isDemoMode) await demoSignOut();
@@ -79,7 +76,7 @@ export function Navbar({
   return (
     <header className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2 font-bold text-storm-navy">
+        <Link href={brandHref} className="flex items-center gap-2 font-bold text-storm-navy">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-storm-gradient">
             <Zap className="h-4 w-4 text-white" />
           </div>
@@ -101,9 +98,6 @@ export function Navbar({
         <div className="hidden items-center gap-2 lg:flex">
           {isLoggedIn ? (
             <>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href={primaryHref}><LayoutDashboard className="h-4 w-4 mr-1" />{primaryLabel}</Link>
-              </Button>
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/assistant"><Bot className="h-4 w-4 mr-1" />Assistant</Link>
               </Button>
@@ -148,7 +142,6 @@ export function Navbar({
             <hr className="my-2" />
             {isLoggedIn ? (
               <>
-                <Link href={primaryHref} className="text-sm font-medium py-2" onClick={() => setOpen(false)}>{primaryLabel}</Link>
                 <Link href="/assistant" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Assistant</Link>
                 {canManage && role !== "super_admin" && primaryHref !== "/manage" && <Link href="/manage" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Manage</Link>}
                 <Link href="/notifications" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>

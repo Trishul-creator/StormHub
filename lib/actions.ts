@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isDemoMode } from "@/lib/supabase/mode";
 import { createProfileIfMissing, defaultPathForProfile, getAuthUserId, getCurrentProfile } from "@/lib/auth";
 import { demoState } from "@/lib/data/demo-data";
-import { getClubBySlug } from "@/lib/data";
+import { getClubBySlug, getManagedClubBySlug } from "@/lib/data";
 import { friendlyError } from "@/lib/errors";
 import {
   canApproveContent,
@@ -745,6 +745,7 @@ export async function submitContent(data: {
   title: string;
   body: string;
   starts_at?: string;
+  ends_at?: string;
   location?: string;
   category?: string;
   deadline?: string;
@@ -762,7 +763,7 @@ export async function submitContent(data: {
   const profile = await getCurrentProfile();
   if (!supabase || !profile) return { success: false, error: "Please sign in." };
 
-  const club = data.clubSlug ? await getClubBySlug(data.clubSlug) : null;
+  const club = data.clubSlug ? await getManagedClubBySlug(data.clubSlug) : null;
   let membership: Pick<ClubMembership, "club_id" | "status" | "role"> | null = null;
   if (data.clubSlug && !club) return { success: false, error: "Club not found." };
   if (club) {
@@ -807,6 +808,17 @@ export async function submitContent(data: {
   } else if (data.type === "event") {
     if (!club) return { success: false, error: "A club is required." };
     if (!data.starts_at) return { success: false, error: "Start date and time are required." };
+    const startsAt = new Date(data.starts_at);
+    const endsAt = data.ends_at ? new Date(data.ends_at) : null;
+    if (Number.isNaN(startsAt.getTime())) {
+      return { success: false, error: "Start date and time are invalid." };
+    }
+    if (endsAt && Number.isNaN(endsAt.getTime())) {
+      return { success: false, error: "End date and time are invalid." };
+    }
+    if (endsAt && endsAt <= startsAt) {
+      return { success: false, error: "End time must be after the start time." };
+    }
     table = "events";
     insert = {
       school_id: club.school_id,
@@ -814,7 +826,8 @@ export async function submitContent(data: {
       created_by: profile.id,
       title: data.title,
       description: data.body,
-      starts_at: new Date(data.starts_at).toISOString(),
+      starts_at: startsAt.toISOString(),
+      ends_at: endsAt ? endsAt.toISOString() : null,
       location: data.location || null,
       visibility: "public",
       status: contentStatus,
