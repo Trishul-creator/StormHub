@@ -68,6 +68,9 @@ Current specs:
 Public specs run without credentials. Authenticated specs skip unless env vars are configured.
 `test:e2e:readonly` runs only public read-only specs and does not require staging credentials.
 `test:e2e:staging` runs guarded staging setup and then the E2E suite.
+The staging setup script idempotently seeds `school1`, `school2`, the minimal
+School 1 clubs/opportunities, and fake E2E users. It should only fail for
+missing staging schema/migration tables, not for missing seed rows.
 
 Mutating E2E specs must not run against production. Any E2E test that creates,
 updates, or deletes app data must call `skipUnlessMutationsAreSafe()` from

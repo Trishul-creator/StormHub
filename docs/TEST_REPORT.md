@@ -175,6 +175,7 @@ Added:
 - Generic `school1`/`school2` staging SQL.
 - Guarded `scripts/setup-staging-e2e.ts` fake user setup.
 - GitHub Actions workflows for CI and staging E2E.
+- `npm run staging:setup` now seeds required staging schools/clubs/opportunities automatically before fake user setup, so GitHub Actions does not depend on manually running `supabase/staging-setup.sql` for seed rows.
 
 Mutating E2E was not run for this update because staging credentials are not configured in this workspace.
 

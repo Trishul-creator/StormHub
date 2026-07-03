@@ -13,7 +13,7 @@ Never point mutating E2E tests at production.
 
 ## Staging Supabase setup
 
-Use the new empty `StormHub Staging` Supabase project. Run SQL in this exact order from the Supabase SQL Editor:
+Use the new empty `StormHub Staging` Supabase project. Apply the base schema and patches once from the Supabase SQL Editor:
 
 1. `supabase/schema.sql`
 2. `supabase/policies.sql`
@@ -21,7 +21,8 @@ Use the new empty `StormHub Staging` Supabase project. Run SQL in this exact ord
 4. `supabase/improve-signups-roster-and-profile.sql`
 5. `supabase/allow-club-leaders-publish.sql`
 6. `supabase/allow-teachers-without-clubs.sql`
-7. `supabase/staging-setup.sql`
+
+`supabase/staging-setup.sql` is optional backup/documentation SQL. GitHub Actions does not require it for recurring staging setup.
 
 Do not run these on staging unless you intentionally want old/large seeded data:
 
@@ -59,7 +60,7 @@ The SQL order above creates or patches:
 - profile creation trigger for `auth.users`
 - RLS helper functions and policies
 
-`supabase/staging-setup.sql` then adds staging-safe data:
+`npm run staging:setup` then adds or updates staging-safe data automatically:
 
 - School 1 (`school1`)
 - School 2 (`school2`)
@@ -67,11 +68,11 @@ The SQL order above creates or patches:
 - minimal School 1 club interest opportunities
 - School 2 intentionally empty for cross-school empty-state tests
 
-It archives old seeded announcements/resources/workshops if they exist, but it does not delete real users.
+If these rows are missing, the setup script recreates them. Manual SQL is only needed when the staging database schema or migrations are missing.
 
 ## Staging Auth user setup
 
-After running SQL, create fake users with:
+After applying the base schema/patches once, create or refresh staging data and fake users with:
 
 ```bash
 npm run staging:setup
@@ -85,6 +86,8 @@ This script refuses to run unless all are true:
 - `E2E_TEST_PASSWORD` is set
 
 It does not print passwords.
+
+GitHub Actions runs this same command before staging E2E. It idempotently seeds `school1`, `school2`, School 1 test clubs, School 1 test opportunities, and fake E2E users. It fails clearly with `Staging schema is missing. Apply base schema/migrations to staging first.` if required tables such as `schools`, `school_settings`, `clubs`, `opportunities`, or `profiles` do not exist.
 
 Recommended test accounts:
 
@@ -256,6 +259,8 @@ Future E2E tests that create, update, or delete rows must call the mutation guar
 - `npm run test:e2e:readonly`
 
 `.github/workflows/e2e-staging.yml` runs guarded staging setup and E2E only when staging secrets exist.
+
+The workflow prepares required staging rows automatically with `npm run staging:setup`; do not manually rerun `supabase/staging-setup.sql` for every PR. Manual SQL is only needed if the staging database schema/migrations are missing.
 
 Required GitHub secrets for staging E2E:
 
