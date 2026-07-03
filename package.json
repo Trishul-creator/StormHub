@@ -11,9 +11,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:readonly": "playwright test tests/e2e/public.spec.ts",
+    "test:e2e:staging": "npm run staging:setup && playwright test",
     "test:e2e:headed": "playwright test --headed",
+    "staging:setup": "tsx scripts/setup-staging-e2e.ts",
     "qa": "npm run lint && npm run typecheck && npm run build && npm run test",
-    "test:all": "npm run qa && npm run test:e2e"
+    "qa:full": "npm run qa && npm run test:e2e:readonly",
+    "test:all": "npm run qa:full"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -53,6 +57,8 @@
     "jsdom": "^29.1.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.22.5",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.2",
     "vitest": "^4.1.9"
   }

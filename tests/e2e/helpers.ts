@@ -1,4 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
+import {
+  allowsMutatingE2E,
+  emailSafetyMessage,
+  hasSafeE2EEmailMode,
+  mutationSafetyMessage,
+} from "./safety";
 
 export type E2ERole = "super_admin" | "student" | "admin" | "teacher";
 
@@ -19,6 +25,14 @@ export function credentialsFor(role: E2ERole) {
 export function skipWithoutCredentials(role: E2ERole) {
   const keys = envKeys[role];
   test.skip(!credentialsFor(role), `Set ${keys.email} and ${keys.password} to run ${role} E2E tests.`);
+}
+
+export function skipUnlessMutationsAreSafe() {
+  test.skip(!allowsMutatingE2E(), mutationSafetyMessage());
+}
+
+export function skipUnlessEmailIsOutboxOnly() {
+  test.skip(!hasSafeE2EEmailMode(), emailSafetyMessage());
 }
 
 export async function signIn(page: Page, role: E2ERole) {

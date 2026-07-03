@@ -3,6 +3,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDemoMode } from "@/lib/supabase/mode";
 import type { EmailOutboxItem } from "@/types/database";
+import { getEmailDeliveryMode as resolveEmailDeliveryMode } from "@/lib/env";
 
 interface SendEmailInput {
   to: string;
@@ -15,16 +16,8 @@ interface SendEmailResult {
   error?: string;
 }
 
-const deliveryMode = () =>
-  process.env.EMAIL_DELIVERY_MODE?.trim().toLowerCase() ||
-  process.env.EMAIL_PROVIDER?.trim().toLowerCase() ||
-  (process.env.RESEND_API_KEY ? "send" : "outbox_only");
-
 export function getEmailDeliveryMode(): "disabled" | "outbox_only" | "send" {
-  const mode = deliveryMode();
-  if (mode === "send" || mode === "resend") return "send";
-  if (mode === "disabled" || mode === "none" || mode === "in_app_only") return "disabled";
-  return "outbox_only";
+  return resolveEmailDeliveryMode();
 }
 
 export function isEmailDeliveryEnabled(): boolean {
@@ -102,19 +95,15 @@ async function sendWithResend(input: SendEmailInput): Promise<SendEmailResult> {
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   if (isDemoMode()) return { success: true };
 
-  switch (deliveryMode()) {
+  switch (getEmailDeliveryMode()) {
     case "send":
-    case "resend":
       return sendWithResend(input);
     case "outbox_only":
       return { success: true };
     case "disabled":
-    case "none":
-    case "in_app_only":
-    case "":
       return { success: true };
     default:
-      return { success: false, error: `Unsupported EMAIL_DELIVERY_MODE: ${deliveryMode()}.` };
+      return { success: false, error: `Unsupported EMAIL_DELIVERY_MODE.` };
   }
 }
 

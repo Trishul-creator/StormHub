@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAssistantContext } from "@/lib/assistant/context";
+import { getGroqApiKey, getGroqModel } from "@/lib/env";
 
 export const runtime = "nodejs";
 
@@ -27,7 +28,6 @@ const dailyUsage = new Map<string, { date: string; count: number }>();
 const DAILY_LIMIT = Number(process.env.ASSISTANT_DAILY_LIMIT ?? 25);
 const MAX_MESSAGE_LENGTH = 1200;
 const MAX_MESSAGES = 10;
-const MODEL = process.env.GROQ_MODEL ?? "openai/gpt-oss-20b";
 
 const academicSubjectPattern =
   /\b(math|algebra|geometry|calculus|statistics|science|biology|chemistry|physics|reading|english|literature|essay|homework|assignment|worksheet|quiz|test|exam|answer key|solve|proof|equation|lab report|book report|summary of|analyze this passage|write my|do my|code this|programming assignment|photosynthesis|cell|mitosis|atom|molecule|chemical|stoichiometry|newton|force|velocity|grammar|thesis|theme|poem|novel)\b/i;
@@ -204,7 +204,7 @@ function normalizeResponse(value: unknown): {
 }
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = getGroqApiKey();
   if (!apiKey) {
     return NextResponse.json(
       { error: "StormHub Assistant is not configured yet." },
@@ -306,7 +306,7 @@ ${context}
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: getGroqModel(),
       temperature: 0.45,
       max_completion_tokens: 650,
       messages: [
