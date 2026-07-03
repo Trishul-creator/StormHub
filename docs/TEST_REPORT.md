@@ -141,3 +141,52 @@ Date/time: 2026-07-02 16:05 CDT
 ### Bugs or mismatches discovered
 
 - `/admin/feedback` still exists in the route table. Prior product direction said app feedback should route only to support, not an admin feedback panel. This should be addressed in a separate scoped product cleanup.
+
+## Staging safety update
+
+Date/time: 2026-07-02
+
+Added staging/E2E safety preparation:
+
+- `supabase/staging-setup.sql` for staging-only schools, minimal clubs, minimal opportunities, and disabled sample modules.
+- E2E safety helpers requiring `E2E_ENVIRONMENT=staging` and `E2E_ALLOW_MUTATIONS=true` before mutating tests run.
+- E2E email safety requiring `EMAIL_DELIVERY_MODE=outbox_only` before email tests run.
+- `docs/DEPLOYMENT.md` with staging SQL order, fake test users, and Vercel Preview/Production env guidance.
+
+Mutating E2E was not run during this update because the Staging Supabase URL/keys and fake Auth users were not configured in this workspace.
+
+Safe checks run after staging-prep changes:
+
+- `npm run typecheck` — passed.
+- `npm run lint` — passed.
+- `npm run test` — passed, 8 test files / 39 tests.
+- `npm run build` — passed.
+
+## Environment wiring update
+
+Date/time: 2026-07-02
+
+Added:
+
+- Centralized env resolver in `lib/env.ts`.
+- Support for staging-prefixed Supabase env vars in explicit staging E2E/server/script contexts.
+- Runtime email safety that forces explicit staging E2E to outbox-only.
+- Assistant/Groq disable behavior through missing `GROQ_API_KEY`, `AI_FEATURES_ENABLED=false`, `GROQ_ENABLED=false`, or explicit staging E2E.
+- Generic `school1`/`school2` staging SQL.
+- Guarded `scripts/setup-staging-e2e.ts` fake user setup.
+- GitHub Actions workflows for CI and staging E2E.
+- `npm run staging:setup` now seeds required staging schools/clubs/opportunities automatically before fake user setup, so GitHub Actions does not depend on manually running `supabase/staging-setup.sql` for seed rows.
+
+Mutating E2E was not run for this update because staging credentials are not configured in this workspace.
+
+Safe checks run after environment-wiring changes:
+
+- `npm run typecheck` — passed.
+- `npm run lint` — passed.
+- `npm run test` — passed, 9 test files / 45 tests.
+- `npm run build` — passed.
+
+Skipped:
+
+- `npm run staging:setup` was not run because staging Supabase credentials and `E2E_TEST_PASSWORD` are not configured in this workspace.
+- Mutating E2E was not run because staging guards and staging database setup are not active in this workspace.

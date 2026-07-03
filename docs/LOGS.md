@@ -12,6 +12,7 @@ Last updated: 2026-07-02
 - Email provider: Resend when `EMAIL_DELIVERY_MODE=send` and `RESEND_API_KEY`/`EMAIL_FROM` are configured.
 - AI: app assistant route backed by Groq when configured.
 - Test stack added: Vitest, React Testing Library, Playwright.
+- Environment resolution is centralized in `lib/env.ts`, including server/test fallback support for `STAGING_*` Supabase variables.
 
 ## Major refactors completed so far
 
@@ -27,6 +28,7 @@ Last updated: 2026-07-02
 - Improved event routing/deletion so club-created meetings can be opened and archived.
 - Adjusted signed-in navigation so users do not see public “Home” as their primary tab.
 - Added controlled email modes and support contact routing.
+- Added staging setup guardrails, generic `school1`/`school2` staging data, and guarded E2E user setup.
 
 ## Known resolved issues
 
@@ -61,6 +63,19 @@ npm run qa
 ```
 
 `npm run qa` runs lint, typecheck, build, and unit/component tests.
+
+## Staging/E2E safety rules
+
+- Production Supabase is for real users/data only.
+- Staging Supabase is for fake users/data and E2E mutations.
+- Staging database setup order is documented in `docs/DEPLOYMENT.md`.
+- Staging data uses generic `school1` and `school2`, not real school names.
+- Mutating E2E tests must call `skipUnlessMutationsAreSafe()`.
+- Email E2E tests must call `skipUnlessEmailIsOutboxOnly()`.
+- Mutating E2E requires `E2E_ENVIRONMENT=staging` and `E2E_ALLOW_MUTATIONS=true`.
+- Staging email requires `EMAIL_DELIVERY_MODE=outbox_only`; it may create `email_outbox` rows but must not call Resend.
+- Staging/Preview should set `AI_FEATURES_ENABLED=false` and `GROQ_ENABLED=false`; missing `GROQ_API_KEY` disables the assistant safely.
+- Never run `seed.sql`, `setup.sql`, `fix-current-db.sql`, or destructive reset scripts on production unless there is a separate, explicit migration plan.
 
 ## Manual QA checklist
 

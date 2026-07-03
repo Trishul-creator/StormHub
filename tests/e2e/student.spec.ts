@@ -11,7 +11,7 @@ test.describe("student core flow", () => {
     await page.goto("/dashboard");
     await expect(page.getByRole("heading", { name: /dashboard/i })).toBeVisible();
 
-    await page.getByRole("link", { name: /^clubs$/i }).click();
+    await page.locator("header nav").first().getByRole("link", { name: /^clubs$/i }).click();
     await expect(page).toHaveURL(/\/clubs|\/s\/[^/]+\/clubs/);
     await expect(page.getByRole("heading", { name: /clubs/i })).toBeVisible();
   });

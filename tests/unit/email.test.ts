@@ -37,6 +37,15 @@ describe("email delivery mode decisions", () => {
     expect(getEmailDeliveryMode()).toBe("send");
   });
 
+  it("forces explicit staging E2E to outbox-only even if send env is present", () => {
+    vi.stubEnv("E2E_ENVIRONMENT", "staging");
+    vi.stubEnv("EMAIL_DELIVERY_MODE", "send");
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    expect(getEmailDeliveryMode()).toBe("outbox_only");
+    expect(isEmailDeliveryEnabled()).toBe(false);
+    expect(isEmailOutboxEnabled()).toBe(true);
+  });
+
   it("uses outbox_only when no provider is configured", () => {
     vi.stubEnv("EMAIL_DELIVERY_MODE", "");
     vi.stubEnv("EMAIL_PROVIDER", "");

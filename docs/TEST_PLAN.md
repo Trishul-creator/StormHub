@@ -66,6 +66,28 @@ Current specs:
 - `student.spec.ts`
 
 Public specs run without credentials. Authenticated specs skip unless env vars are configured.
+`test:e2e:readonly` runs only public read-only specs and does not require staging credentials.
+`test:e2e:staging` runs guarded staging setup and then the E2E suite.
+The staging setup script idempotently seeds `school1`, `school2`, the minimal
+School 1 clubs/opportunities, and fake E2E users. It should only fail for
+missing staging schema/migration tables, not for missing seed rows.
+
+Mutating E2E specs must not run against production. Any E2E test that creates,
+updates, or deletes app data must call `skipUnlessMutationsAreSafe()` from
+`tests/e2e/helpers.ts`.
+
+Required mutation-safety env vars:
+
+- `E2E_ENVIRONMENT=staging`
+- `E2E_ALLOW_MUTATIONS=true`
+- `E2E_TEST_PASSWORD` when running `npm run staging:setup`
+
+Email E2E specs must not send real email. Any E2E test that exercises email
+delivery must call `skipUnlessEmailIsOutboxOnly()` from `tests/e2e/helpers.ts`.
+
+Required email-safety env var:
+
+- `EMAIL_DELIVERY_MODE=outbox_only`
 
 Required optional env vars:
 
@@ -126,6 +148,9 @@ Manual Supabase SQL checks should verify:
 - Event/club/opportunity RLS does not leak cross-school data.
 - Super admins retain platform-level access.
 
+Staging database setup for these tests is documented in `docs/DEPLOYMENT.md`.
+Use the dedicated Staging Supabase project only.
+
 ## 7. Manual QA flows
 
 ### Public
@@ -140,7 +165,7 @@ Manual Supabase SQL checks should verify:
 
 1. Sign in.
 2. Confirm redirect/arrival at `/admin/schools`.
-3. Open Elkhorn South and Elkhorn North.
+3. Open School 1 and School 2.
 4. Confirm Platform Admin Mode.
 5. Confirm Join Club is not primary action.
 

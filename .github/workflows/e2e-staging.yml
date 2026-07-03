@@ -1,0 +1,75 @@
+name: Staging E2E
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  e2e-staging:
+    runs-on: ubuntu-latest
+    env:
+      STAGING_NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_URL || secrets.STAGING_SUPABASE_URL }}
+      STAGING_NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.STAGING_SUPABASE_ANON_KEY }}
+      STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_URL || secrets.STAGING_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.STAGING_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+      E2E_ENVIRONMENT: staging
+      E2E_ALLOW_MUTATIONS: "true"
+      EMAIL_DELIVERY_MODE: outbox_only
+      EMAIL_PROVIDER: disabled
+      AI_FEATURES_ENABLED: "false"
+      GROQ_ENABLED: "false"
+      NEXT_PUBLIC_DEFAULT_SCHOOL_SLUG: school1
+      ALLOWED_SIGNUP_EMAIL_DOMAINS: stormhub.test
+      SUPPORT_EMAIL: stormhubsupport@gmail.com
+      NEXT_PUBLIC_SUPPORT_EMAIL: stormhubsupport@gmail.com
+      EMAIL_REPLY_TO: stormhubsupport@gmail.com
+      E2E_SUPER_ADMIN_EMAIL: e2e.superadmin@stormhub.test
+      E2E_STUDENT_EMAIL: e2e.student.school1@stormhub.test
+      E2E_ADMIN_EMAIL: e2e.admin.school1@stormhub.test
+      E2E_TEACHER_EMAIL: e2e.teacher.school1@stormhub.test
+    steps:
+      - name: Check staging secrets
+        id: secrets
+        shell: bash
+        run: |
+          if [[ -z "$STAGING_NEXT_PUBLIC_SUPABASE_URL" || -z "$STAGING_NEXT_PUBLIC_SUPABASE_ANON_KEY" || -z "$STAGING_SUPABASE_SERVICE_ROLE_KEY" || -z "$E2E_TEST_PASSWORD" ]]; then
+            echo "has_secrets=false" >> "$GITHUB_OUTPUT"
+            echo "Staging E2E skipped because required staging secrets are missing."
+          else
+            echo "has_secrets=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.secrets.outputs.has_secrets == 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: steps.secrets.outputs.has_secrets == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.secrets.outputs.has_secrets == 'true'
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        if: steps.secrets.outputs.has_secrets == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        if: steps.secrets.outputs.has_secrets == 'true'
+        run: npm run build
+
+      - name: Run staging E2E
+        if: steps.secrets.outputs.has_secrets == 'true'
+        env:
+          E2E_SUPER_ADMIN_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+          E2E_STUDENT_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+          E2E_TEACHER_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+        run: npm run test:e2e:staging

@@ -1,4 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
+import {
+  allowsMutatingE2E,
+  emailSafetyMessage,
+  hasSafeE2EEmailMode,
+  mutationSafetyMessage,
+} from "./safety";
 
 export type E2ERole = "super_admin" | "student" | "admin" | "teacher";
 
@@ -21,6 +27,14 @@ export function skipWithoutCredentials(role: E2ERole) {
   test.skip(!credentialsFor(role), `Set ${keys.email} and ${keys.password} to run ${role} E2E tests.`);
 }
 
+export function skipUnlessMutationsAreSafe() {
+  test.skip(!allowsMutatingE2E(), mutationSafetyMessage());
+}
+
+export function skipUnlessEmailIsOutboxOnly() {
+  test.skip(!hasSafeE2EEmailMode(), emailSafetyMessage());
+}
+
 export async function signIn(page: Page, role: E2ERole) {
   const credentials = credentialsFor(role);
   if (!credentials) throw new Error(`Missing E2E credentials for ${role}.`);
@@ -28,5 +42,35 @@ export async function signIn(page: Page, role: E2ERole) {
   await page.getByLabel(/email/i).fill(credentials.email);
   await page.getByLabel(/password/i).fill(credentials.password);
   await page.getByRole("button", { name: /sign in/i }).click();
-  await expect(page).not.toHaveURL(/\/auth\/sign-in/);
+
+  const signInError = page
+    .getByText(/sign in failed|invalid login|invalid credentials|email not confirmed|database not configured/i)
+    .first();
+
+  const result = await Promise.race([
+    page
+      .waitForURL((url) => !url.pathname.startsWith("/auth/sign-in"), { timeout: 20_000 })
+      .then(() => "signed-in" as const)
+      .catch(() => null),
+    signInError
+      .waitFor({ state: "visible", timeout: 20_000 })
+      .then(() => "error" as const)
+      .catch(() => null),
+  ]);
+
+  if (result === "error") {
+    const errorText = (await signInError.textContent())?.trim() || "Unknown sign-in error.";
+    throw new Error(`E2E sign-in failed for ${role}: ${errorText}`);
+  }
+
+  if (result !== "signed-in") {
+    const visibleError = await signInError.isVisible().catch(() => false);
+    const errorText = visibleError ? (await signInError.textContent())?.trim() : "";
+    throw new Error(
+      `E2E sign-in did not leave /auth/sign-in for ${role}.${errorText ? ` Visible error: ${errorText}` : ""}`
+    );
+  }
+
+  await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
+  await expect(page).not.toHaveURL(/\/auth\/sign-in/, { timeout: 10_000 });
 }
