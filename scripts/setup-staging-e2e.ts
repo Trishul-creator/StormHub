@@ -306,6 +306,19 @@ async function findAuthUserId(admin: { auth: SupabaseAdmin["auth"] }, email: str
   throw new Error("Too many auth users to scan safely. Narrow the staging project or create test users manually.");
 }
 
+async function assertAuthUserReady(admin: { auth: SupabaseAdmin["auth"] }, userId: string, email: string) {
+  const { data, error } = await admin.auth.admin.getUserById(userId);
+  if (error) throw error;
+  const authUser = data.user;
+  if (!authUser) throw new Error(`Could not verify auth user ${email}.`);
+  if (authUser.email?.toLowerCase() !== email.toLowerCase()) {
+    throw new Error(`Auth user email mismatch while preparing ${email}.`);
+  }
+  if (!authUser.email_confirmed_at && !authUser.confirmed_at) {
+    throw new Error(`Auth user ${email} is not email-confirmed after setup.`);
+  }
+}
+
 async function main() {
   assertSafeToMutate();
 
@@ -345,6 +358,7 @@ async function main() {
     }
 
     if (!userId) throw new Error(`Could not create or find ${user.email}.`);
+    await assertAuthUserReady(admin, userId, user.email);
 
     const { error: profileError } = await admin.from("profiles").upsert({
       id: userId,
@@ -356,6 +370,16 @@ async function main() {
       updated_at: new Date().toISOString(),
     });
     if (profileError) throw profileError;
+
+    const { data: profile, error: verifyProfileError } = await admin
+      .from("profiles")
+      .select("id,email,role,school_id")
+      .eq("id", userId)
+      .maybeSingle();
+    if (verifyProfileError) throw verifyProfileError;
+    if (!profile) throw new Error(`Profile was not created for ${user.email}.`);
+    if (profile.role !== user.role) throw new Error(`Profile role mismatch for ${user.email}.`);
+    if ((profile.school_id ?? null) !== schoolId) throw new Error(`Profile school mismatch for ${user.email}.`);
   }
 
   console.log(`Staging E2E data and users are ready: ${users.length} accounts.`);
