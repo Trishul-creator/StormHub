@@ -269,3 +269,56 @@ export function buildDiscoveryHints(input: {
   }
   return hints;
 }
+
+export type EmptyStateSurface = "clubs" | "opportunities" | "search";
+
+export interface EmptyStateAction {
+  label: string;
+  href: string;
+}
+
+function searchHref(pathname: string, params: Record<string, string | undefined>): string {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) query.set(key, value);
+  });
+  const queryString = query.toString();
+  return queryString ? `${pathname}?${queryString}` : pathname;
+}
+
+export function buildEmptyStateActions(input: {
+  surface: EmptyStateSurface;
+  query?: string;
+  category?: string;
+  filter?: string;
+  grade?: string;
+  closing?: string;
+  isAdmin?: boolean;
+}): EmptyStateAction[] {
+  const hasSearchOrFilter = Boolean(input.query || input.category || input.filter || input.grade || input.closing);
+
+  if (input.surface === "clubs") {
+    return [
+      ...(hasSearchOrFilter ? [{ label: "Clear filters", href: "/clubs" }] : []),
+      { label: "Featured clubs", href: "/clubs?featured=true" },
+      ...(input.query ? [{ label: "Search everything", href: searchHref("/search", { q: input.query }) }] : []),
+      ...(input.isAdmin ? [{ label: "Create club", href: "/manage/clubs/new" }] : []),
+    ];
+  }
+
+  if (input.surface === "opportunities") {
+    return [
+      ...(hasSearchOrFilter ? [{ label: "Clear filters", href: "/opportunities" }] : []),
+      { label: "Closing soon", href: "/opportunities?closing=true" },
+      ...(input.query ? [{ label: "Search everything", href: searchHref("/search", { q: input.query }) }] : []),
+      ...(input.isAdmin ? [{ label: "Create opportunity", href: "/manage/opportunities" }] : []),
+    ];
+  }
+
+  return [
+    ...(input.query ? [{ label: "Search clubs", href: searchHref("/clubs", { q: input.query }) }] : []),
+    ...(input.query ? [{ label: "Search opportunities", href: searchHref("/opportunities", { q: input.query }) }] : []),
+    { label: "Browse calendar", href: "/calendar" },
+    { label: "Contact school team", href: "/contact" },
+  ];
+}

@@ -7,18 +7,33 @@ interface EmptyStateProps {
   description?: string;
   actionLabel?: string;
   actionHref?: string;
+  actions?: Array<{
+    label: string;
+    href: string;
+  }>;
 }
 
-export function EmptyState({ title, description, actionLabel, actionHref }: EmptyStateProps) {
+export function EmptyState({ title, description, actionLabel, actionHref, actions = [] }: EmptyStateProps) {
+  const normalizedActions =
+    actions.length > 0
+      ? actions
+      : actionLabel && actionHref
+        ? [{ label: actionLabel, href: actionHref }]
+        : [];
+
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-storm-light/20 py-12 px-6 text-center">
       <Inbox className="mb-4 h-10 w-10 text-storm-silver" />
       <h3 className="font-semibold text-storm-navy">{title}</h3>
       {description && <p className="mt-1 max-w-sm text-sm text-muted-foreground">{description}</p>}
-      {actionLabel && actionHref && (
-        <Button asChild className="mt-4" variant="outline">
-          <Link href={actionHref}>{actionLabel}</Link>
-        </Button>
+      {normalizedActions.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          {normalizedActions.map((action) => (
+            <Button key={`${action.href}-${action.label}`} asChild variant="outline">
+              <Link href={action.href}>{action.label}</Link>
+            </Button>
+          ))}
+        </div>
       )}
     </div>
   );

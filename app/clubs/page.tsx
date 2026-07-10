@@ -8,6 +8,8 @@ import { checkMembership } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
 import { CLUB_FILTER_GROUPS } from "@/lib/utils";
 import { getCurrentSchool } from "@/lib/schools";
+import { buildEmptyStateActions } from "@/lib/product";
+import { isAdminRole } from "@/lib/permissions";
 
 interface ClubsPageProps {
   searchParams: Promise<{ q?: string; category?: string; featured?: string; filter?: string }>;
@@ -33,6 +35,13 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
   const { userId, isLoggedIn, profile } = await getAuthContext();
   const manageableClubs = profile ? await getManageableClubs(profile) : [];
   const manageableSlugs = new Set(manageableClubs.map((club) => club.slug));
+  const emptyActions = buildEmptyStateActions({
+    surface: "clubs",
+    query: params.q,
+    category: params.category,
+    filter: params.filter ?? params.featured,
+    isAdmin: isAdminRole(profile?.role),
+  });
   const membershipChecks = await Promise.all(
     clubs.map(async (club) => ({
       slug: club.slug,
@@ -69,7 +78,11 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
           <MobileFilterDrawer title="Filter clubs" options={filterOptions} activeValue={params.filter} />
           <p className="mb-4 text-sm text-muted-foreground">{clubs.length} clubs found</p>
           {clubs.length === 0 ? (
-            <EmptyState title="No clubs found" description="Try adjusting your search or filters." actionLabel="View all clubs" actionHref="/clubs" />
+            <EmptyState
+              title="No clubs found"
+              description="Try a broader search, clear the filters, or jump into the full school search if this may be an event or opportunity."
+              actions={emptyActions}
+            />
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
               {clubs.map((club) => (

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { getAdminUsers, getClubs, getEvents, getOpportunities } from "@/lib/data";
 import { getAuthContext } from "@/lib/auth";
 import { isAdminRole } from "@/lib/permissions";
-import { buildGlobalSearchResults } from "@/lib/product";
+import { buildEmptyStateActions, buildGlobalSearchResults } from "@/lib/product";
 import { humanizeLabel } from "@/lib/utils";
 
 interface SearchPageProps {
@@ -30,6 +30,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     : [[], [], [], []];
 
   const results = buildGlobalSearchResults({ query, clubs, events, opportunities, people });
+  const emptyActions = buildEmptyStateActions({ surface: "search", query });
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
@@ -50,8 +51,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           <EmptyState
             title="No results found"
             description="Try another club name, deadline, event type, category, or student/staff name if you have admin access."
-            actionLabel="Browse clubs"
-            actionHref="/clubs"
+            actions={emptyActions}
           />
         ) : (
           <div className="space-y-3">
