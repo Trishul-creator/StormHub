@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth";
+import { getAdminAnalytics, getPendingApprovals } from "@/lib/data";
 import { Users, School, FileText, BarChart3 } from "lucide-react";
 import { redirect } from "next/navigation";
 
@@ -15,6 +16,7 @@ const adminLinks = [
 export default async function AdminPage() {
   const { profile } = await requireAdmin();
   if (profile.role === "super_admin") redirect("/admin/schools");
+  const [analytics, pendingApprovals] = await Promise.all([getAdminAnalytics(), getPendingApprovals()]);
   const visibleLinks = adminLinks.filter((link) => {
     if (link.href === "/admin/schools") return profile.role === "super_admin";
     return true;
@@ -23,6 +25,13 @@ export default async function AdminPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <PageHeader title="Admin Panel" description="School-wide administration for StormHub." />
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <AdminMetric label="Pending approvals" value={pendingApprovals.length} />
+        <AdminMetric label="Active clubs" value={analytics.activeClubs} />
+        <AdminMetric label="Upcoming events" value={analytics.upcomingEvents} />
+        <AdminMetric label="Student memberships" value={analytics.totalMemberships} />
+        <AdminMetric label="Recent activity" value={analytics.recentActivity.length} />
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         {visibleLinks.map((link) => (
           <Link key={link.href} href={link.href}>
@@ -36,6 +45,15 @@ export default async function AdminPage() {
           </Link>
         ))}
       </div>
+    </div>
+  );
+}
+
+function AdminMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border bg-white p-4">
+      <p className="text-2xl font-bold text-storm-navy">{value}</p>
+      <p className="text-sm text-muted-foreground">{label}</p>
     </div>
   );
 }

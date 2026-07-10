@@ -31,7 +31,12 @@ export default async function ApprovalsPage() {
           </div>
         ))}
         {pendingItems.length === 0 && (
-          <EmptyState title="No pending approvals" description="Submitted club content will appear here." />
+          <EmptyState
+            title="No pending approvals"
+            description="Submitted club content will appear here. Use the content and club tools to review what students and sponsors already published."
+            actionLabel="View managed clubs"
+            actionHref="/manage/clubs"
+          />
         )}
       </div>
       {demo && (

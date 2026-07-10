@@ -13,7 +13,7 @@ Never point mutating E2E tests at production.
 
 ## Staging Supabase setup
 
-Use the new empty `StormHub Staging` Supabase project. Apply the base schema and patches once from the Supabase SQL Editor:
+Use the new empty `StormHub Staging` Supabase project. Prefer timestamped files in `supabase/migrations/` for new database changes. For the current baseline, apply the base schema and patches once from the Supabase SQL Editor:
 
 1. `supabase/schema.sql`
 2. `supabase/policies.sql`
@@ -21,6 +21,8 @@ Use the new empty `StormHub Staging` Supabase project. Apply the base schema and
 4. `supabase/improve-signups-roster-and-profile.sql`
 5. `supabase/allow-club-leaders-publish.sql`
 6. `supabase/allow-teachers-without-clubs.sql`
+
+When a PR includes a new file under `supabase/migrations/`, apply that migration to staging before running authenticated staging E2E. Keep `supabase/policies.sql` as the current full RLS snapshot, and use timestamped migrations as the repeatable production/staging change log.
 
 `supabase/staging-setup.sql` is optional backup/documentation SQL. GitHub Actions does not require it for recurring staging setup.
 
