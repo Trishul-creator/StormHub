@@ -9,6 +9,8 @@ import { getAuthContext } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { buildEmptyStateActions } from "@/lib/product";
+import { isAdminRole } from "@/lib/permissions";
 
 interface OpportunitiesPageProps {
   searchParams: Promise<{ q?: string; category?: string; closing?: string; grade?: string }>;
@@ -40,6 +42,14 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
   const bookmarkedIds = canParticipate ? await getUserBookmarkIds(userId) : new Set<string>();
 
   const filterOptions = categories.map((category) => ({ label: category, value: category }));
+  const emptyActions = buildEmptyStateActions({
+    surface: "opportunities",
+    query: params.q,
+    category: params.category,
+    grade: params.grade,
+    closing: params.closing,
+    isAdmin: isAdminRole(profile?.role),
+  });
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -100,9 +110,8 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
           {opportunities.length === 0 ? (
             <EmptyState
               title="No opportunities found"
-              description="Try a different search, category, grade, or deadline filter. New signups and tryouts can be added by school admins."
-              actionLabel="View all opportunities"
-              actionHref="/opportunities"
+              description="Try a broader search, clear the filters, or check the school-wide search if this may be a club or event."
+              actions={emptyActions}
             />
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">

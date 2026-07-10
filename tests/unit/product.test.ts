@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildEmptyStateActions,
   buildDiscoveryHints,
   buildGlobalSearchResults,
   getNotificationGroupId,
@@ -106,6 +107,29 @@ describe("product helpers", () => {
       { label: "Start with clubs", href: "/clubs?featured=true" },
       { label: "Find deadlines", href: "/opportunities?closing=true" },
       { label: "More Science", href: "/opportunities?category=Science" },
+    ]);
+  });
+
+  it("builds recovery actions for filtered empty states", () => {
+    expect(
+      buildEmptyStateActions({
+        surface: "clubs",
+        query: "robot",
+        filter: "Featured",
+        isAdmin: true,
+      })
+    ).toEqual([
+      { label: "Clear filters", href: "/clubs" },
+      { label: "Featured clubs", href: "/clubs?featured=true" },
+      { label: "Search everything", href: "/search?q=robot" },
+      { label: "Create club", href: "/manage/clubs/new" },
+    ]);
+
+    expect(buildEmptyStateActions({ surface: "search", query: "science fair" })).toEqual([
+      { label: "Search clubs", href: "/clubs?q=science+fair" },
+      { label: "Search opportunities", href: "/opportunities?q=science+fair" },
+      { label: "Browse calendar", href: "/calendar" },
+      { label: "Contact school team", href: "/contact" },
     ]);
   });
 });
