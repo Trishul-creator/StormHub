@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   canAccessSchoolAdmin,
   canCreateClub,
+  canDeleteUser,
+  canEditRole,
   canJoinClub,
   canManageClub,
   canManageClubRoster,
@@ -114,6 +116,29 @@ describe("school admin permissions", () => {
     expect(canManageSchool(profile("student"), schoolA)).toBe(false);
     expect(canManageSchool(profile("teacher"), schoolA)).toBe(false);
   });
+
+  it("allows school admins to edit only student and teacher roles in their own school", () => {
+    const admin = profile("admin", { school_id: schoolA });
+    expect(canEditRole(admin, profile("student", { school_id: schoolA }), "teacher")).toBe(true);
+    expect(canEditRole(admin, profile("teacher", { school_id: schoolA }), "student")).toBe(true);
+    expect(canEditRole(admin, profile("student", { school_id: schoolB }), "teacher")).toBe(false);
+    expect(canEditRole(admin, profile("admin", { school_id: schoolA }), "teacher")).toBe(false);
+    expect(canEditRole(admin, profile("student", { school_id: schoolA }), "admin")).toBe(false);
+  });
+
+  it("allows school admins to delete only student and teacher accounts in their own school", () => {
+    const admin = profile("admin", { school_id: schoolA });
+    expect(canDeleteUser(admin, profile("student", { school_id: schoolA }))).toBe(true);
+    expect(canDeleteUser(admin, profile("teacher", { school_id: schoolA }))).toBe(true);
+    expect(canDeleteUser(admin, profile("student", { school_id: schoolB }))).toBe(false);
+    expect(canDeleteUser(admin, profile("admin", { school_id: schoolA }))).toBe(false);
+  });
+
+  it("allows super admins to edit and delete across schools", () => {
+    const superAdmin = profile("super_admin");
+    expect(canEditRole(superAdmin, profile("admin", { school_id: schoolB }), "teacher")).toBe(true);
+    expect(canDeleteUser(superAdmin, profile("teacher", { school_id: schoolB }))).toBe(true);
+  });
 });
 
 describe("club permissions", () => {
@@ -144,7 +169,9 @@ describe("club permissions", () => {
   });
 
   it("limits roster management to admins or teacher sponsors", () => {
-    expect(canManageClubRoster(profile("admin"), club())).toBe(true);
+    expect(canManageClubRoster(profile("admin", { school_id: schoolA }), club({ school_id: schoolA }))).toBe(true);
+    expect(canManageClubRoster(profile("admin", { school_id: schoolA }), club({ school_id: schoolB }))).toBe(false);
+    expect(canManageClubRoster(profile("super_admin"), club({ school_id: schoolB }))).toBe(true);
     expect(canManageClubRoster(profile("teacher"), club(), membership("sponsor"))).toBe(true);
     expect(canManageClubRoster(profile("student"), club(), membership("president"))).toBe(false);
   });

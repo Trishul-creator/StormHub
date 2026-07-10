@@ -50,8 +50,19 @@ export async function POST(request: NextRequest) {
     if (profile.role !== "student") {
       return NextResponse.json({ error: "Only student accounts can manage RSVPs." }, { status: 403 });
     }
+    if (!profile.school_id) {
+      return NextResponse.json({ error: "Your account is not assigned to a school." }, { status: 403 });
+    }
     if (!isUuidish(body.eventId)) {
       return NextResponse.json({ error: "Missing event ID." }, { status: 400 });
+    }
+    const { data: event } = await supabase
+      .from("events")
+      .select("id, school_id")
+      .eq("id", body.eventId)
+      .maybeSingle();
+    if (!event || event.school_id !== profile.school_id) {
+      return NextResponse.json({ error: "You can only manage RSVPs for events in your own school." }, { status: 403 });
     }
     if (body.type === "rsvp_event") {
       const { error } = await supabase
@@ -80,8 +91,19 @@ export async function POST(request: NextRequest) {
     if (profile.role !== "student") {
       return NextResponse.json({ error: "Only student accounts can save opportunities." }, { status: 403 });
     }
+    if (!profile.school_id) {
+      return NextResponse.json({ error: "Your account is not assigned to a school." }, { status: 403 });
+    }
     if (!isUuidish(body.opportunityId)) {
       return NextResponse.json({ error: "Missing opportunity ID." }, { status: 400 });
+    }
+    const { data: opportunity } = await supabase
+      .from("opportunities")
+      .select("id, school_id")
+      .eq("id", body.opportunityId)
+      .maybeSingle();
+    if (!opportunity || opportunity.school_id !== profile.school_id) {
+      return NextResponse.json({ error: "You can only save opportunities from your own school." }, { status: 403 });
     }
     const { data: existing } = await supabase
       .from("bookmarks")

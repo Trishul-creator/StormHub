@@ -132,6 +132,7 @@ export function canEditRole(
 ): boolean {
   if (!actor || !isAdminRole(actor.role) || actor.id === target.id) return false;
   if (actor.role !== "super_admin") {
+    if (!actor.school_id || actor.school_id !== target.school_id) return false;
     if (!["student", "teacher"].includes(target.role)) return false;
     if (!["student", "teacher"].includes(newRole)) return false;
   }
@@ -140,7 +141,10 @@ export function canEditRole(
 
 export function canDeleteUser(actor: Profile | null, target: Profile): boolean {
   if (!actor || !isAdminRole(actor.role) || actor.id === target.id) return false;
-  if (actor.role !== "super_admin" && !["student", "teacher"].includes(target.role)) return false;
+  if (actor.role !== "super_admin") {
+    if (!actor.school_id || actor.school_id !== target.school_id) return false;
+    if (!["student", "teacher"].includes(target.role)) return false;
+  }
   return true;
 }
 
@@ -150,7 +154,10 @@ export function canManageClubRoster(
   membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
 ): boolean {
   if (!user) return false;
-  if (isAdminRole(user.role)) return true;
+  if (user.role === "super_admin") return true;
+  if (user.role === "admin") {
+    return typeof club !== "string" && !!user.school_id && user.school_id === club.school_id;
+  }
   return user.role === "teacher" && canManageClub(user, club, membership);
 }
 
