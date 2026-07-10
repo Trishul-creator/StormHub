@@ -55,7 +55,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           />
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">{results.length} best matches for "{query}"</p>
+            <p className="text-sm text-muted-foreground">
+              {results.length} best matches for &quot;{query}&quot;
+            </p>
             {results.map((result) => (
               <Link
                 key={`${result.type}-${result.id}`}
