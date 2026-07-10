@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Bookmark, Bot, Calendar, CheckSquare, Settings, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RoleChecklist } from "@/components/dashboard/role-checklist";
 import { DashboardCard } from "@/components/layout/stat-cards";
 import { EmptyState } from "@/components/layout/empty-state";
 import {
@@ -12,6 +13,7 @@ import {
 import { requireAuth } from "@/lib/auth";
 import { formatDate } from "@/lib/utils";
 import { isAdminRole } from "@/lib/permissions";
+import { buildDiscoveryHints, getRoleOnboardingItems } from "@/lib/product";
 import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
@@ -23,15 +25,31 @@ export default async function DashboardPage() {
 
   if (profile.role === "teacher") {
     const pending = await getPendingApprovals();
+    const checklist = getRoleOnboardingItems("teacher", {
+      manageableClubs: manageableClubs.length,
+      pendingApprovals: pending.length,
+    });
     return (
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-storm-navy">Teacher Dashboard</h1>
         <p className="mt-1 text-muted-foreground">Manage your assigned clubs, rosters, events, and announcements.</p>
+        <div className="mt-6">
+          <RoleChecklist
+            title="Teacher launch checklist"
+            description="The fastest path to keeping club operations current."
+            items={checklist}
+          />
+        </div>
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           <DashboardMetric label="Assigned clubs" value={manageableClubs.length} icon={Users} />
           {pending.length > 0 && <DashboardMetric label="Pending approvals" value={pending.length} icon={CheckSquare} />}
         </div>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <DashboardLink
+            href="/manage"
+            title="My clubs command center"
+            description="Review rosters, pending content, quick-post actions, and member status."
+          />
           <DashboardLink
             href="/calendar"
             title="Calendar"
@@ -51,6 +69,17 @@ export default async function DashboardPage() {
   }
 
   const dashboard = await getStudentDashboard(userId);
+  const checklist = getRoleOnboardingItems("student", {
+    joinedClubs: dashboard.memberships.length,
+    savedOpportunities: dashboard.savedOpportunities.length,
+    rsvpedEvents: dashboard.upcomingEvents.length,
+  });
+  const firstCategory = dashboard.memberships.find((membership) => membership.club?.category)?.club?.category;
+  const discoveryHints = buildDiscoveryHints({
+    joinedCategory: firstCategory,
+    hasJoinedClubs: dashboard.memberships.length > 0,
+    hasSavedOpportunities: dashboard.savedOpportunities.length > 0,
+  });
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -76,6 +105,14 @@ export default async function DashboardPage() {
             <Link href="/assistant">Open Assistant</Link>
           </Button>
         </div>
+      </div>
+
+      <div className="mb-8">
+        <RoleChecklist
+          title="Student launch checklist"
+          description="Set up your club feed, saved deadlines, and event plan."
+          items={checklist}
+        />
       </div>
 
       {manageableClubs.length > 0 && (
@@ -177,7 +214,18 @@ export default async function DashboardPage() {
           action={<Button variant="ghost" size="sm" asChild><Link href="/opportunities">Explore</Link></Button>}
         >
           {dashboard.recommendedOpportunities.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Join clubs to get personalized recommendations.</p>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Join clubs and save opportunities to get stronger recommendations.</p>
+              {discoveryHints.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {discoveryHints.map((hint) => (
+                    <Button key={hint.href} variant="outline" size="sm" asChild>
+                      <Link href={hint.href}>{hint.label}</Link>
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
           ) : (
             <div className="space-y-3">
               {dashboard.recommendedOpportunities.map((o) => (

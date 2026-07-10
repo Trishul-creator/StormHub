@@ -2,9 +2,12 @@ import Link from "next/link";
 import { Shield, Zap, Users, BarChart3, CheckSquare, Mail } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { RoleChecklist } from "@/components/dashboard/role-checklist";
 import { requireManager } from "@/lib/auth";
-import { getPendingApprovals } from "@/lib/data";
+import { getAdminAnalytics, getManageableClubs, getPendingApprovals } from "@/lib/data";
 import { canAccessAdmin, canAccessManageAnalytics, canApproveContent } from "@/lib/permissions";
+import { getRoleOnboardingItems } from "@/lib/product";
 import { redirect } from "next/navigation";
 
 const manageLinks = [
@@ -20,7 +23,17 @@ const manageLinks = [
 export default async function ManagePage() {
   const { profile } = await requireManager();
   if (profile.role === "super_admin") redirect("/admin/schools");
-  const pendingApprovals = canApproveContent(profile) ? await getPendingApprovals() : [];
+  const [pendingApprovals, manageableClubs, analytics] = await Promise.all([
+    canApproveContent(profile) ? getPendingApprovals() : Promise.resolve([]),
+    getManageableClubs(profile),
+    canAccessManageAnalytics(profile) ? getAdminAnalytics() : Promise.resolve(null),
+  ]);
+  const checklist = getRoleOnboardingItems(profile.role, {
+    manageableClubs: manageableClubs.length,
+    pendingApprovals: pendingApprovals.length,
+    activeClubs: analytics?.activeClubs ?? manageableClubs.filter((club) => club.status === "active").length,
+    recentActivity: analytics?.recentActivity.length ?? 0,
+  });
   const visibleLinks = manageLinks.filter((link) => {
     if (link.href === "/admin") return canAccessAdmin(profile);
     if (link.href === "/manage/opportunities") return canAccessAdmin(profile);
@@ -35,6 +48,44 @@ export default async function ManagePage() {
         title="Management"
         description="Manage clubs, content, and approvals. Officer and admin tools."
       />
+      <div className="mb-6">
+        <RoleChecklist
+          title={profile.role === "teacher" ? "Teacher command checklist" : "Admin operating checklist"}
+          description={profile.role === "teacher" ? "Keep club content and rosters ready for students." : "A quick operational pass before publishing or presenting the app."}
+          items={checklist}
+        />
+      </div>
+      {profile.role === "admin" && analytics && (
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <MetricCard label="Pending approvals" value={pendingApprovals.length} />
+          <MetricCard label="Active clubs" value={analytics.activeClubs} />
+          <MetricCard label="Upcoming events" value={analytics.upcomingEvents} />
+          <MetricCard label="Saved opportunities" value={analytics.totalBookmarks} />
+        </div>
+      )}
+      {profile.role === "teacher" && manageableClubs.length > 0 && (
+        <section className="mb-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-storm-navy">My clubs command center</h2>
+            <Button variant="ghost" size="sm" asChild><Link href="/manage/clubs">View all</Link></Button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {manageableClubs.slice(0, 6).map((club) => (
+              <Card key={club.id}>
+                <CardHeader>
+                  <CardTitle className="text-base">{club.name}</CardTitle>
+                  <CardDescription>{club.category ?? "Club"} · {club.status.replaceAll("_", " ")}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" asChild><Link href={`/manage/clubs/${club.slug}/members`}>Roster</Link></Button>
+                  <Button size="sm" variant="outline" asChild><Link href={`/manage/clubs/${club.slug}/announcements`}>Post</Link></Button>
+                  <Button size="sm" variant="outline" asChild><Link href={`/manage/clubs/${club.slug}/events`}>Events</Link></Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {visibleLinks.map((link) => (
           <Link key={link.href} href={link.href}>
@@ -50,6 +101,15 @@ export default async function ManagePage() {
           </Link>
         ))}
       </div>
+    </div>
+  );
+}
+
+function MetricCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border bg-white p-4">
+      <p className="text-2xl font-bold text-storm-navy">{value}</p>
+      <p className="text-sm text-muted-foreground">{label}</p>
     </div>
   );
 }

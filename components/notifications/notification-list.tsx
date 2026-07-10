@@ -9,11 +9,13 @@ import { Button } from "@/components/ui/button";
 import { markAllNotificationsRead, markNotificationRead } from "@/lib/actions";
 import type { Notification } from "@/types/database";
 import { humanizeLabel } from "@/lib/utils";
+import { groupNotifications } from "@/lib/product";
 
 export function NotificationList({ notifications }: { notifications: Notification[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const unread = notifications.filter((notification) => !notification.read_at).length;
+  const groups = groupNotifications(notifications);
 
   if (notifications.length === 0) {
     return (
@@ -40,35 +42,45 @@ export function NotificationList({ notifications }: { notifications: Notificatio
           </Button>
         </div>
       )}
-      <div className="space-y-3">
-        {notifications.map((notification) => (
-          <button
-            key={notification.id}
-            onClick={() => startTransition(async () => {
-              if (!notification.read_at) await markNotificationRead(notification.id);
-              router.push(notification.link || "/notifications");
-              router.refresh();
-            })}
-            className={`block w-full rounded-xl border p-4 text-left transition hover:border-storm-electric/40 hover:shadow-sm ${
-              notification.read_at ? "bg-white" : "bg-blue-50/60"
-            }`}
-          >
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <p className="font-semibold text-storm-navy">{notification.title}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{notification.message}</p>
-              </div>
-              {notification.importance !== "normal" && (
-                <Badge variant={notification.importance === "urgent" ? "destructive" : "warning"}>
-                  {humanizeLabel(notification.importance)}
-                </Badge>
-              )}
+      <div className="space-y-6">
+        {groups.map((group) => (
+          <section key={group.id}>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase text-muted-foreground">{group.label}</h2>
+              {group.unreadCount > 0 && <Badge variant="secondary">{group.unreadCount} unread</Badge>}
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              {notification.club?.name ? `${notification.club.name} · ` : ""}
-              {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-            </p>
-          </button>
+            <div className="space-y-3">
+              {group.notifications.map((notification) => (
+                <button
+                  key={notification.id}
+                  onClick={() => startTransition(async () => {
+                    if (!notification.read_at) await markNotificationRead(notification.id);
+                    router.push(notification.link || "/notifications");
+                    router.refresh();
+                  })}
+                  className={`block w-full rounded-xl border p-4 text-left transition hover:border-storm-electric/40 hover:shadow-sm ${
+                    notification.read_at ? "bg-white" : "bg-blue-50/60"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-storm-navy">{notification.title}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{notification.message}</p>
+                    </div>
+                    {notification.importance !== "normal" && (
+                      <Badge variant={notification.importance === "urgent" ? "destructive" : "warning"}>
+                        {humanizeLabel(notification.importance)}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    {notification.club?.name ? `${notification.club.name} · ` : ""}
+                    {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </section>
         ))}
       </div>
     </div>

@@ -11,7 +11,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 interface OpportunitiesPageProps {
-  searchParams: Promise<{ q?: string; category?: string; closing?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; closing?: string; grade?: string }>;
 }
 
 export default async function OpportunitiesPage({ searchParams }: OpportunitiesPageProps) {
@@ -19,7 +19,8 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
   const { userId, isLoggedIn, profile } = await getAuthContext();
   if (profile?.role === "teacher") redirect("/calendar");
 
-  const [opportunities, categories] = await Promise.all([
+  const selectedGrade = params.grade ? Number(params.grade) : undefined;
+  const [allOpportunities, categories] = await Promise.all([
     getOpportunities({
     search: params.q,
     category: params.category,
@@ -27,6 +28,13 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
     }),
     getOpportunityCategories(),
   ]);
+  const opportunities = Number.isFinite(selectedGrade)
+    ? allOpportunities.filter((opportunity) => {
+        const min = opportunity.grade_min ?? 9;
+        const max = opportunity.grade_max ?? 12;
+        return selectedGrade! >= min && selectedGrade! <= max;
+      })
+    : allOpportunities;
 
   const canParticipate = profile?.role === "student" || !profile;
   const bookmarkedIds = canParticipate ? await getUserBookmarkIds(userId) : new Set<string>();
@@ -62,13 +70,40 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
               ⏰ Closing soon
             </a>
           </div>
+          <div className="mt-6">
+            <p className="mb-2 text-sm font-medium text-storm-navy">Grade</p>
+            <div className="space-y-1">
+              {[9, 10, 11, 12].map((grade) => {
+                const href = `?${new URLSearchParams({
+                  ...(params.q ? { q: params.q } : {}),
+                  ...(params.category ? { category: params.category } : {}),
+                  ...(params.closing ? { closing: params.closing } : {}),
+                  grade: String(grade),
+                }).toString()}`;
+                return (
+                  <a
+                    key={grade}
+                    href={href}
+                    className={`block rounded-lg px-3 py-2 text-sm ${params.grade === String(grade) ? "bg-storm-electric/10 text-storm-electric font-medium" : "hover:bg-storm-light/50 text-muted-foreground"}`}
+                  >
+                    Grade {grade}
+                  </a>
+                );
+              })}
+            </div>
+          </div>
         </aside>
 
         <div className="flex-1">
           <MobileFilterDrawer title="Filter opportunities" options={filterOptions} activeValue={params.category} paramName="category" />
           <p className="mb-4 text-sm text-muted-foreground">{opportunities.length} opportunities</p>
           {opportunities.length === 0 ? (
-            <EmptyState title="No opportunities found" description="Try a different search or category." actionLabel="View all" actionHref="/opportunities" />
+            <EmptyState
+              title="No opportunities found"
+              description="Try a different search, category, grade, or deadline filter. New signups and tryouts can be added by school admins."
+              actionLabel="View all opportunities"
+              actionHref="/opportunities"
+            />
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
               {opportunities.map((opp) => (
