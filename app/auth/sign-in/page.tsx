@@ -7,15 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { demoSignIn, supabaseSignIn } from "@/lib/actions";
-import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { demoSignIn } from "@/lib/actions";
 import { toast } from "@/hooks/use-toast";
 import { Zap } from "lucide-react";
 
 export default function SignInPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const isDemo = !isSupabaseConfigured();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -24,9 +22,7 @@ export default function SignInPage() {
     const email = form.get("email") as string;
     const password = form.get("password") as string;
 
-    const result = isDemo
-      ? await demoSignIn(email, password)
-      : await supabaseSignIn(email, password);
+    const result = await demoSignIn(email, password);
 
     setLoading(false);
     if (result.success) {
@@ -48,9 +44,7 @@ export default function SignInPage() {
             <Zap className="h-5 w-5 text-white" />
           </div>
           <CardTitle>Sign in to StormHub</CardTitle>
-          <CardDescription>
-            {isDemo ? "Demo mode — any email/password works" : "Use your school email to sign in"}
-          </CardDescription>
+          <CardDescription>Use your school email to sign in</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -70,11 +64,6 @@ export default function SignInPage() {
             Don&apos;t have an account?{" "}
             <Link href="/auth/sign-up" className="text-storm-electric hover:underline">Sign up</Link>
           </p>
-          {isDemo && (
-            <p className="mt-3 text-center text-xs text-amber-700 bg-amber-50 rounded-lg p-2">
-              Configure Supabase in .env.local for real authentication
-            </p>
-          )}
         </CardContent>
       </Card>
     </div>
