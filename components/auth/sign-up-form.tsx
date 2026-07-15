@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabaseSignUp } from "@/lib/actions";
-import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Zap } from "lucide-react";
 
@@ -23,7 +22,6 @@ export function SignUpForm({ schools, preselectedSchoolId }: { schools: SignUpSc
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [loadedAt] = useState(() => Date.now());
-  const isDemo = !isSupabaseConfigured();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -53,12 +51,6 @@ export function SignUpForm({ schools, preselectedSchoolId }: { schools: SignUpSc
       toast({ title: "Sign up failed", description: "Choose your school.", variant: "destructive" });
       return;
     }
-    if (isDemo) {
-      setLoading(false);
-      toast({ title: "Demo mode", description: "Configure Supabase to create real accounts.", variant: "destructive" });
-      return;
-    }
-
     const result = await supabaseSignUp(
       email,
       password,
