@@ -19,6 +19,25 @@ export default function PrivacyPage() {
         </section>
 
         <section>
+          <h2 className="text-lg font-semibold text-storm-navy mb-2">Service providers</h2>
+          <p>
+            StormHub uses Supabase for accounts and database hosting, Vercel for application hosting,
+            Resend for enabled email delivery, and hCaptcha for abuse prevention. These providers process
+            only the information needed to operate those services under the school&apos;s approved configuration.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-storm-navy mb-2">Optional assistant</h2>
+          <p>
+            The assistant is disabled unless the district approves external AI processing. When enabled,
+            user prompts, the user&apos;s role, the school name, and public club or opportunity listings are sent
+            to the approved AI provider. Names, email addresses, memberships, saved items, notifications, and
+            approval records are not included in the provider context.
+          </p>
+        </section>
+
+        <section>
           <h2 className="text-lg font-semibold text-storm-navy mb-2">What we do NOT collect</h2>
           <ul className="list-disc pl-5 space-y-1">
             <li>Grades or academic records</li>
@@ -40,8 +59,9 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-lg font-semibold text-storm-navy mb-2">Your rights</h2>
           <p>
-            You can request deletion of your account and associated data. Contact us through the
-            feedback form or reach out to a platform administrator.
+            You can export your account data or submit a deletion request from Settings. School administrators
+            review deletion requests according to district retention requirements. Operational audit records may
+            be retained after account deletion when required for security and accountability.
           </p>
         </section>
 

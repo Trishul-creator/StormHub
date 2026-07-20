@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/layout/empty-state";
 import { CategoryBadge } from "@/components/ui/badge";
-import { requireAuth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { getManageableClubs } from "@/lib/data";
 import { getSchoolBySlug } from "@/lib/schools";
 
@@ -14,7 +14,7 @@ interface SchoolDraftsPageProps {
 }
 
 export default async function SchoolDraftsPage({ params }: SchoolDraftsPageProps) {
-  const { profile } = await requireAuth("/admin/schools");
+  const { profile } = await requireAdmin();
   if (profile.role !== "super_admin") redirect("/admin?error=super_admin_required");
 
   const { schoolSlug } = await params;

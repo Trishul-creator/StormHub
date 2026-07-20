@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Shield, Zap, Users, BarChart3, CheckSquare, Mail } from "lucide-react";
+import { Shield, Zap, Users, BarChart3, CheckSquare, History, Mail } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ const manageLinks = [
   { href: "/manage/analytics", icon: BarChart3, title: "Analytics", description: "View platform metrics" },
   { href: "/manage/digest", icon: Mail, title: "Weekly Digest", description: "Generate newsletter content" },
   { href: "/admin", icon: Shield, title: "Admin Panel", description: "School-wide administration" },
+  { href: "/admin/audit", icon: History, title: "Audit Log", description: "Review administrative change history" },
 ];
 
 export default async function ManagePage() {
@@ -36,6 +37,7 @@ export default async function ManagePage() {
   });
   const visibleLinks = manageLinks.filter((link) => {
     if (link.href === "/admin") return canAccessAdmin(profile);
+    if (link.href === "/admin/audit") return canAccessAdmin(profile);
     if (link.href === "/manage/opportunities") return canAccessAdmin(profile);
     if (link.href === "/manage/analytics") return canAccessManageAnalytics(profile);
     if (link.href === "/manage/approvals") return canAccessAdmin(profile) || pendingApprovals.length > 0;

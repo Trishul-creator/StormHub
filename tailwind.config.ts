@@ -13,7 +13,7 @@ const config: Config = {
         storm: {
           navy: "#0B1D3A",
           blue: "#1E3A5F",
-          electric: "#3B82F6",
+          electric: "#1D4ED8",
           silver: "#94A3B8",
           light: "#E2E8F0",
         },
@@ -58,7 +58,7 @@ const config: Config = {
       },
       backgroundImage: {
         "storm-gradient":
-          "linear-gradient(135deg, #0B1D3A 0%, #1E3A5F 50%, #2563EB 100%)",
+          "linear-gradient(135deg, #0B1D3A 0%, #1E3A5F 50%, #1D4ED8 100%)",
         "storm-subtle":
           "linear-gradient(180deg, #F8FAFC 0%, #EEF2FF 100%)",
       },

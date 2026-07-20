@@ -10,10 +10,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { demoSignIn } from "@/lib/actions";
 import { toast } from "@/hooks/use-toast";
 import { Zap } from "lucide-react";
+import { Captcha } from "@/components/auth/captcha";
 
 export default function SignInPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -22,7 +24,7 @@ export default function SignInPage() {
     const email = form.get("email") as string;
     const password = form.get("password") as string;
 
-    const result = await demoSignIn(email, password);
+    const result = await demoSignIn(email, password, captchaToken);
 
     setLoading(false);
     if (result.success) {
@@ -56,13 +58,14 @@ export default function SignInPage() {
               <Label htmlFor="password">Password</Label>
               <Input id="password" name="password" type="password" required className="mt-1" />
             </div>
+            <Captcha onToken={setCaptchaToken} />
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Signing in..." : "Sign in"}
             </Button>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
-            <Link href="/auth/sign-up" className="text-storm-electric hover:underline">Sign up</Link>
+            <Link href="/auth/sign-up" className="text-storm-electric underline">Sign up</Link>
           </p>
         </CardContent>
       </Card>

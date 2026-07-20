@@ -13,10 +13,10 @@ export function Footer({ role }: { role?: UserRole }) {
             <p className="mt-2 text-sm max-w-md">
               Student-built opportunity hub for school communities. Discover clubs, opportunities, and everything happening on the school calendar.
             </p>
-            <p className="mt-4 text-xs text-storm-silver/70">
+            <p className="mt-4 text-xs text-storm-silver">
               Student-built platform. Not an official school system unless approved by school administration.
             </p>
-            <p className="mt-2 text-xs text-storm-silver/70">
+            <p className="mt-2 text-xs text-storm-silver">
               Need help? Use the contact form or email {SUPPORT_EMAIL}.
             </p>
           </div>
@@ -39,7 +39,7 @@ export function Footer({ role }: { role?: UserRole }) {
             </ul>
           </div>
         </div>
-        <div className="mt-8 border-t border-storm-blue pt-8 text-center text-xs text-storm-silver/60">
+        <div className="mt-8 border-t border-storm-blue pt-8 text-center text-xs text-storm-silver">
           © {new Date().getFullYear()} {APP_NAME} · Privacy-first · Built for students
         </div>
       </div>

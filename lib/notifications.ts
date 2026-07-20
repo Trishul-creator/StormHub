@@ -157,13 +157,13 @@ export async function createEmailOutboxItem(input: {
   subject: string;
   body: string;
   type: string;
-}): Promise<void> {
-  if (isDemoMode()) return;
-  if (!isEmailOutboxEnabled()) return;
+}): Promise<string | null> {
+  if (isDemoMode()) return null;
+  if (!isEmailOutboxEnabled()) return null;
   const admin = createAdminClient();
   if (!admin) {
     console.warn("[createEmailOutboxItem] SUPABASE_SERVICE_ROLE_KEY is required for trusted queue writes.");
-    return;
+    return null;
   }
   const { data, error } = await admin
     .from("email_outbox")
@@ -179,9 +179,10 @@ export async function createEmailOutboxItem(input: {
     .single();
   if (error) {
     console.error("[createEmailOutboxItem]", error.message);
-    return;
+    return null;
   }
   if (data && isEmailDeliveryEnabled()) await sendEmailOutboxItem(data);
+  return data?.id ?? null;
 }
 
 export async function maybeQueueEmailForNotification(

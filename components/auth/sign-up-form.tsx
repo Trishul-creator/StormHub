@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabaseSignUp } from "@/lib/actions";
 import { toast } from "@/hooks/use-toast";
 import { Zap } from "lucide-react";
+import { Captcha } from "@/components/auth/captcha";
 
 interface SignUpSchool {
   id: string;
@@ -30,6 +31,7 @@ export function SignUpForm({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [loadedAt] = useState(() => Date.now());
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -66,7 +68,7 @@ export function SignUpForm({
       gradeLevelRaw ? Number(gradeLevelRaw) : null,
       accessCode,
       schoolId,
-      { website, loadedAt: formLoadedAt }
+      { website, loadedAt: formLoadedAt, captchaToken }
     );
     setLoading(false);
     if (result.success) {
@@ -135,7 +137,7 @@ export function SignUpForm({
           </div>
           <div>
             <Label htmlFor="password">Password</Label>
-            <Input id="password" name="password" type="password" required minLength={6} className="mt-1" />
+            <Input id="password" name="password" type="password" required minLength={12} className="mt-1" />
           </div>
           {requiresAccessCode && (
             <div>
@@ -148,13 +150,14 @@ export function SignUpForm({
             <Input id="website" name="website" tabIndex={-1} autoComplete="off" />
           </div>
           <input type="hidden" name="loadedAt" value={loadedAt} />
+          <Captcha onToken={setCaptchaToken} />
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Creating account..." : "Create account"}
           </Button>
         </form>
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Already have an account?{" "}
-          <Link href="/auth/sign-in" className="text-storm-electric hover:underline">Sign in</Link>
+          <Link href="/auth/sign-in" className="text-storm-electric underline">Sign in</Link>
         </p>
         <p className="mt-3 text-center text-xs text-muted-foreground">
           Confirm your email after signup. New accounts are tied to one school workspace, and staff roles are assigned by authorized administrators.

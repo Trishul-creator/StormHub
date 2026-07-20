@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 export interface SignupBotProof {
   website?: string;
   loadedAt?: number;
+  captchaToken?: string | null;
 }
 
 export function validateSignupBotProof(

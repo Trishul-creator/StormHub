@@ -10,7 +10,7 @@ The public `/` page is a neutral platform landing page. Each school is a separat
 - Supabase Auth, Postgres, and RLS
 - Vercel hosting
 - In-app notifications plus Resend email delivery
-- Optional Groq assistant integration
+- Optional, district-approved Groq assistant integration (disabled by default)
 
 ## Local environment
 
@@ -21,6 +21,7 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_DEFAULT_SCHOOL_SLUG=elkhorn-south
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 SUPPORT_EMAIL=stormhubsupport@gmail.com
 NEXT_PUBLIC_SUPPORT_EMAIL=stormhubsupport@gmail.com
 EMAIL_DELIVERY_MODE=outbox_only
@@ -30,7 +31,13 @@ EMAIL_REPLY_TO=stormhubsupport@gmail.com
 SUPABASE_SERVICE_ROLE_KEY=
 SIGNUP_ACCESS_CODE=
 ALLOWED_SIGNUP_EMAIL_DOMAINS=
-GROQ_API_KEY=
+NEXT_PUBLIC_HCAPTCHA_SITE_KEY=
+HCAPTCHA_SECRET_KEY=
+CRON_SECRET=
+REQUEST_RATE_LIMIT_SECRET=
+AI_FEATURES_ENABLED=false
+GROQ_ENABLED=false
+AI_DATA_SHARING_APPROVED=false
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` is server-only. Do not expose it in client code.
@@ -45,14 +52,18 @@ Normal updates stay inside StormHub. Important or urgent updates may also be ema
 
 ## Database setup
 
-For an existing project, run the SQL patches in Supabase SQL Editor in this order:
+The timestamped migration chain in `supabase/migrations` is the database source of truth.
+For local development:
 
-1. `supabase/fix-current-db.sql`
-2. `supabase/allow-club-leaders-publish.sql`
-3. `supabase/improve-signups-roster-and-profile.sql`
-4. `supabase/multi-school-platform-cleanup.sql`
+```bash
+supabase start
+supabase db reset
+supabase test db
+```
 
-The final patch adds school settings/metadata, preserves existing schools such as Elkhorn South and Elkhorn North, allows platform-level super admins to be schoolless, hides standalone non-core modules by default, and creates a minimal pilot opportunity set for Elkhorn South.
+The files directly under `supabase/*.sql` are retained only as legacy/manual references. Do not apply
+them to a new database. Existing production rollout and one-time baseline repair steps are in
+`docs/PRODUCTION_ROLLOUT.md`.
 
 ## Development
 
@@ -66,6 +77,9 @@ Useful checks:
 ```bash
 npm run lint
 npm run build
+npm run test
+npm run test:e2e:readonly
+supabase test db
 ```
 
 ## Deployment
@@ -76,6 +90,7 @@ Deploy through Vercel from the GitHub repository. Required production env vars:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `NEXT_PUBLIC_DEFAULT_SCHOOL_SLUG`
 - `NEXT_PUBLIC_APP_URL`
+- `NEXT_PUBLIC_SITE_URL`
 - `SUPPORT_EMAIL`
 - `NEXT_PUBLIC_SUPPORT_EMAIL`
 - `EMAIL_DELIVERY_MODE`
@@ -83,12 +98,16 @@ Deploy through Vercel from the GitHub repository. Required production env vars:
 - `EMAIL_FROM`
 - `EMAIL_REPLY_TO`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `NEXT_PUBLIC_HCAPTCHA_SITE_KEY`
+- `HCAPTCHA_SECRET_KEY`
+- `CRON_SECRET`
+- `REQUEST_RATE_LIMIT_SECRET`
 
 Optional production env vars:
 
 - `SIGNUP_ACCESS_CODE`
 - `ALLOWED_SIGNUP_EMAIL_DOMAINS`
-- `GROQ_API_KEY`
+- `GROQ_API_KEY`, only after district approval
 - `EMAIL_DELIVERY_MODE=outbox_only` for queue-only testing.
 - `EMAIL_DELIVERY_MODE=send` for real Resend delivery.
 
@@ -106,9 +125,12 @@ Enabled core surfaces:
 - In-app notifications
 - Controlled important/urgent email notifications
 - Support/contact through stormhubsupport@gmail.com
-- AI assistant with app-focused guardrails
+- Weekly digest delivery with idempotent scheduling
+- Account suspension, graduation deactivation, data export, and deletion requests
+- Immutable administrative audit log
 - School admin/user/role management
 - Super-admin school workspace creation
+- Optional AI assistant, disabled until district approval
 
 Roles:
 

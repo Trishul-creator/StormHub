@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { createHmac } from "node:crypto";
 import {
   allowsMutatingE2E,
   emailSafetyMessage,
@@ -73,4 +74,65 @@ export async function signIn(page: Page, role: E2ERole) {
 
   await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
   await expect(page).not.toHaveURL(/\/auth\/sign-in/, { timeout: 10_000 });
+
+  if (role === "admin" || role === "super_admin") {
+    await completeAdminMfa(page, role);
+  }
+}
+
+async function completeAdminMfa(page: Page, role: "admin" | "super_admin") {
+  const redirectTo = role === "super_admin" ? "/admin/schools" : "/admin";
+  await page.goto(`/auth/mfa?redirect=${encodeURIComponent(redirectTo)}`);
+
+  const setupButton = page.getByRole("button", { name: /set up authenticator/i });
+  const codeInput = page.getByLabel(/six-digit code/i);
+  await Promise.race([
+    setupButton.waitFor({ state: "visible", timeout: 15_000 }).catch(() => undefined),
+    codeInput.waitFor({ state: "visible", timeout: 15_000 }).catch(() => undefined),
+    page.waitForURL((url) => url.pathname === redirectTo, { timeout: 15_000 }).catch(() => undefined),
+  ]);
+  if (new URL(page.url()).pathname === redirectTo) return;
+
+  let secret = role === "super_admin"
+    ? process.env.E2E_SUPER_ADMIN_TOTP_SECRET
+    : process.env.E2E_ADMIN_TOTP_SECRET;
+  if (await setupButton.isVisible().catch(() => false)) {
+    await setupButton.click();
+    const manualKey = page.getByText(/manual key:/i);
+    await expect(manualKey).toBeVisible({ timeout: 10_000 });
+    secret = (await manualKey.textContent())?.replace(/.*manual key:\s*/i, "").trim();
+  }
+  if (!secret) {
+    throw new Error(`No TOTP secret is available for the ${role} E2E account. Run staging:setup to reset dedicated test factors.`);
+  }
+
+  await expect(codeInput).toBeVisible({ timeout: 10_000 });
+  await codeInput.fill(generateTotp(secret));
+  await page.getByRole("button", { name: /verify and continue/i }).click();
+  await page.waitForURL((url) => url.pathname === redirectTo, { timeout: 20_000 });
+}
+
+function generateTotp(base32Secret: string, timestamp = Date.now()): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const normalized = base32Secret.toUpperCase().replace(/[^A-Z2-7]/g, "");
+  let bits = "";
+  for (const character of normalized) {
+    const value = alphabet.indexOf(character);
+    if (value < 0) throw new Error("Invalid base32 TOTP secret.");
+    bits += value.toString(2).padStart(5, "0");
+  }
+  const bytes = Buffer.alloc(Math.floor(bits.length / 8));
+  for (let index = 0; index < bytes.length; index += 1) {
+    bytes[index] = Number.parseInt(bits.slice(index * 8, index * 8 + 8), 2);
+  }
+
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(timestamp / 30_000)));
+  const digest = createHmac("sha1", bytes).update(counter).digest();
+  const offset = digest[digest.length - 1] & 0x0f;
+  const binary = ((digest[offset] & 0x7f) << 24)
+    | ((digest[offset + 1] & 0xff) << 16)
+    | ((digest[offset + 2] & 0xff) << 8)
+    | (digest[offset + 3] & 0xff);
+  return String(binary % 1_000_000).padStart(6, "0");
 }

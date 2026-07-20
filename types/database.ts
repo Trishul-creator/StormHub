@@ -4,6 +4,8 @@ export type UserRole =
   | "admin"
   | "super_admin";
 
+export type AccountStatus = "active" | "suspended" | "deactivated";
+
 export type ClubStatus = "draft" | "interest_open" | "active" | "paused" | "archived";
 
 export type ContentStatus =
@@ -63,6 +65,7 @@ export interface School {
   mascot?: string | null;
   is_active?: boolean;
   is_public?: boolean;
+  allowed_email_domains?: string[];
   created_at?: string;
   updated_at?: string;
 }
@@ -75,6 +78,8 @@ export interface Profile {
   grade_level?: number | null;
   avatar_url?: string | null;
   role: UserRole;
+  account_status?: AccountStatus;
+  graduation_year?: number | null;
   created_at?: string;
   updated_at?: string;
 }

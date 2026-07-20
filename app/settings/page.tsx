@@ -6,6 +6,8 @@ import { Bell } from "lucide-react";
 import { NotificationPreferencesForm } from "@/components/notifications/preferences-form";
 import { getNotificationPreferences } from "@/lib/notifications";
 import { ProfileSettingsForm } from "@/components/settings/profile-settings-form";
+import { AccountControls } from "@/components/settings/account-controls";
+import { Shield } from "lucide-react";
 
 export default async function SettingsPage() {
   const { profile } = await requireAuth("/settings");
@@ -31,6 +33,14 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <NotificationPreferencesForm initial={preferences} role={profile.role} />
+        </CardContent>
+      </Card>
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5" /> Account and privacy</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AccountControls role={profile.role} />
         </CardContent>
       </Card>
     </div>

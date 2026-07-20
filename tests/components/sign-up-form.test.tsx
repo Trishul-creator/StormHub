@@ -45,7 +45,7 @@ describe("SignUpForm", () => {
     fireEvent.change(screen.getByLabelText("Full name"), { target: { value: "Test Student" } });
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "student@example.edu" } });
     fireEvent.change(screen.getByLabelText("Grade"), { target: { value: "10" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password123" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "StrongPassword123" } });
     const loadedAt = document.querySelector<HTMLInputElement>('input[name="loadedAt"]');
     expect(loadedAt).not.toBeNull();
     fireEvent.change(loadedAt!, { target: { value: String(Date.now() - 2000) } });
@@ -55,12 +55,12 @@ describe("SignUpForm", () => {
     await waitFor(() => {
       expect(supabaseSignUp).toHaveBeenCalledWith(
         "student@example.edu",
-        "password123",
+        "StrongPassword123",
         "Test Student",
         10,
         "",
         "school-1",
-        expect.objectContaining({ website: "", loadedAt: expect.any(Number) })
+        expect.objectContaining({ captchaToken: null, website: "", loadedAt: expect.any(Number) })
       );
     });
     expect(toast).toHaveBeenCalledWith({

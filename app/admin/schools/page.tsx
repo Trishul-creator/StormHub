@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { ArrowRight, Building2, Calendar, GraduationCap, Mail, Users } from "lucide-react";
+import { ArrowRight, Building2, Calendar, GraduationCap, Mail, UserRoundX, Users } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireAuth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAllSchools, getSchoolManageUrl, getSchoolPublicUrl } from "@/lib/schools";
 import { slugify } from "@/lib/utils";
@@ -14,22 +15,26 @@ import type { School } from "@/types/database";
 async function createSchoolAction(formData: FormData) {
   "use server";
 
-  const { profile } = await requireAuth("/admin/schools");
+  const { profile } = await requireAdmin();
   if (profile.role !== "super_admin") redirect("/admin?error=super_admin_required");
 
-  const admin = createAdminClient();
-  if (!admin) redirect("/admin/schools?error=service_role_required");
+  const supabase = await createClient();
+  if (!supabase) redirect("/admin/schools?error=database_required");
 
   const name = String(formData.get("name") ?? "").trim();
   const shortName = String(formData.get("short_name") ?? "").trim();
   const city = String(formData.get("city") ?? "").trim();
   const state = String(formData.get("state") ?? "").trim();
   const mascot = String(formData.get("mascot") ?? "").trim();
+  const allowedEmailDomains = String(formData.get("allowed_email_domains") ?? "")
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ""))
+    .filter((domain) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain));
   const slug = slugify(String(formData.get("slug") ?? "").trim() || name);
 
-  if (!name || !slug) redirect("/admin/schools?error=missing_school_name");
+  if (!name || !slug || allowedEmailDomains.length === 0) redirect("/admin/schools?error=missing_school_configuration");
 
-  const { data: school, error } = await admin
+  const { data: school, error } = await supabase
     .from("schools")
     .insert({
       name,
@@ -38,6 +43,7 @@ async function createSchoolAction(formData: FormData) {
       city: city || null,
       state: state || null,
       mascot: mascot || null,
+      allowed_email_domains: allowedEmailDomains,
       is_active: true,
       is_public: true,
     })
@@ -49,7 +55,7 @@ async function createSchoolAction(formData: FormData) {
     redirect("/admin/schools?error=create_failed");
   }
 
-  await admin.from("school_settings").upsert(
+  await supabase.from("school_settings").upsert(
     {
       school_id: school.id,
       announcements_enabled: true,
@@ -67,7 +73,7 @@ async function createSchoolAction(formData: FormData) {
 }
 
 export default async function AdminSchoolsPage() {
-  const { profile } = await requireAuth("/admin/schools");
+  const { profile } = await requireAdmin();
   if (profile.role !== "super_admin") redirect("/admin?error=super_admin_required");
 
   const schools = await getAllSchools();
@@ -81,6 +87,9 @@ export default async function AdminSchoolsPage() {
       >
         <Button variant="outline" asChild>
           <Link href="/admin/feedback"><Mail className="h-4 w-4" /> Support inbox</Link>
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href="/admin/deletion-requests"><UserRoundX className="h-4 w-4" /> Deletion requests</Link>
         </Button>
       </PageHeader>
 
@@ -108,6 +117,11 @@ export default async function AdminSchoolsPage() {
             <label className="block text-sm">
               <span className="text-muted-foreground">School name</span>
               <input name="name" required className="mt-1 w-full rounded-md border px-3 py-2" placeholder="Example High School" />
+            </label>
+            <label className="block text-sm">
+              <span className="text-muted-foreground">Approved email domains</span>
+              <input name="allowed_email_domains" required className="mt-1 w-full rounded-md border px-3 py-2" placeholder="students.example.edu, staff.example.edu" />
+              <span className="mt-1 block text-xs text-muted-foreground">Comma-separated domains. New accounts must use one of these domains.</span>
             </label>
             <label className="block text-sm">
               <span className="text-muted-foreground">Workspace URL name (optional)</span>

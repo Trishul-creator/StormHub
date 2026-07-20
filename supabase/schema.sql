@@ -1,5 +1,5 @@
+-- LEGACY REFERENCE ONLY. Use timestamped files in supabase/migrations.
 -- StormHub Database Schema
--- Run this in Supabase SQL Editor or via Supabase CLI
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

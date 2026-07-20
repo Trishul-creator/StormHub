@@ -1,6 +1,6 @@
 # StormHub Test Plan
 
-Last updated: 2026-07-02
+Last updated: 2026-07-20
 
 ## 1. Static checks
 
@@ -16,12 +16,14 @@ These catch syntax, lint, TypeScript, and Next.js production build failures.
 
 ## 2. Unit tests with Vitest
 
-Current targets:
+Current targets include:
 
 - Permission logic in `lib/permissions.ts`.
 - School route helpers in `lib/schools.ts`.
 - Email delivery mode decisions in `lib/email.ts`.
 - Utility helpers in `lib/utils.ts`.
+- Environment feature gates, including AI data-sharing approval.
+- Weekly digest period, content, and idempotency helpers.
 - Pure visibility/filter expectations represented with test-local helpers.
 
 Command:
@@ -32,11 +34,12 @@ npm run test
 
 ## 3. Component tests
 
-Current targets:
+Current targets include:
 
 - `ClubCard`
 - `OpportunityCard`
 - `EmptyState`
+- Signup submission and school access-code behavior.
 
 Approach:
 
@@ -58,18 +61,21 @@ Current folder:
 tests/e2e
 ```
 
-Current specs:
+Current specs include:
 
 - `public.spec.ts`
 - `school-workspaces.spec.ts`
 - `super-admin.spec.ts`
 - `student.spec.ts`
+- `accessibility.spec.ts` across Chromium, Firefox, WebKit, iPhone, and Chromebook viewports.
 
 Public specs run without credentials. Authenticated specs skip unless env vars are configured.
 `test:e2e:readonly` runs only public read-only specs and does not require staging credentials.
 `test:e2e:staging` runs guarded staging setup and then the E2E suite.
 The staging setup script idempotently seeds `school1`, `school2`, the minimal
-School 1 clubs/opportunities, and fake E2E users. It should only fail for
+School 1 clubs/opportunities, and fake E2E users. It resets MFA factors only for
+the dedicated E2E admin accounts so Playwright can enroll and verify TOTP through
+the real UI on every run. It should only fail for
 missing staging schema/migration tables, not for missing seed rows.
 
 Mutating E2E specs must not run against production. Any E2E test that creates,
@@ -122,7 +128,7 @@ Automated unit coverage now includes:
 - Student/officer/sponsor club management boundaries.
 - Admin/super admin preview/manage but do not join through student flow.
 
-Remaining E2E/security targets:
+Additional E2E/security targets:
 
 - Student cannot access `/admin`.
 - Student cannot access `/manage`.
@@ -133,23 +139,19 @@ Remaining E2E/security targets:
 
 ## 6. Database/RLS tests
 
-Automated RLS tests are not currently implemented. They require either:
+`supabase/tests/database/rls.test.sql` runs against a fresh local database in CI.
+The pgTAP suite covers anonymous access, active and suspended students, teacher
+sponsors, school admins, super admins, MFA assurance levels, cross-school data,
+public-form direct inserts, school email domains, and immutable audit history.
 
-- A disposable Supabase project.
-- Supabase local stack in CI.
-- Seeded test users and SQL assertions.
+Run locally:
 
-Manual Supabase SQL checks should verify:
-
-- `profiles` role constraints.
-- `club_memberships` role/status constraints.
-- Students cannot update rejected memberships back to active.
-- School admins are scoped to their school.
-- Event/club/opportunity RLS does not leak cross-school data.
-- Super admins retain platform-level access.
-
-Staging database setup for these tests is documented in `docs/DEPLOYMENT.md`.
-Use the dedicated Staging Supabase project only.
+```bash
+npx supabase start
+npx supabase db reset
+npx supabase test db
+npx supabase db lint --local --level error
+```
 
 ## 7. Manual QA flows
 
@@ -199,9 +201,8 @@ Use the dedicated Staging Supabase project only.
 
 ## 8. What is not automated yet
 
-- Full Supabase RLS integration tests.
 - Real email provider send tests.
 - AI assistant safety jailbreak regression suite.
 - Complete admin/teacher/officer E2E flows.
 - Visual regression tests.
-- Mobile layout regression tests.
+- Physical Chromebook and phone validation.

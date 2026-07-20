@@ -5,6 +5,7 @@ import { getAdminUsers, isDemoMode } from "@/lib/data";
 import { getManageableClubs } from "@/lib/data";
 import { UserRoleEditor } from "@/components/admin/user-role-editor";
 import { getSchoolBySlug } from "@/lib/schools";
+import { GraduationCleanup } from "@/components/admin/graduation-cleanup";
 
 interface AdminUsersPageProps {
   searchParams: Promise<{ school?: string }>;
@@ -28,6 +29,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
             : "Manage user roles and permissions. Platform admins are intentionally excluded from school inventory."
         }
       />
+      {!demo && <GraduationCleanup />}
       <div className="rounded-xl border overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-storm-light/50">
@@ -35,6 +37,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
               <th className="text-left p-4 font-medium">Name</th>
               <th className="text-left p-4 font-medium">Email</th>
               <th className="text-left p-4 font-medium">Role</th>
+              <th className="text-left p-4 font-medium">Status</th>
               <th className="text-left p-4 font-medium">Assignments</th>
               <th className="text-left p-4 font-medium">Manage</th>
             </tr>
@@ -45,6 +48,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
                 <td className="p-4">{user.full_name || "Unnamed user"}</td>
                 <td className="p-4 text-muted-foreground">{user.email || "—"}</td>
                 <td className="p-4"><RoleBadge role={user.role} /></td>
+                <td className="p-4 capitalize">{user.account_status ?? "active"}</td>
                 <td className="p-4 text-xs text-muted-foreground">
                   {user.club_assignments
                     .filter((assignment) => assignment.status === "active" && assignment.role !== "member")

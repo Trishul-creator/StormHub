@@ -2,8 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Trash2 } from "lucide-react";
-import { deleteUserAccount, updateUserRoleAndClubs } from "@/lib/actions";
+import { Ban, CheckCircle2, Loader2, Trash2 } from "lucide-react";
+import { deleteUserAccount, updateUserAccountStatus, updateUserRoleAndClubs } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import type { AdminUser, Club, UserRole } from "@/types/database";
@@ -77,6 +77,18 @@ export function UserRoleEditor({
     });
   }
 
+  function changeStatus(status: "active" | "suspended") {
+    startTransition(async () => {
+      const result = await updateUserAccountStatus(user.id, status);
+      if (result.success) {
+        toast({ title: status === "active" ? "Account restored" : "Account suspended" });
+        router.refresh();
+      } else {
+        toast({ title: "Could not update account", description: result.error, variant: "destructive" });
+      }
+    });
+  }
+
   if (isSelf || protectedTarget) {
     return (
       <div className="space-y-2">
@@ -126,6 +138,15 @@ export function UserRoleEditor({
           {pending && <Loader2 className="h-4 w-4 animate-spin" />}
           Save role
         </Button>
+        {user.account_status === "suspended" || user.account_status === "deactivated" ? (
+          <Button size="sm" variant="outline" onClick={() => changeStatus("active")} disabled={pending}>
+            <CheckCircle2 className="h-4 w-4" /> Reactivate
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" onClick={() => changeStatus("suspended")} disabled={pending}>
+            <Ban className="h-4 w-4" /> Suspend
+          </Button>
+        )}
         <Button size="sm" variant="destructive" onClick={removeUser} disabled={pending}>
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
           Delete user

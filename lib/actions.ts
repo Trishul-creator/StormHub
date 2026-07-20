@@ -25,6 +25,7 @@ import type {
   MembershipRole,
   Profile,
   UserRole,
+  AccountStatus,
   FeedbackStatus,
 } from "@/types/database";
 import { slugify } from "@/lib/utils";
@@ -48,6 +49,8 @@ import {
   type SignupBotProof,
   validateSignupBotProof,
 } from "@/lib/signup-security";
+import { verifyCaptchaToken } from "@/lib/captcha";
+import { checkDurableRateLimit, markRateLimitAttemptSuccessful } from "@/lib/request-rate-limit";
 
 const DEMO_USER_COOKIE = "stormhub_demo_user";
 const DEMO_EMAIL_COOKIE = "stormhub_demo_email";
@@ -55,6 +58,15 @@ const DEMO_MEMBERSHIPS_COOKIE = "stormhub_demo_memberships";
 const DEMO_BOOKMARKS_COOKIE = "stormhub_demo_bookmarks";
 const DEMO_RSVPS_COOKIE = "stormhub_demo_rsvps";
 const DEMO_READ_NOTIFICATIONS_COOKIE = "stormhub_demo_read_notifications";
+
+async function hasAdministrativeMfa(
+  supabase: NonNullable<Awaited<ReturnType<typeof createClient>>>,
+  profile: Profile
+): Promise<boolean> {
+  if (!isAdminRole(profile.role)) return false;
+  const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  return !error && data.currentLevel === "aal2";
+}
 
 function formatMembershipRole(role: MembershipRole): string {
   return role.replace(/_/g, " ");
@@ -519,11 +531,13 @@ export async function submitFeedback(data: {
   email?: string;
   category: string;
   message: string;
+  captchaToken?: string | null;
 }): Promise<{ success: boolean; error?: string; message?: string }> {
   if (isDemoMode()) return { success: true };
 
   const supabase = await createClient();
-  if (!supabase) return { success: false, error: "Database not configured." };
+  const admin = createAdminClient();
+  if (!supabase || !admin) return { success: false, error: "Support is not configured." };
 
   const { data: { user } } = await supabase.auth.getUser();
   const profile = user ? await getCurrentProfile() : null;
@@ -546,7 +560,27 @@ export async function submitFeedback(data: {
     return { success: false, error: "Enter a message between 10 and 5,000 characters." };
   }
 
-  const { error: insertError } = await supabase.from("feedback").insert({
+  const requestHeaders = await headers();
+  const clientAddress = getClientAddress(requestHeaders) ?? "unknown";
+  const captcha = await verifyCaptchaToken(data.captchaToken, clientAddress);
+  if (!captcha.success) return captcha;
+
+  const ipLimit = await checkDurableRateLimit({
+    requestType: "feedback-ip",
+    identity: clientAddress,
+    maxAttempts: 10,
+    windowMinutes: 60,
+  });
+  if (!ipLimit.allowed) return { success: false, error: ipLimit.error };
+  const senderLimit = await checkDurableRateLimit({
+    requestType: "feedback-sender",
+    identity: email || clientAddress,
+    maxAttempts: 5,
+    windowMinutes: 60,
+  });
+  if (!senderLimit.allowed) return { success: false, error: senderLimit.error };
+
+  const { error: insertError } = await admin.from("feedback").insert({
     school_id: school.id,
     user_id: user?.id ?? null,
     name,
@@ -556,6 +590,10 @@ export async function submitFeedback(data: {
     status: "open",
   });
   if (insertError) return { success: false, error: friendlyError(insertError, "Could not save your support message.") };
+  await Promise.all([
+    markRateLimitAttemptSuccessful(ipLimit.attemptId),
+    markRateLimitAttemptSuccessful(senderLimit.attemptId),
+  ]);
 
   await createEmailOutboxItem({
     recipientEmail: SUPPORT_EMAIL,
@@ -1022,6 +1060,9 @@ export async function deleteUserAccount(targetUserId: string): Promise<{ success
   if (!supabase || !admin || !actor) {
     return { success: false, error: "Administrator configuration is incomplete. Check SUPABASE_SERVICE_ROLE_KEY." };
   }
+  if (!(await hasAdministrativeMfa(supabase, actor))) {
+    return { success: false, error: "Verify administrator MFA before deleting an account." };
+  }
 
   const { data: targetData, error: targetError } = await supabase
     .from("profiles")
@@ -1060,6 +1101,193 @@ export async function deleteUserAccount(targetUserId: string): Promise<{ success
   revalidatePath("/admin/users");
   revalidatePath("/manage/clubs");
   revalidatePath("/dashboard");
+  return { success: true };
+}
+
+export async function updateUserAccountStatus(
+  targetUserId: string,
+  status: AccountStatus
+): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: false, error: "Account status changes are unavailable in demo mode." };
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  const actor = await getCurrentProfile();
+  if (!supabase || !admin || !actor) return { success: false, error: "Administrator configuration is incomplete." };
+  if (!isAdminRole(actor.role)) return { success: false, error: "Administrator access required." };
+  if (!(await hasAdministrativeMfa(supabase, actor))) {
+    return { success: false, error: "Verify administrator MFA before changing an account status." };
+  }
+
+  const { data: targetData, error: targetError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", targetUserId)
+    .maybeSingle();
+  if (targetError || !targetData) return { success: false, error: "User not found." };
+  const target = targetData as Profile;
+  if (target.id === actor.id) return { success: false, error: "You cannot change your own account status." };
+  if (actor.role !== "super_admin" && (
+    target.school_id !== actor.school_id || !["student", "teacher"].includes(target.role)
+  )) {
+    return { success: false, error: "You do not have permission to change this account." };
+  }
+
+  const previousStatus = target.account_status ?? "active";
+  const banDuration = status === "active" ? "none" : "876000h";
+  const { error: authError } = await admin.auth.admin.updateUserById(targetUserId, { ban_duration: banDuration });
+  if (authError) return { success: false, error: authError.message || "Could not update authentication status." };
+
+  const { error } = await supabase.rpc("admin_set_account_status", {
+    target_user_id: targetUserId,
+    new_status: status,
+  });
+  if (error) {
+    await admin.auth.admin.updateUserById(targetUserId, {
+      ban_duration: previousStatus === "active" ? "none" : "876000h",
+    });
+    return { success: false, error: friendlyError(error, "Could not update account status.") };
+  }
+
+  revalidatePath("/admin/users");
+  return { success: true };
+}
+
+export async function deactivateGraduatingStudents(
+  graduationYear: number
+): Promise<{ success: boolean; count?: number; error?: string }> {
+  if (isDemoMode()) return { success: false, error: "Graduation cleanup is unavailable in demo mode." };
+  if (!Number.isInteger(graduationYear) || graduationYear < 2000 || graduationYear > 2200) {
+    return { success: false, error: "Choose a valid graduation year." };
+  }
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  const actor = await getCurrentProfile();
+  if (!supabase || !admin || !actor || !isAdminRole(actor.role)) {
+    return { success: false, error: "Administrator configuration is incomplete." };
+  }
+  if (!(await hasAdministrativeMfa(supabase, actor))) {
+    return { success: false, error: "Verify administrator MFA before running graduation cleanup." };
+  }
+
+  let query = supabase
+    .from("profiles")
+    .select("id")
+    .eq("role", "student")
+    .eq("grade_level", 12)
+    .eq("account_status", "active");
+  if (actor.role !== "super_admin") query = query.eq("school_id", actor.school_id);
+  const { data: students, error: lookupError } = await query;
+  if (lookupError) return { success: false, error: friendlyError(lookupError, "Could not load graduating students.") };
+
+  let completed = 0;
+  for (const student of students ?? []) {
+    const { error: statusError } = await supabase.rpc("admin_set_account_status", {
+      target_user_id: student.id,
+      new_status: "deactivated",
+    });
+    if (statusError) continue;
+    const [{ error: profileError }, { error: authError }] = await Promise.all([
+      admin.from("profiles").update({ graduation_year: graduationYear }).eq("id", student.id),
+      admin.auth.admin.updateUserById(student.id, { ban_duration: "876000h" }),
+    ]);
+    if (!profileError && !authError) completed += 1;
+  }
+
+  revalidatePath("/admin/users");
+  return completed === (students?.length ?? 0)
+    ? { success: true, count: completed }
+    : { success: false, count: completed, error: `Deactivated ${completed} of ${students?.length ?? 0} students. Review the audit log before retrying.` };
+}
+
+export async function requestAccountDeletion(
+  reason?: string
+): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: false, error: "Deletion requests are unavailable in demo mode." };
+  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  if (!supabase || !profile) return { success: false, error: "Please sign in." };
+  const normalizedReason = reason?.trim().slice(0, 1000) || null;
+  const { error } = await supabase.from("account_deletion_requests").insert({
+    user_id: profile.id,
+    school_id: profile.school_id ?? null,
+    reason: normalizedReason,
+  });
+  if (error?.code === "23505") return { success: false, error: "You already have a pending deletion request." };
+  if (error) return { success: false, error: friendlyError(error, "Could not submit deletion request.") };
+  revalidatePath("/settings");
+  return { success: true };
+}
+
+export async function reviewAccountDeletionRequest(data: {
+  requestId: string;
+  decision: "reject" | "complete";
+  reviewerNotes?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: false, error: "Deletion review is unavailable in demo mode." };
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  const actor = await getCurrentProfile();
+  if (!supabase || !admin || !actor || !isAdminRole(actor.role)) {
+    return { success: false, error: "Administrator configuration is incomplete." };
+  }
+  if (!(await hasAdministrativeMfa(supabase, actor))) {
+    return { success: false, error: "Verify administrator MFA before reviewing deletion requests." };
+  }
+
+  const { data: request, error: requestError } = await supabase
+    .from("account_deletion_requests")
+    .select("id,user_id,status")
+    .eq("id", data.requestId)
+    .maybeSingle();
+  if (requestError || !request) return { success: false, error: "Deletion request not found." };
+  if (request.status !== "pending") return { success: false, error: "This request has already been reviewed." };
+
+  const reviewerNotes = data.reviewerNotes?.trim().slice(0, 2000) || null;
+  if (data.decision === "reject") {
+    const { error } = await supabase
+      .from("account_deletion_requests")
+      .update({
+        status: "rejected",
+        reviewed_by: actor.id,
+        reviewed_at: new Date().toISOString(),
+        reviewer_notes: reviewerNotes,
+      })
+      .eq("id", request.id)
+      .eq("status", "pending");
+    if (error) return { success: false, error: friendlyError(error, "Could not reject this request.") };
+    revalidatePath("/admin/deletion-requests");
+    return { success: true };
+  }
+
+  if (!request.user_id) return { success: false, error: "The requested account no longer exists." };
+  const { error: approvalError } = await supabase
+    .from("account_deletion_requests")
+    .update({
+      status: "approved",
+      reviewed_by: actor.id,
+      reviewed_at: new Date().toISOString(),
+      reviewer_notes: reviewerNotes,
+    })
+    .eq("id", request.id)
+    .eq("status", "pending");
+  if (approvalError) return { success: false, error: friendlyError(approvalError, "Could not approve this request.") };
+
+  const deletion = await deleteUserAccount(request.user_id);
+  if (!deletion.success) {
+    await admin.from("account_deletion_requests").update({ status: "pending" }).eq("id", request.id);
+    return deletion;
+  }
+
+  const { error: completionError } = await admin
+    .from("account_deletion_requests")
+    .update({ status: "completed" })
+    .eq("id", request.id);
+  if (completionError) {
+    return { success: false, error: "The account was deleted, but the request could not be marked completed. Review the audit log." };
+  }
+
+  revalidatePath("/admin/deletion-requests");
+  revalidatePath("/admin/users");
   return { success: true };
 }
 
@@ -1264,9 +1492,9 @@ export async function deleteServiceHour(id: string): Promise<{ success: boolean;
   return { success: false, error: "Service-hour tracking is handled through the school’s separate system." };
 }
 
-export async function demoSignIn(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+export async function demoSignIn(email: string, password: string, captchaToken?: string | null): Promise<{ success: boolean; error?: string; redirectTo?: string }> {
   if (!isDemoMode()) {
-    return supabaseSignIn(email, password);
+    return supabaseSignIn(email, password, captchaToken);
   }
   if (!email || !password) return { success: false, error: "Email and password required." };
   const cookieStore = await cookies();
@@ -1285,10 +1513,14 @@ export async function demoSignOut(): Promise<void> {
   cookieStore.delete(DEMO_EMAIL_COOKIE);
 }
 
-export async function supabaseSignIn(email: string, password: string) {
+export async function supabaseSignIn(email: string, password: string, captchaToken?: string | null) {
   const supabase = await createClient();
   if (!supabase) return { success: false, error: "Database not configured." };
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+    options: captchaToken ? { captchaToken } : undefined,
+  });
   if (error) return { success: false, error: friendlyError(error, "Sign in failed.") };
   if (data.user) {
     const profile = await createProfileIfMissing(data.user.id, data.user.email ?? "", data.user.user_metadata?.full_name as string);
@@ -1314,8 +1546,8 @@ export async function supabaseSignUp(
   if (normalizedFullName.length < 3 || normalizedFullName.length > 120) {
     return { success: false, error: "Enter your full name." };
   }
-  if (password.length < 6) {
-    return { success: false, error: "Password must be at least 6 characters." };
+  if (password.length < 12) {
+    return { success: false, error: "Password must be at least 12 characters." };
   }
   if (requiredAccessCode && accessCode?.trim() !== requiredAccessCode) {
     return { success: false, error: "Enter the correct school signup code." };
@@ -1368,7 +1600,7 @@ export async function supabaseSignUp(
   }
   const { data: school, error: schoolError } = await db
     .from("schools")
-    .select("id, is_active")
+    .select("id, is_active, allowed_email_domains")
     .eq("id", schoolId)
     .maybeSingle();
   if (schoolError || !school || school.is_active === false) {
@@ -1377,8 +1609,13 @@ export async function supabaseSignUp(
   const normalizedGrade = typeof gradeLevel === "number" && gradeLevel >= 6 && gradeLevel <= 12
     ? gradeLevel
     : null;
-  const allowedDomains = (process.env.ALLOWED_SIGNUP_EMAIL_DOMAINS ?? "")
-    .split(",")
+  const configuredDomains: string[] = Array.isArray(school.allowed_email_domains)
+    ? school.allowed_email_domains.filter((domain: unknown): domain is string => typeof domain === "string")
+    : [];
+  const allowedDomains = [
+    ...configuredDomains,
+    ...(process.env.ALLOWED_SIGNUP_EMAIL_DOMAINS ?? "").split(","),
+  ]
     .map((domain) => domain.trim().toLowerCase())
     .filter(Boolean);
   const blockedDomains = (process.env.BLOCKED_SIGNUP_EMAIL_DOMAINS ?? "")
@@ -1386,6 +1623,9 @@ export async function supabaseSignUp(
     .map((domain) => domain.trim().toLowerCase())
     .filter(Boolean);
   const emailDomain = normalizedEmail.split("@")[1]?.toLowerCase();
+  if (allowedDomains.length === 0) {
+    return { success: false, error: "Signups are not configured for this school yet. Contact the school administrator." };
+  }
   if (allowedDomains.length > 0 && (!emailDomain || !allowedDomains.includes(emailDomain))) {
     return {
       success: false,
@@ -1400,7 +1640,10 @@ export async function supabaseSignUp(
   const { data, error } = await supabase.auth.signUp({
     email: normalizedEmail,
     password,
-    options: { data: { full_name: normalizedFullName, grade_level: normalizedGrade, school_id: schoolId } },
+    options: {
+      data: { full_name: normalizedFullName, grade_level: normalizedGrade, school_id: schoolId },
+      ...(botProof?.captchaToken ? { captchaToken: botProof.captchaToken } : {}),
+    },
   });
   if (error) return { success: false, error: friendlyError(error, "Sign up failed.") };
   if (data.user) {

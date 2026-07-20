@@ -97,6 +97,7 @@ const stagingSchools = [
     city: "Staging",
     state: "ST",
     mascot: "Storm",
+    allowed_email_domains: ["stormhub.test"],
   },
   {
     id: "b0000000-0000-4000-8000-000000000002",
@@ -105,6 +106,7 @@ const stagingSchools = [
     city: "Staging",
     state: "ST",
     mascot: "Lightning",
+    allowed_email_domains: ["stormhub.test"],
   },
 ] as const;
 
@@ -319,6 +321,15 @@ async function assertAuthUserReady(admin: { auth: SupabaseAdmin["auth"] }, userI
   }
 }
 
+async function resetDedicatedAdminFactors(admin: { auth: SupabaseAdmin["auth"] }, userId: string) {
+  const { data, error } = await admin.auth.admin.mfa.listFactors({ userId });
+  if (error) throw error;
+  for (const factor of data.factors) {
+    const { error: deleteError } = await admin.auth.admin.mfa.deleteFactor({ userId, id: factor.id });
+    if (deleteError) throw deleteError;
+  }
+}
+
 async function main() {
   assertSafeToMutate();
 
@@ -331,9 +342,10 @@ async function main() {
 
   for (const user of users) {
     const schoolId = user.schoolSlug ? schoolIds.get(user.schoolSlug)! : null;
+    const authSchoolId = schoolId ?? schoolIds.get("school1")!;
     const metadata = {
       full_name: user.fullName,
-      school_id: schoolId,
+      school_id: authSchoolId,
       grade_level: user.gradeLevel ? String(user.gradeLevel) : undefined,
     };
 
@@ -359,6 +371,9 @@ async function main() {
 
     if (!userId) throw new Error(`Could not create or find ${user.email}.`);
     await assertAuthUserReady(admin, userId, user.email);
+    if (user.role === "admin" || user.role === "super_admin") {
+      await resetDedicatedAdminFactors(admin, userId);
+    }
 
     const { error: profileError } = await admin.from("profiles").upsert({
       id: userId,

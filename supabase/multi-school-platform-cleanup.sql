@@ -1,3 +1,4 @@
+-- LEGACY REFERENCE ONLY. Superseded by timestamped migrations.
 -- StormHub patch: multi-school platform cleanup.
 -- Run this after the existing StormHub patches.
 -- Safe intent:
