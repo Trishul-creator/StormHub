@@ -11,6 +11,18 @@ import { Label } from "@/components/ui/label";
 
 type Factor = { id: string; status: string; friendly_name?: string };
 
+const SVG_DATA_URL_PREFIX = "data:image/svg+xml;utf-8,";
+
+function normalizeQrCode(qrCode: string) {
+  const trimmed = qrCode.trim();
+  if (!trimmed.startsWith(SVG_DATA_URL_PREFIX)) return trimmed;
+
+  const svg = trimmed.slice(SVG_DATA_URL_PREFIX.length).trim();
+  return svg.startsWith("<")
+    ? `${SVG_DATA_URL_PREFIX}${encodeURIComponent(svg)}`
+    : trimmed;
+}
+
 export function MfaSetup() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -63,18 +75,41 @@ export function MfaSetup() {
     if (!supabase) return;
     setSubmitting(true);
     setError(null);
-    const { data, error: enrollError } = await supabase.auth.mfa.enroll({
-      factorType: "totp",
-      friendlyName: "StormHub administrator",
-    });
-    setSubmitting(false);
-    if (enrollError) {
-      setError(enrollError.message);
-      return;
+
+    try {
+      const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
+      if (factorsError) {
+        setError(factorsError.message);
+        return;
+      }
+
+      const staleFactors = (factors?.totp ?? []).filter(
+        (factor: Factor) => factor.status !== "verified"
+      );
+      for (const factor of staleFactors) {
+        const { error: unenrollError } = await supabase.auth.mfa.unenroll({ factorId: factor.id });
+        if (unenrollError) {
+          setError("A previous authenticator setup could not be reset. Refresh the page and try again.");
+          return;
+        }
+      }
+
+      const { data, error: enrollError } = await supabase.auth.mfa.enroll({
+        factorType: "totp",
+        friendlyName: "StormHub administrator",
+      });
+      if (enrollError) {
+        setError(enrollError.message);
+        return;
+      }
+      setFactorId(data.id);
+      setQrCode(normalizeQrCode(data.totp.qr_code));
+      setSecret(data.totp.secret);
+    } catch {
+      setError("Authenticator setup is temporarily unavailable. Try again.");
+    } finally {
+      setSubmitting(false);
     }
-    setFactorId(data.id);
-    setQrCode(data.totp.qr_code);
-    setSecret(data.totp.secret);
   }
 
   async function verify() {
