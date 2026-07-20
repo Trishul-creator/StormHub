@@ -78,7 +78,7 @@ function CalendarEvent({
         compact && "px-1 py-0.5 text-[10px]"
       )}
     >
-      <span className="mr-1 opacity-70">{format(parseISO(event.starts_at), "h:mm")}</span>
+      <span className="mr-1">{format(parseISO(event.starts_at), "h:mm")}</span>
       {event.title}
     </Link>
   );
@@ -268,9 +268,8 @@ export function EventsPageClient({
                 const selected = isSameDay(day, selectedDay);
                 const hasRsvpEvent = dayEvents.some((event) => rsvpSet.has(event.id));
                 return (
-                  <button
+                  <div
                     key={day.toISOString()}
-                    onClick={() => setSelectedDay(day)}
                     className={cn(
                       "min-h-24 border-b border-r p-1.5 text-left align-top transition hover:bg-storm-light/30 sm:min-h-32 sm:p-2",
                       !isSameMonth(day, visibleMonth) && "bg-slate-50/70 text-muted-foreground",
@@ -278,7 +277,12 @@ export function EventsPageClient({
                       selected && "bg-blue-50/70 ring-2 ring-inset ring-storm-electric/40"
                     )}
                   >
-                    <span
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDay(day)}
+                      aria-label={`Show events for ${format(day, "MMMM d, yyyy")}`}
+                      aria-pressed={selected}
+                      aria-current={isToday(day) ? "date" : undefined}
                       className={cn(
                         "mb-1.5 flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold",
                         isToday(day) && "bg-storm-electric text-white",
@@ -286,7 +290,7 @@ export function EventsPageClient({
                       )}
                     >
                       {format(day, "d")}
-                    </span>
+                    </button>
                     <div className="space-y-1">
                       {dayEvents.slice(0, 3).map((event) => (
                         <CalendarEvent
@@ -302,7 +306,7 @@ export function EventsPageClient({
                         </div>
                       )}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
