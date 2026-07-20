@@ -15,6 +15,42 @@ Require these checks before merge:
 
 Do not deploy a database migration from an unmerged branch to production.
 
+### One-time staging migration required for this PR
+
+The protected `e2e-staging` check intentionally fails until the staging project has the checked-in
+schema. The current failure for `schools.allowed_email_domains` means staging still has the older
+manual schema.
+
+1. In the staging Supabase dashboard, open **Settings > General** and copy the **Reference ID**.
+2. From this branch, sign in with the Supabase account that owns that staging project and link it:
+
+```bash
+supabase login
+supabase link --project-ref <staging-reference-id>
+supabase migration list
+```
+
+3. If the existing staging tables came from `schema.sql`, mark only the baseline as already applied:
+
+```bash
+supabase migration repair --status applied 20260701000000
+```
+
+4. Compare the migration list with the staging schema. If either `20260710160000` or
+   `20260720120000` was previously run manually, repair that exact version as applied. Do not mark
+   `20260721120000` applied; that is the new hardening migration that must run.
+5. Preview and apply the remaining staging migrations:
+
+```bash
+supabase db push --dry-run
+supabase db push
+```
+
+6. In **Table Editor > schools**, confirm each staging school has `stormhub.test` in
+   `allowed_email_domains`, then rerun the failed `Staging E2E` job on PR #7.
+7. Re-link the CLI to the intended project before any later database command. The local CLI account
+   may have access to unrelated Supabase projects, so never select a project by guesswork.
+
 ## 2. Configure Resend And Supabase SMTP
 
 1. In Resend, add and verify the sending domain. Complete every DNS record Resend provides.

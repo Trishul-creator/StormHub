@@ -138,13 +138,23 @@ const school1Clubs = [
 ] as const;
 
 async function assertRequiredTablesExist(admin: SupabaseAdmin) {
-  const requiredTables = ["schools", "school_settings", "clubs", "opportunities", "profiles"] as const;
+  const requiredRelations = [
+    { table: "schools", columns: "id,allowed_email_domains" },
+    { table: "school_settings", columns: "school_id" },
+    { table: "clubs", columns: "id" },
+    { table: "opportunities", columns: "id" },
+    { table: "profiles", columns: "id,account_status,graduation_year" },
+    { table: "account_deletion_requests", columns: "id" },
+    { table: "admin_audit_log", columns: "id" },
+    { table: "digest_deliveries", columns: "id" },
+    { table: "request_attempts", columns: "id" },
+  ] as const;
 
-  for (const table of requiredTables) {
-    const { error } = await admin.from(table).select("*").limit(1);
+  for (const { table, columns } of requiredRelations) {
+    const { error } = await admin.from(table).select(columns).limit(1);
     if (error) {
       throw new Error(
-        `Staging schema is missing. Apply base schema/migrations to staging first. Missing or inaccessible table: ${table}.`
+        `Staging schema is missing ${table} (${columns}). Apply the migration chain from docs/PRODUCTION_ROLLOUT.md before rerunning E2E. Provider message: ${error.message}`
       );
     }
   }
