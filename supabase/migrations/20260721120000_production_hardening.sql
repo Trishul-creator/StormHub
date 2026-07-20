@@ -58,7 +58,7 @@ SELECT id FROM public.schools
 ON CONFLICT (school_id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS public.account_deletion_requests (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   school_id UUID REFERENCES public.schools(id) ON DELETE SET NULL,
   status TEXT NOT NULL DEFAULT 'pending'
@@ -77,7 +77,7 @@ CREATE INDEX IF NOT EXISTS idx_account_deletion_requests_school_status
   ON public.account_deletion_requests(school_id, status, requested_at DESC);
 
 CREATE TABLE IF NOT EXISTS public.admin_audit_log (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id UUID REFERENCES public.schools(id) ON DELETE SET NULL,
   actor_user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   action TEXT NOT NULL,
@@ -94,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_admin_audit_log_actor_occurred
   ON public.admin_audit_log(actor_user_id, occurred_at DESC);
 
 CREATE TABLE IF NOT EXISTS public.digest_deliveries (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   school_id UUID REFERENCES public.schools(id) ON DELETE SET NULL,
   period_start DATE NOT NULL,
@@ -130,7 +130,7 @@ REVOKE ALL ON FUNCTION public.claim_digest_delivery(UUID, UUID, DATE) FROM PUBLI
 GRANT EXECUTE ON FUNCTION public.claim_digest_delivery(UUID, UUID, DATE) TO service_role;
 
 CREATE TABLE IF NOT EXISTS public.request_attempts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   request_type TEXT NOT NULL,
   actor_hash TEXT NOT NULL,
   was_successful BOOLEAN NOT NULL DEFAULT FALSE,
