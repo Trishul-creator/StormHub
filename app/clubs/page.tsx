@@ -10,29 +10,34 @@ import { CLUB_FILTER_GROUPS } from "@/lib/utils";
 import { getCurrentSchool } from "@/lib/schools";
 import { buildEmptyStateActions } from "@/lib/product";
 import { isAdminRole } from "@/lib/permissions";
+import { SchoolFilter } from "@/components/layout/school-filter";
+import { getSchoolFilterContext } from "@/lib/schools";
 
 interface ClubsPageProps {
-  searchParams: Promise<{ q?: string; category?: string; featured?: string; filter?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; featured?: string; filter?: string; school?: string }>;
 }
 
 export default async function ClubsPage({ searchParams }: ClubsPageProps) {
   const params = await searchParams;
-  const school = await getCurrentSchool();
+  const { userId, isLoggedIn, profile } = await getAuthContext();
+  const { schools, selectedSchool } = await getSchoolFilterContext(profile, params.school);
+  const school = selectedSchool ?? await getCurrentSchool(profile);
   const featuredOnly = params.featured === "true" || params.filter === "featured";
   const clubs = await getClubs({
     search: params.q,
     category: params.category,
     featured: featuredOnly,
     filterGroup: params.filter === "featured" ? undefined : params.filter,
+    schoolId: school?.id,
   });
 
   const filterOptions = CLUB_FILTER_GROUPS.map((g) => ({ label: g.label, value: g.label }));
   const featuredHref = `?${new URLSearchParams({
     ...(params.q ? { q: params.q } : {}),
+    ...(school?.slug ? { school: school.slug } : {}),
     featured: "true",
   }).toString()}`;
 
-  const { userId, isLoggedIn, profile } = await getAuthContext();
   const manageableClubs = profile ? await getManageableClubs(profile) : [];
   const manageableSlugs = new Set(manageableClubs.map((club) => club.slug));
   const emptyActions = buildEmptyStateActions({
@@ -45,7 +50,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
   const membershipChecks = await Promise.all(
     clubs.map(async (club) => ({
       slug: club.slug,
-      isMember: userId ? await checkMembership(club.slug) : false,
+      isMember: userId ? await checkMembership(club.slug, school?.id) : false,
     }))
   );
   const membershipMap = Object.fromEntries(membershipChecks.map((m) => [m.slug, m.isMember]));
@@ -57,8 +62,9 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
         description={`Discover clubs and activities at ${school?.name ?? "your school"}. Join to access member resources, announcements, and events.`}
       />
 
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
         <SearchBar placeholder="Search clubs..." defaultValue={params.q} className="flex-1" />
+        <SchoolFilter schools={schools} activeSlug={school?.slug} />
       </div>
 
       <div className="flex gap-8">

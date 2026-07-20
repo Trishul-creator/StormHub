@@ -6,13 +6,13 @@ import { getCurrentSchool } from "@/lib/schools";
 
 export default async function DigestPage() {
   const { profile } = await requireManager();
+  const school = await getCurrentSchool(profile);
 
-  const [opportunities, events, clubs, announcements, school] = await Promise.all([
-    getOpportunities(),
-    getEvents(),
-    getFeaturedClubs(),
-    getRecentAnnouncements(),
-    getCurrentSchool(profile),
+  const [opportunities, events, clubs, announcements] = await Promise.all([
+    getOpportunities({ schoolId: school?.id }),
+    getEvents({ schoolId: school?.id }),
+    getFeaturedClubs(school?.id),
+    getRecentAnnouncements(5, school?.id),
   ]);
   const chronologicalAnnouncements = [...announcements].sort((a, b) => {
     const aTime = new Date(a.published_at ?? a.created_at ?? 0).getTime();
@@ -27,7 +27,7 @@ export default async function DigestPage() {
         description="Preview newsletter content for school announcements. Copy and paste into your school newsletter."
       />
       <DigestPreview
-        opportunities={opportunities}
+        opportunities={opportunities.filter((item) => item.status === "approved" && item.visibility === "public")}
         events={events}
         clubs={clubs}
         announcements={chronologicalAnnouncements}

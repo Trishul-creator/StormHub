@@ -20,6 +20,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
           slug: school.slug,
         }))}
         preselectedSchoolId={preselectedSchool?.id}
+        requiresAccessCode={Boolean(process.env.SIGNUP_ACCESS_CODE?.trim())}
       />
     </div>
   );

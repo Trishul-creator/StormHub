@@ -10,6 +10,7 @@ import { getAuthContext } from "@/lib/auth";
 import { checkMembership } from "@/lib/actions";
 import { getSchoolBySlug } from "@/lib/schools";
 import { canJoinClub, canManageClub } from "@/lib/permissions";
+import { getWorkspaceClubSummary } from "@/lib/product";
 
 interface SchoolWorkspacePageProps {
   params: Promise<{ schoolSlug: string }>;
@@ -22,10 +23,11 @@ export default async function SchoolWorkspacePage({ params }: SchoolWorkspacePag
 
   const auth = await getAuthContext();
   const [clubs, events, opportunities] = await Promise.all([
-    getClubs({ schoolId: school.id, featured: true }),
+    getClubs({ schoolId: school.id }),
     getEvents({ schoolId: school.id, upcoming: true }),
     getOpportunities({ schoolId: school.id }),
   ]);
+  const { visibleCount, spotlightClubs } = getWorkspaceClubSummary(clubs);
   const membershipChecks = await Promise.all(
     clubs.map(async (club) => ({
       slug: club.slug,
@@ -43,6 +45,9 @@ export default async function SchoolWorkspacePage({ params }: SchoolWorkspacePag
             <h1 className="mt-2 text-4xl font-bold tracking-tight md:text-5xl">
               {school.name}
             </h1>
+            {school.mascot && (
+              <p className="mt-2 text-base font-medium text-white/85">Home of the {school.mascot}</p>
+            )}
             <p className="mt-4 max-w-2xl text-lg text-storm-silver">
               Clubs, calendar events, opportunities, and updates for this school community.
             </p>
@@ -63,7 +68,7 @@ export default async function SchoolWorkspacePage({ params }: SchoolWorkspacePag
 
       <section className="container mx-auto px-4 py-12">
         <div className="grid gap-4 md:grid-cols-3">
-          <SummaryCard icon={Users} label="Visible clubs" value={clubs.length} />
+          <SummaryCard icon={Users} label="Visible clubs" value={visibleCount} />
           <SummaryCard icon={Calendar} label="Upcoming events" value={events.length} />
           <SummaryCard icon={GraduationCap} label="Opportunities" value={opportunities.length} />
         </div>
@@ -72,7 +77,7 @@ export default async function SchoolWorkspacePage({ params }: SchoolWorkspacePag
       <section className="container mx-auto px-4 pb-16">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-storm-navy">Featured clubs</h2>
+            <h2 className="text-2xl font-bold text-storm-navy">Clubs to explore</h2>
             <p className="text-sm text-muted-foreground">Visible clubs in {school.short_name || school.name}.</p>
           </div>
           <Button variant="outline" asChild>
@@ -83,7 +88,7 @@ export default async function SchoolWorkspacePage({ params }: SchoolWorkspacePag
           <EmptyState title="No public clubs yet" description="This school workspace is ready. Clubs can be added by school admins." />
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {clubs.slice(0, 3).map((club) => (
+            {spotlightClubs.slice(0, 3).map((club) => (
               <ClubCard
                 key={club.id}
                 club={club}

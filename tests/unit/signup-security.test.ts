@@ -1,0 +1,38 @@
+import { describe, expect, it } from "vitest";
+import {
+  getClientAddress,
+  getSignupRateLimitConfig,
+  hashSignupIdentifier,
+  validateSignupBotProof,
+} from "@/lib/signup-security";
+
+describe("signup security", () => {
+  it("rejects missing, filled, and implausibly fast bot proof", () => {
+    expect(validateSignupBotProof(undefined, 10_000)).toBeTruthy();
+    expect(validateSignupBotProof({ website: "spam.example", loadedAt: 1_000 }, 10_000)).toBeTruthy();
+    expect(validateSignupBotProof({ website: "", loadedAt: 9_000 }, 10_000)).toBeTruthy();
+    expect(validateSignupBotProof({ website: "", loadedAt: 8_000 }, 10_000)).toBeNull();
+  });
+
+  it("uses the first forwarded address and hashes identifiers consistently", () => {
+    const headers = new Headers({ "x-forwarded-for": "203.0.113.4, 10.0.0.1" });
+    expect(getClientAddress(headers)).toBe("203.0.113.4");
+    expect(hashSignupIdentifier("Student@School.edu", "secret")).toBe(
+      hashSignupIdentifier("student@school.edu", "secret")
+    );
+    expect(hashSignupIdentifier("student@school.edu", "secret")).not.toContain("student");
+  });
+
+  it("supports deployment-specific limits while retaining safe defaults", () => {
+    expect(getSignupRateLimitConfig({})).toEqual({
+      windowMinutes: 60,
+      maxEmailAttempts: 5,
+      maxIpAttempts: 50,
+    });
+    expect(getSignupRateLimitConfig({
+      SIGNUP_RATE_LIMIT_WINDOW_MINUTES: "30",
+      SIGNUP_MAX_ATTEMPTS_PER_EMAIL: "3",
+      SIGNUP_MAX_ATTEMPTS_PER_IP: "20",
+    })).toEqual({ windowMinutes: 30, maxEmailAttempts: 3, maxIpAttempts: 20 });
+  });
+});

@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   getDefaultSchoolSlug,
+  getFilterableSchools,
   getSchoolManageUrl,
   getSchoolPublicUrl,
   getSchoolWorkspaceUrl,
+  selectSchoolFilter,
 } from "@/lib/schools";
+import type { Profile, School } from "@/types/database";
 
 describe("school route helpers", () => {
   it("uses the configured default slug or stable fallback", () => {
@@ -25,4 +28,26 @@ describe("school route helpers", () => {
     expect(getSchoolWorkspaceUrl(selectedSchool)).not.toBe("/s/elkhorn-south");
     expect(getSchoolManageUrl(selectedSchool)).not.toBe("/admin/schools/elkhorn-south");
   });
+
+  it("limits signed-in school users to their assigned school", () => {
+    const schools = [school("school-1", "north"), school("school-2", "south")];
+    const profile = { id: "user-1", school_id: "school-2", role: "student" } satisfies Profile;
+
+    expect(getFilterableSchools(schools, profile).map((item) => item.slug)).toEqual(["south"]);
+  });
+
+  it("lets platform admins select an explicit school and hides private schools publicly", () => {
+    const schools = [
+      school("school-1", "north"),
+      { ...school("school-2", "south"), is_public: false },
+    ];
+
+    expect(getFilterableSchools(schools, null).map((item) => item.slug)).toEqual(["north"]);
+    const platformSchools = getFilterableSchools(schools, { id: "admin", role: "super_admin" });
+    expect(selectSchoolFilter(platformSchools, "south")?.id).toBe("school-2");
+  });
 });
+
+function school(id: string, slug: string): School {
+  return { id, slug, name: slug, is_active: true, is_public: true };
+}

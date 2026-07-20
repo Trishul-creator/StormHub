@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { ArrowRight, Building2, Calendar, GraduationCap, Users } from "lucide-react";
+import { ArrowRight, Building2, Calendar, GraduationCap, Mail, Users } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -78,7 +78,11 @@ export default async function AdminSchoolsPage() {
       <PageHeader
         title="Platform Admin"
         description="Choose a school workspace before viewing or managing school-specific content."
-      />
+      >
+        <Button variant="outline" asChild>
+          <Link href="/admin/feedback"><Mail className="h-4 w-4" /> Support inbox</Link>
+        </Button>
+      </PageHeader>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <div className="space-y-4">
@@ -106,8 +110,11 @@ export default async function AdminSchoolsPage() {
               <input name="name" required className="mt-1 w-full rounded-md border px-3 py-2" placeholder="Example High School" />
             </label>
             <label className="block text-sm">
-              <span className="text-muted-foreground">Slug</span>
+              <span className="text-muted-foreground">Workspace URL name (optional)</span>
               <input name="slug" className="mt-1 w-full rounded-md border px-3 py-2" placeholder="example-high" />
+              <span className="mt-1 block text-xs text-muted-foreground">
+                This becomes the school link, such as /s/example-high. Leave it blank to generate it from the school name.
+              </span>
             </label>
             <label className="block text-sm">
               <span className="text-muted-foreground">Short name</span>
@@ -125,7 +132,8 @@ export default async function AdminSchoolsPage() {
             </div>
             <label className="block text-sm">
               <span className="text-muted-foreground">Mascot</span>
-              <input name="mascot" className="mt-1 w-full rounded-md border px-3 py-2" />
+              <input name="mascot" className="mt-1 w-full rounded-md border px-3 py-2" placeholder="Storm" />
+              <span className="mt-1 block text-xs text-muted-foreground">Shown on the public school workspace.</span>
             </label>
             <Button type="submit" className="w-full">Create school</Button>
           </div>
@@ -189,7 +197,7 @@ function SchoolWorkspaceCard({ school, stats }: { school: School; stats: SchoolS
               <CardTitle>{school.name}</CardTitle>
             </div>
             <CardDescription className="mt-1">
-              /{school.slug} · {[school.city, school.state].filter(Boolean).join(", ") || "Location not set"} ·{" "}
+              {school.mascot ? `Home of the ${school.mascot} · ` : ""}/{school.slug} · {[school.city, school.state].filter(Boolean).join(", ") || "Location not set"} ·{" "}
               {school.is_active === false ? "Inactive" : "Active"} · {school.is_public === false ? "Private" : "Public"}
             </CardDescription>
           </div>

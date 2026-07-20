@@ -277,6 +277,14 @@ export interface EmptyStateAction {
   href: string;
 }
 
+export function getWorkspaceClubSummary(clubs: Club[]) {
+  const featured = clubs.filter((club) => club.is_featured);
+  return {
+    visibleCount: clubs.length,
+    spotlightClubs: featured.length > 0 ? featured : clubs,
+  };
+}
+
 function searchHref(pathname: string, params: Record<string, string | undefined>): string {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {

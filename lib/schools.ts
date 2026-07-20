@@ -172,3 +172,33 @@ export async function getAllSchools(): Promise<School[]> {
   }
   return (data as School[]) ?? [];
 }
+
+export function getFilterableSchools(schools: School[], profile?: Profile | null): School[] {
+  if (profile && profile.role !== "super_admin") {
+    return schools.filter((school) => school.id === profile.school_id);
+  }
+
+  return schools.filter(
+    (school) => school.is_active !== false && (profile?.role === "super_admin" || school.is_public !== false)
+  );
+}
+
+export function selectSchoolFilter(
+  schools: School[],
+  requestedSlug?: string | null
+): School | null {
+  return (
+    schools.find((school) => school.slug === requestedSlug) ??
+    schools.find((school) => school.slug === DEFAULT_SCHOOL_SLUG) ??
+    schools[0] ??
+    null
+  );
+}
+
+export async function getSchoolFilterContext(
+  profile?: Profile | null,
+  requestedSlug?: string | null
+): Promise<{ schools: School[]; selectedSchool: School | null }> {
+  const schools = getFilterableSchools(await getAllSchools(), profile);
+  return { schools, selectedSchool: selectSchoolFilter(schools, requestedSlug) };
+}
