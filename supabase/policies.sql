@@ -17,6 +17,7 @@ ALTER TABLE interest_forms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE approval_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE signup_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE email_outbox ENABLE ROW LEVEL SECURITY;
@@ -259,7 +260,8 @@ BEGIN
         'club_announcements', 'club_resources', 'opportunities', 'events',
         'event_rsvps', 'bookmarks', 'workshops', 'service_hours',
         'interest_forms', 'approval_requests', 'analytics_events', 'feedback',
-        'notifications', 'notification_preferences', 'email_outbox'
+        'notifications', 'notification_preferences', 'email_outbox',
+        'signup_attempts'
       )
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', policy_row.policyname, policy_row.schemaname, policy_row.tablename);
@@ -521,8 +523,15 @@ CREATE POLICY "analytics_insert" ON analytics_events FOR INSERT
   WITH CHECK (auth.uid() IS NOT NULL AND (user_id IS NULL OR user_id = auth.uid()));
 CREATE POLICY "analytics_admin_read" ON analytics_events FOR SELECT USING (can_admin_school(school_id));
 
-CREATE POLICY "feedback_insert" ON feedback FOR INSERT WITH CHECK (true);
+CREATE POLICY "feedback_insert" ON feedback FOR INSERT
+  WITH CHECK (
+    (auth.uid() IS NULL AND user_id IS NULL)
+    OR (auth.uid() IS NOT NULL AND (user_id IS NULL OR user_id = auth.uid()))
+  );
 CREATE POLICY "feedback_admin_read" ON feedback FOR SELECT USING (can_admin_school(school_id));
+CREATE POLICY "feedback_admin_update" ON feedback FOR UPDATE
+  USING (can_admin_school(school_id))
+  WITH CHECK (can_admin_school(school_id));
 
 CREATE POLICY "notifications_read_own" ON notifications FOR SELECT
   USING (recipient_user_id = auth.uid());
@@ -539,4 +548,4 @@ CREATE POLICY "notification_preferences_update_own" ON notification_preferences 
   WITH CHECK (user_id = auth.uid());
 
 CREATE POLICY "email_outbox_admin_read" ON email_outbox FOR SELECT
-  USING (is_admin());
+  USING (is_super_admin());

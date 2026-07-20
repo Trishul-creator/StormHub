@@ -18,7 +18,15 @@ interface SignUpSchool {
   slug: string;
 }
 
-export function SignUpForm({ schools, preselectedSchoolId }: { schools: SignUpSchool[]; preselectedSchoolId?: string | null }) {
+export function SignUpForm({
+  schools,
+  preselectedSchoolId,
+  requiresAccessCode = false,
+}: {
+  schools: SignUpSchool[];
+  preselectedSchoolId?: string | null;
+  requiresAccessCode?: boolean;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [loadedAt] = useState(() => Date.now());
@@ -57,7 +65,8 @@ export function SignUpForm({ schools, preselectedSchoolId }: { schools: SignUpSc
       fullName,
       gradeLevelRaw ? Number(gradeLevelRaw) : null,
       accessCode,
-      schoolId
+      schoolId,
+      { website, loadedAt: formLoadedAt }
     );
     setLoading(false);
     if (result.success) {
@@ -108,7 +117,7 @@ export function SignUpForm({ schools, preselectedSchoolId }: { schools: SignUpSc
           </div>
           <div>
             <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" required placeholder="you@example.com" className="mt-1" />
+            <Input id="email" name="email" type="email" required placeholder="you@school.edu" className="mt-1" />
           </div>
           <div>
             <Label htmlFor="gradeLevel">Grade</Label>
@@ -128,10 +137,12 @@ export function SignUpForm({ schools, preselectedSchoolId }: { schools: SignUpSc
             <Label htmlFor="password">Password</Label>
             <Input id="password" name="password" type="password" required minLength={6} className="mt-1" />
           </div>
-          <div>
-            <Label htmlFor="accessCode">School signup code</Label>
-            <Input id="accessCode" name="accessCode" placeholder="Only required if your school provides one" className="mt-1" />
-          </div>
+          {requiresAccessCode && (
+            <div>
+              <Label htmlFor="accessCode">School signup code</Label>
+              <Input id="accessCode" name="accessCode" required autoComplete="one-time-code" className="mt-1" />
+            </div>
+          )}
           <div className="hidden" aria-hidden="true">
             <Label htmlFor="website">Website</Label>
             <Input id="website" name="website" tabIndex={-1} autoComplete="off" />
@@ -146,7 +157,7 @@ export function SignUpForm({ schools, preselectedSchoolId }: { schools: SignUpSc
           <Link href="/auth/sign-in" className="text-storm-electric hover:underline">Sign in</Link>
         </p>
         <p className="mt-3 text-center text-xs text-muted-foreground">
-          New accounts are tied to one school workspace. Admin and teacher roles are assigned later by authorized staff.
+          Confirm your email after signup. New accounts are tied to one school workspace, and staff roles are assigned by authorized administrators.
         </p>
       </CardContent>
     </Card>

@@ -17,4 +17,15 @@ test.describe("public school workspace separation", () => {
     await expect(page).toHaveURL(/\/s\/school2\/calendar/);
     await expect(page.getByRole("heading", { name: /calendar/i })).toBeVisible();
   });
+
+  test("global discovery pages expose a school selector", async ({ page }) => {
+    await page.goto("/calendar");
+    await expect(page.getByLabel("School")).toBeVisible();
+
+    await page.goto("/clubs");
+    await expect(page.getByLabel("School")).toBeVisible();
+
+    await page.goto("/opportunities");
+    await expect(page.getByLabel("School")).toBeVisible();
+  });
 });

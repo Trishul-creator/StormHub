@@ -11,24 +11,28 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { buildEmptyStateActions } from "@/lib/product";
 import { isAdminRole } from "@/lib/permissions";
+import { SchoolFilter } from "@/components/layout/school-filter";
+import { getSchoolFilterContext } from "@/lib/schools";
 
 interface OpportunitiesPageProps {
-  searchParams: Promise<{ q?: string; category?: string; closing?: string; grade?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; closing?: string; grade?: string; school?: string }>;
 }
 
 export default async function OpportunitiesPage({ searchParams }: OpportunitiesPageProps) {
   const params = await searchParams;
   const { userId, isLoggedIn, profile } = await getAuthContext();
   if (profile?.role === "teacher") redirect("/calendar");
+  const { schools, selectedSchool } = await getSchoolFilterContext(profile, params.school);
 
   const selectedGrade = params.grade ? Number(params.grade) : undefined;
   const [allOpportunities, categories] = await Promise.all([
     getOpportunities({
-    search: params.q,
-    category: params.category,
-    closingSoon: params.closing === "true",
+      search: params.q,
+      category: params.category,
+      closingSoon: params.closing === "true",
+      schoolId: selectedSchool?.id,
     }),
-    getOpportunityCategories(),
+    getOpportunityCategories(selectedSchool?.id),
   ]);
   const opportunities = Number.isFinite(selectedGrade)
     ? allOpportunities.filter((opportunity) => {
@@ -68,15 +72,22 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
         )}
       </PageHeader>
 
-      <div className="mb-6">
-        <SearchBar placeholder="Search opportunities..." defaultValue={params.q} />
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
+        <SearchBar placeholder="Search opportunities..." defaultValue={params.q} className="flex-1" />
+        <SchoolFilter schools={schools} activeSlug={selectedSchool?.slug} />
       </div>
 
       <div className="flex gap-8">
         <aside className="hidden w-56 shrink-0 lg:block">
           <FilterSidebar title="Category" options={filterOptions} activeValue={params.category} paramName="category" />
           <div className="mt-6 space-y-1">
-            <a href="?closing=true" className={`block rounded-lg px-3 py-2 text-sm ${params.closing === "true" ? "bg-amber-100 text-amber-800 font-medium" : "hover:bg-storm-light/50 text-muted-foreground"}`}>
+            <a href={`?${new URLSearchParams({
+              ...(params.q ? { q: params.q } : {}),
+              ...(params.category ? { category: params.category } : {}),
+              ...(params.grade ? { grade: params.grade } : {}),
+              ...(selectedSchool?.slug ? { school: selectedSchool.slug } : {}),
+              closing: "true",
+            }).toString()}`} className={`block rounded-lg px-3 py-2 text-sm ${params.closing === "true" ? "bg-amber-100 text-amber-800 font-medium" : "hover:bg-storm-light/50 text-muted-foreground"}`}>
               ⏰ Closing soon
             </a>
           </div>
@@ -88,6 +99,7 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
                   ...(params.q ? { q: params.q } : {}),
                   ...(params.category ? { category: params.category } : {}),
                   ...(params.closing ? { closing: params.closing } : {}),
+                  ...(selectedSchool?.slug ? { school: selectedSchool.slug } : {}),
                   grade: String(grade),
                 }).toString()}`;
                 return (

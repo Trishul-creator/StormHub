@@ -11,9 +11,11 @@ import type { FeedbackStatus } from "@/types/database";
 export function FeedbackStatusActions({
   id,
   status,
+  canReply,
 }: {
   id: string;
   status: FeedbackStatus;
+  canReply: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -35,7 +37,7 @@ export function FeedbackStatusActions({
     startTransition(async () => {
       const result = await respondToFeedback(id, message);
       if (result.success) {
-        toast({ title: "Response sent", description: "The sender was emailed and the feedback was resolved." });
+        toast({ title: "Response queued", description: "The reply was added to email delivery and the message was resolved." });
         router.refresh();
       } else {
         toast({ title: "Could not send response", description: result.error, variant: "destructive" });
@@ -45,17 +47,19 @@ export function FeedbackStatusActions({
 
   return (
     <div className="w-full space-y-3 md:w-72">
-      <form action={respond} className="space-y-2">
-        <Textarea
-          name="response"
-          rows={3}
-          placeholder="Write a response that will be emailed to the sender..."
-          disabled={pending}
-        />
-        <Button size="sm" type="submit" disabled={pending} className="w-full">
-          Send response & resolve
-        </Button>
-      </form>
+      {canReply && (
+        <form action={respond} className="space-y-2">
+          <Textarea
+            name="response"
+            rows={3}
+            placeholder="Write a response that will be emailed to the sender..."
+            disabled={pending}
+          />
+          <Button size="sm" type="submit" disabled={pending} className="w-full">
+            Queue response & resolve
+          </Button>
+        </form>
+      )}
       <div className="flex flex-wrap gap-2">
         {status !== "reviewed" && (
           <Button size="sm" variant="outline" disabled={pending} onClick={() => setStatus("reviewed")}>

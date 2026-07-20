@@ -263,6 +263,21 @@ CREATE TABLE IF NOT EXISTS feedback (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Server-only signup throttling. Identifiers are keyed hashes, never raw IPs or emails.
+CREATE TABLE IF NOT EXISTS signup_attempts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  ip_hash TEXT,
+  email_hash TEXT NOT NULL,
+  was_successful BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_signup_attempts_email_created
+  ON signup_attempts(email_hash, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_signup_attempts_ip_created
+  ON signup_attempts(ip_hash, created_at DESC)
+  WHERE ip_hash IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS notifications (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   recipient_user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
@@ -545,6 +560,7 @@ ALTER TABLE interest_forms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE approval_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE signup_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE email_outbox ENABLE ROW LEVEL SECURITY;
@@ -561,7 +577,8 @@ BEGIN
         'schools', 'profiles', 'clubs', 'club_memberships',
         'club_announcements', 'club_resources', 'opportunities', 'events',
         'event_rsvps', 'bookmarks', 'workshops', 'service_hours',
-        'interest_forms', 'approval_requests', 'analytics_events', 'feedback'
+        'interest_forms', 'approval_requests', 'analytics_events', 'feedback',
+        'signup_attempts'
       )
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', policy_row.policyname, policy_row.schemaname, policy_row.tablename);
@@ -883,9 +900,15 @@ CREATE POLICY "analytics_admin_read" ON analytics_events FOR SELECT
 
 -- Feedback
 CREATE POLICY "feedback_insert" ON feedback FOR INSERT
-  WITH CHECK (true);
+  WITH CHECK (
+    (auth.uid() IS NULL AND user_id IS NULL)
+    OR (auth.uid() IS NOT NULL AND (user_id IS NULL OR user_id = auth.uid()))
+  );
 CREATE POLICY "feedback_admin_read" ON feedback FOR SELECT
   USING (is_admin());
+CREATE POLICY "feedback_admin_update" ON feedback FOR UPDATE
+  USING (is_admin())
+  WITH CHECK (is_admin());
 
 CREATE POLICY "notifications_read_own" ON notifications FOR SELECT
   USING (recipient_user_id = auth.uid());
@@ -900,7 +923,7 @@ CREATE POLICY "notification_preferences_update_own" ON notification_preferences 
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
 CREATE POLICY "email_outbox_admin_read" ON email_outbox FOR SELECT
-  USING (is_admin());
+  USING (get_user_role() = 'super_admin');
 
 -- ========== SEED DATA ==========
 -- StormHub Seed Data for Elkhorn South High School

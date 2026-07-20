@@ -5,6 +5,7 @@ import {
   buildGlobalSearchResults,
   getNotificationGroupId,
   getRoleOnboardingItems,
+  getWorkspaceClubSummary,
   groupNotifications,
 } from "@/lib/product";
 import type { Club, Event, Notification, Opportunity } from "@/types/database";
@@ -110,6 +111,20 @@ describe("product helpers", () => {
     ]);
   });
 
+  it("counts every visible club while preferring featured clubs for the workspace spotlight", () => {
+    const ordinaryClub = club("ordinary", false);
+    const featuredClub = club("featured", true);
+
+    expect(getWorkspaceClubSummary([ordinaryClub])).toEqual({
+      visibleCount: 1,
+      spotlightClubs: [ordinaryClub],
+    });
+    expect(getWorkspaceClubSummary([ordinaryClub, featuredClub])).toEqual({
+      visibleCount: 2,
+      spotlightClubs: [featuredClub],
+    });
+  });
+
   it("builds recovery actions for filtered empty states", () => {
     expect(
       buildEmptyStateActions({
@@ -148,5 +163,19 @@ function notification(id: string, type: Notification["type"], readAt: string | n
     opportunity_id: null,
     event_id: null,
     created_at: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+function club(id: string, isFeatured: boolean): Club {
+  return {
+    id,
+    school_id: "school-1",
+    name: `${id} club`,
+    slug: id,
+    is_featured: isFeatured,
+    is_listed: true,
+    status: "active",
+    is_active: true,
+    visibility: "public",
   };
 }

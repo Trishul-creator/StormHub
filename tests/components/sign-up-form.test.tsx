@@ -59,7 +59,8 @@ describe("SignUpForm", () => {
         "Test Student",
         10,
         "",
-        "school-1"
+        "school-1",
+        expect.objectContaining({ website: "", loadedAt: expect.any(Number) })
       );
     });
     expect(toast).toHaveBeenCalledWith({
@@ -67,5 +68,15 @@ describe("SignUpForm", () => {
       description: "Confirm your email address to complete signup.",
     });
     expect(push).toHaveBeenCalledWith("/auth/sign-in");
+  });
+
+  it("only asks for a school signup code when the deployment requires one", () => {
+    const schools = [{ id: "school-1", name: "Storm High", slug: "storm-high" }];
+    const { rerender } = render(<SignUpForm schools={schools} />);
+
+    expect(screen.queryByLabelText("School signup code")).not.toBeInTheDocument();
+
+    rerender(<SignUpForm schools={schools} requiresAccessCode />);
+    expect(screen.getByLabelText("School signup code")).toBeRequired();
   });
 });

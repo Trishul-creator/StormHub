@@ -286,7 +286,10 @@ export async function getClubManagedContent(
   return (data as Array<ClubAnnouncement | ClubResource | Event>) ?? [];
 }
 
-export async function getRecentAnnouncements(limit = 5): Promise<(ClubAnnouncement & { club?: Club })[]> {
+export async function getRecentAnnouncements(
+  limit = 5,
+  schoolId?: string | null
+): Promise<(ClubAnnouncement & { club?: Club })[]> {
   if (isDemoMode()) {
     return demoAnnouncements
       .filter((announcement) => announcement.status === "approved")
@@ -298,12 +301,12 @@ export async function getRecentAnnouncements(limit = 5): Promise<(ClubAnnounceme
   }
   const supabase = await createClient();
   if (!supabase) return [];
-  const school = await getCurrentSchool();
+  const resolvedSchoolId = await resolveSchoolId(schoolId);
   const { data, error } = await supabase
     .from("club_announcements")
     .select("*, club:clubs!inner(*)")
     .eq("status", "approved")
-    .eq("club.school_id", school?.id ?? DEFAULT_SCHOOL_ID)
+    .eq("club.school_id", resolvedSchoolId ?? DEFAULT_SCHOOL_ID)
     .order("published_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -1110,7 +1113,7 @@ export async function getFeedbackItems(): Promise<FeedbackItem[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("feedback")
-    .select("*, profile:profiles(id,full_name,email,role)")
+    .select("*, profile:profiles(id,full_name,email,role), school:schools(id,name,slug)")
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) {

@@ -329,6 +329,7 @@ export interface FeedbackItem {
   status: FeedbackStatus;
   created_at?: string;
   profile?: Pick<Profile, "id" | "full_name" | "email" | "role"> | null;
+  school?: Pick<School, "id" | "name" | "slug"> | null;
 }
 
 export interface EmailOutboxItem {

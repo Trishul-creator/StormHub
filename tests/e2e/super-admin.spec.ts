@@ -13,6 +13,14 @@ test.describe("super admin school chooser", () => {
     await expect(page.getByRole("heading", { name: /platform admin/i })).toBeVisible();
     await expect(page.getByText(/School 1/i).first()).toBeVisible();
     await expect(page.getByText(/School 2/i).first()).toBeVisible();
+    await expect(page.getByText(/Workspace URL name/i)).toBeVisible();
+    await expect(page.getByText(/^Slug$/)).toHaveCount(0);
+
+    await page.getByRole("link", { name: /support inbox/i }).click();
+    await expect(page).toHaveURL(/\/admin\/feedback/);
+    await expect(page.getByRole("heading", { name: /support inbox/i })).toBeVisible();
+
+    await page.goto("/admin/schools");
 
     await page.goto("/admin/schools/school1");
     await expect(page).toHaveURL(/\/admin\/schools\/school1/);

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDemoMode } from "@/lib/supabase/mode";
@@ -41,6 +41,13 @@ import {
 } from "@/lib/notifications";
 import { processEmailOutbox } from "@/lib/email";
 import type { NotificationImportance, NotificationPreferences } from "@/types/database";
+import {
+  getClientAddress,
+  getSignupRateLimitConfig,
+  hashSignupIdentifier,
+  type SignupBotProof,
+  validateSignupBotProof,
+} from "@/lib/signup-security";
 
 const DEMO_USER_COOKIE = "stormhub_demo_user";
 const DEMO_EMAIL_COOKIE = "stormhub_demo_email";
@@ -519,7 +526,37 @@ export async function submitFeedback(data: {
   if (!supabase) return { success: false, error: "Database not configured." };
 
   const { data: { user } } = await supabase.auth.getUser();
+  const profile = user ? await getCurrentProfile() : null;
+  const school = profile?.school_id ? await getSchoolById(profile.school_id) : await getCurrentSchool();
+  if (!school) return { success: false, error: "Choose a school workspace before contacting support." };
+
+  const name = data.name?.trim().replace(/\s+/g, " ") || null;
+  const email = data.email?.trim().toLowerCase() || user?.email || null;
+  const message = data.message.trim();
   const normalizedCategory = data.category.trim().toLowerCase();
+  const allowedCategories = new Set(["app-feedback", "bug", "feature", "club", "other"]);
+  if (!allowedCategories.has(normalizedCategory)) {
+    return { success: false, error: "Choose a valid support category." };
+  }
+  if (name && name.length > 120) return { success: false, error: "Name is too long." };
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { success: false, error: "Enter a valid reply email." };
+  }
+  if (message.length < 10 || message.length > 5000) {
+    return { success: false, error: "Enter a message between 10 and 5,000 characters." };
+  }
+
+  const { error: insertError } = await supabase.from("feedback").insert({
+    school_id: school.id,
+    user_id: user?.id ?? null,
+    name,
+    email,
+    category: normalizedCategory,
+    message,
+    status: "open",
+  });
+  if (insertError) return { success: false, error: friendlyError(insertError, "Could not save your support message.") };
+
   await createEmailOutboxItem({
     recipientEmail: SUPPORT_EMAIL,
     subject: `[StormHub Support] ${
@@ -533,13 +570,15 @@ export async function submitFeedback(data: {
     }`,
     body: [
       `Category: ${data.category}`,
-      `From: ${data.name?.trim() || "Anonymous"}`,
-      `Reply email: ${data.email?.trim() || user?.email || "Not provided"}`,
+      `School: ${school.name}`,
+      `From: ${name || "Anonymous"}`,
+      `Reply email: ${email || "Not provided"}`,
       "",
-      data.message,
+      message,
     ].join("\n"),
     type: "support_message",
   });
+  revalidatePath("/admin/feedback");
   return { success: true };
 }
 
@@ -559,6 +598,7 @@ export async function updateFeedbackStatus(
   const { error } = await supabase.from("feedback").update({ status }).eq("id", id);
   if (error) return { success: false, error: friendlyError(error, "Could not update feedback.") };
   revalidatePath("/admin");
+  revalidatePath("/admin/feedback");
   return { success: true };
 }
 
@@ -609,6 +649,7 @@ export async function respondToFeedback(
   const { error } = await supabase.from("feedback").update({ status: "resolved" }).eq("id", id);
   if (error) return { success: false, error: friendlyError(error, "Could not mark feedback resolved.") };
   revalidatePath("/admin");
+  revalidatePath("/admin/feedback");
   return { success: true };
 }
 
@@ -1262,11 +1303,14 @@ export async function supabaseSignUp(
   fullName: string,
   gradeLevel?: number | null,
   accessCode?: string,
-  schoolId?: string | null
+  schoolId?: string | null,
+  botProof?: SignupBotProof
 ) {
   const normalizedEmail = email.trim().toLowerCase();
   const normalizedFullName = fullName.trim().replace(/\s+/g, " ");
   const requiredAccessCode = process.env.SIGNUP_ACCESS_CODE?.trim();
+  const botProofError = validateSignupBotProof(botProof);
+  if (botProofError) return { success: false, error: botProofError };
   if (normalizedFullName.length < 3 || normalizedFullName.length > 120) {
     return { success: false, error: "Enter your full name." };
   }
@@ -1282,6 +1326,46 @@ export async function supabaseSignUp(
   const admin = createAdminClient();
   const db = admin ?? await createClient();
   if (!db) return { success: false, error: "Database not configured." };
+
+  let signupAttemptId: string | null = null;
+  if (admin) {
+    const requestHeaders = await headers();
+    const clientAddress = getClientAddress(requestHeaders);
+    const fingerprintSecret =
+      process.env.SIGNUP_RATE_LIMIT_SECRET?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+    if (fingerprintSecret) {
+      const config = getSignupRateLimitConfig();
+      const since = new Date(Date.now() - config.windowMinutes * 60 * 1000).toISOString();
+      const emailHash = hashSignupIdentifier(normalizedEmail, fingerprintSecret);
+      const ipHash = clientAddress ? hashSignupIdentifier(clientAddress, fingerprintSecret) : null;
+      const emailCountQuery = admin
+        .from("signup_attempts")
+        .select("id", { count: "exact", head: true })
+        .eq("email_hash", emailHash)
+        .gte("created_at", since);
+      const ipCountQuery = ipHash
+        ? admin
+            .from("signup_attempts")
+            .select("id", { count: "exact", head: true })
+            .eq("ip_hash", ipHash)
+            .gte("created_at", since)
+        : Promise.resolve({ count: 0, error: null });
+      const [emailCount, ipCount] = await Promise.all([emailCountQuery, ipCountQuery]);
+      if (!emailCount.error && (emailCount.count ?? 0) >= config.maxEmailAttempts) {
+        return { success: false, error: "Too many signup attempts. Wait before trying this email again." };
+      }
+      if (!ipCount.error && (ipCount.count ?? 0) >= config.maxIpAttempts) {
+        return { success: false, error: "Too many signup attempts from this network. Try again later." };
+      }
+      const { data: attempt, error: attemptError } = await admin
+        .from("signup_attempts")
+        .insert({ email_hash: emailHash, ip_hash: ipHash })
+        .select("id")
+        .single();
+      if (attemptError) console.warn("[supabaseSignUp] Signup throttling unavailable:", attemptError.message);
+      signupAttemptId = attempt?.id ?? null;
+    }
+  }
   const { data: school, error: schoolError } = await db
     .from("schools")
     .select("id, is_active")
@@ -1325,6 +1409,9 @@ export async function supabaseSignUp(
       .from("profiles")
       .update({ full_name: normalizedFullName, grade_level: normalizedGrade, school_id: schoolId })
       .eq("id", data.user.id);
+  }
+  if (admin && signupAttemptId) {
+    await admin.from("signup_attempts").update({ was_successful: true }).eq("id", signupAttemptId);
   }
   return { success: true, needsConfirmation: !data.session };
 }
@@ -1695,8 +1782,9 @@ export async function generateOpportunityDeadlineReminders(): Promise<{ success:
 
 export async function retryEmailOutbox(): Promise<{ success: boolean; attempted?: number; sent?: number; failed?: number; error?: string }> {
   const profile = await getCurrentProfile();
-  if (!profile || !isAdminRole(profile.role)) return { success: false, error: "Administrator access required." };
+  if (!profile || profile.role !== "super_admin") return { success: false, error: "Platform administrator access required." };
   const result = await processEmailOutbox();
   revalidatePath("/manage");
+  revalidatePath("/manage/email-outbox");
   return { success: true, ...result };
 }

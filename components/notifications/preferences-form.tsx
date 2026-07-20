@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
+import { Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { updateNotificationPreferences } from "@/lib/actions";
@@ -57,20 +59,25 @@ export function NotificationPreferencesForm({
       {option("important_email_enabled", isAdmin ? "Important system/admin notifications" : "Important email notifications", "Allow email queue items for important updates when the sender requests email.")}
       {option("urgent_email_enabled", isAdmin ? "Urgent system/admin notifications" : "Urgent email notifications", "Urgent updates are queued for email by default.")}
       {isAdmin && option("admin_attention_email_enabled", "Admin attention emails", "Queue email for items that require administrator action.")}
-      {option("weekly_digest_enabled", "Weekly digest (planned)", "Optional weekly summary. Automatic sending is not implemented yet.", true)}
-      <Button
-        disabled={pending}
-        onClick={() => startTransition(async () => {
-          const result = await updateNotificationPreferences(values);
-          toast({
-            title: result.success ? "Preferences saved" : "Could not save preferences",
-            description: result.error,
-            variant: result.success ? "default" : "destructive",
-          });
-        })}
-      >
-        {pending ? "Saving..." : "Save notification preferences"}
-      </Button>
+      {option("weekly_digest_enabled", "Weekly digest", "Include the weekly school summary in your email preferences.")}
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Button
+          disabled={pending}
+          onClick={() => startTransition(async () => {
+            const result = await updateNotificationPreferences(values);
+            toast({
+              title: result.success ? "Preferences saved" : "Could not save preferences",
+              description: result.error,
+              variant: result.success ? "default" : "destructive",
+            });
+          })}
+        >
+          {pending ? "Saving..." : "Save notification preferences"}
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href="/digest"><Eye className="h-4 w-4" /> View weekly digest</Link>
+        </Button>
+      </div>
     </div>
   );
 }
