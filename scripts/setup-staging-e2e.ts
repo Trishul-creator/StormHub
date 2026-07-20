@@ -401,6 +401,18 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : "Staging E2E setup failed.");
+  console.error(formatSetupError(error));
   process.exit(1);
 });
+
+function formatSetupError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const details = error as Record<string, unknown>;
+    return ["code", "message", "details", "hint"]
+      .map((key) => typeof details[key] === "string" ? `${key}: ${details[key]}` : null)
+      .filter(Boolean)
+      .join(" | ") || "Staging E2E setup failed with an unknown provider error.";
+  }
+  return typeof error === "string" ? error : "Staging E2E setup failed.";
+}
