@@ -100,6 +100,10 @@ async function completeAdminMfa(page: Page, role: "admin" | "super_admin") {
     await setupButton.click();
     const manualKey = page.getByText(/manual key:/i);
     await expect(manualKey).toBeVisible({ timeout: 10_000 });
+    const authenticatorLink = page.getByRole("link", { name: /open authenticator app/i });
+    await expect(authenticatorLink).toBeVisible();
+    const authenticatorHref = await authenticatorLink.getAttribute("href");
+    expect(authenticatorHref?.startsWith("otpauth://totp/")).toBe(true);
     secret = (await manualKey.textContent())?.replace(/.*manual key:\s*/i, "").trim();
   }
   if (!secret) {

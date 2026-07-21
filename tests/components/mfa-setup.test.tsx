@@ -46,8 +46,9 @@ describe("MfaSetup", () => {
       data: {
         id: "new-factor",
         totp: {
-          qr_code: "data:image/svg+xml;utf-8,<svg width=\"10\" height=\"10\"></svg>\n ",
+          qr_code: "data:image/svg+xml;utf-8,<svg width=\"219\" height=\"219\"></svg>\n ",
           secret: "TESTSECRET",
+          uri: "otpauth://totp/StormHub%3Atest%40example.com?secret=TESTSECRET&issuer=StormHub",
         },
       },
       error: null,
@@ -61,8 +62,19 @@ describe("MfaSetup", () => {
 
     expect(await screen.findByText("Manual key: TESTSECRET")).toBeVisible();
     const image = screen.getByRole("img", { name: /authenticator setup qr code/i });
-    expect(image.getAttribute("src")).toContain("%3Csvg%20width%3D%2210%22");
+    expect(image.getAttribute("src")).toContain("%3Csvg%20width%3D%22219%22");
     expect(image.getAttribute("src")).not.toContain("\n");
+    expect(image).toHaveAttribute("width", "219");
+    expect(image).toHaveAttribute("height", "219");
+    expect(screen.getByRole("link", { name: /open authenticator app/i })).toHaveAttribute(
+      "href",
+      "otpauth://totp/StormHub%3Atest%40example.com?secret=TESTSECRET&issuer=StormHub"
+    );
+    expect(mocks.enroll).toHaveBeenCalledWith({
+      factorType: "totp",
+      friendlyName: "StormHub administrator",
+      issuer: "StormHub",
+    });
   });
 
   it("removes an abandoned unverified factor before starting over", async () => {
@@ -78,5 +90,25 @@ describe("MfaSetup", () => {
       expect(mocks.unenroll).toHaveBeenCalledWith({ factorId: "stale-factor" });
       expect(mocks.enroll).toHaveBeenCalledAfter(mocks.unenroll);
     });
+  });
+
+  it("does not render a deep link for a non-authenticator URI", async () => {
+    mocks.enroll.mockResolvedValue({
+      data: {
+        id: "new-factor",
+        totp: {
+          qr_code: "data:image/svg+xml;utf-8,<svg width=\"219\" height=\"219\"></svg>",
+          secret: "TESTSECRET",
+          uri: "https://example.com/not-an-authenticator-link",
+        },
+      },
+      error: null,
+    });
+
+    render(<MfaSetup />);
+    fireEvent.click(await screen.findByRole("button", { name: /set up authenticator/i }));
+
+    expect(await screen.findByText("Manual key: TESTSECRET")).toBeVisible();
+    expect(screen.queryByRole("link", { name: /open authenticator app/i })).not.toBeInTheDocument();
   });
 });
