@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { BarChart3, Calendar, CheckCircle2, Mail, Settings, Users, Zap } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireAuth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { getClubs, getEvents, getOpportunities } from "@/lib/data";
 import { getSchoolBySlug, getSchoolPublicUrl } from "@/lib/schools";
 
@@ -12,8 +14,26 @@ interface AdminSchoolPageProps {
   params: Promise<{ schoolSlug: string }>;
 }
 
+async function updateSignupDomains(formData: FormData) {
+  "use server";
+  const { profile } = await requireAdmin();
+  if (profile.role !== "super_admin") redirect("/admin?error=super_admin_required");
+  const schoolId = String(formData.get("school_id") ?? "");
+  const schoolSlug = String(formData.get("school_slug") ?? "");
+  const domains = String(formData.get("allowed_email_domains") ?? "")
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ""))
+    .filter((domain) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain));
+  if (!schoolId || !schoolSlug || domains.length === 0) redirect(`/admin/schools/${schoolSlug}?error=invalid_domains`);
+  const supabase = await createClient();
+  if (!supabase) redirect(`/admin/schools/${schoolSlug}?error=database_required`);
+  const { error } = await supabase.from("schools").update({ allowed_email_domains: domains }).eq("id", schoolId);
+  if (error) redirect(`/admin/schools/${schoolSlug}?error=update_failed`);
+  revalidatePath(`/admin/schools/${schoolSlug}`);
+}
+
 export default async function AdminSchoolPage({ params }: AdminSchoolPageProps) {
-  const { profile } = await requireAuth("/admin/schools");
+  const { profile } = await requireAdmin();
   if (profile.role !== "super_admin") redirect("/admin?error=super_admin_required");
 
   const { schoolSlug } = await params;
@@ -75,6 +95,20 @@ export default async function AdminSchoolPage({ params }: AdminSchoolPageProps) 
           ))}
         </div>
       </div>
+
+      <form action={updateSignupDomains} className="mt-8 border-t pt-6">
+        <input type="hidden" name="school_id" value={school.id} />
+        <input type="hidden" name="school_slug" value={school.slug} />
+        <h2 className="font-semibold text-storm-navy">Signup protection</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Only email addresses from these domains can create accounts in this workspace.</p>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="flex-1 text-sm">
+            <span className="font-medium">Approved email domains</span>
+            <input name="allowed_email_domains" required defaultValue={(school.allowed_email_domains ?? []).join(", ")} className="mt-1 w-full rounded-md border px-3 py-2" placeholder="students.example.edu, staff.example.edu" />
+          </label>
+          <Button type="submit">Save domains</Button>
+        </div>
+      </form>
     </div>
   );
 }

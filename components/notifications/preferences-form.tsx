@@ -59,7 +59,7 @@ export function NotificationPreferencesForm({
       {option("important_email_enabled", isAdmin ? "Important system/admin notifications" : "Important email notifications", "Allow email queue items for important updates when the sender requests email.")}
       {option("urgent_email_enabled", isAdmin ? "Urgent system/admin notifications" : "Urgent email notifications", "Urgent updates are queued for email by default.")}
       {isAdmin && option("admin_attention_email_enabled", "Admin attention emails", "Queue email for items that require administrator action.")}
-      {option("weekly_digest_enabled", "Weekly digest", "Include the weekly school summary in your email preferences.")}
+      {option("weekly_digest_enabled", "Weekly digest", "Receive the school summary by email each Monday. You can preview the current digest at any time.")}
       <div className="flex flex-col gap-2 sm:flex-row">
         <Button
           disabled={pending}

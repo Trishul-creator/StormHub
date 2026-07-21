@@ -1,3 +1,4 @@
+-- LEGACY REFERENCE ONLY. Use timestamped files in supabase/migrations.
 -- StormHub Row Level Security Policies
 -- Safe to re-run after schema.sql. Policies are dropped before recreation.
 

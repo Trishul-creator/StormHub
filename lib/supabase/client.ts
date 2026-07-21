@@ -1,13 +1,21 @@
 import { createBrowserClient } from "@supabase/ssr";
-import { maybeGetSupabaseAnonKey, maybeGetSupabaseUrl } from "@/lib/env";
+
+function getBrowserConfig() {
+  // Next.js only exposes NEXT_PUBLIC variables to browser bundles when they are
+  // referenced directly. Reading them through a dynamic process.env object
+  // leaves client-side auth incorrectly reporting that Supabase is unavailable.
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  return { url, anonKey };
+}
 
 export function isSupabaseConfigured(): boolean {
-  return Boolean(maybeGetSupabaseUrl() && maybeGetSupabaseAnonKey());
+  const { url, anonKey } = getBrowserConfig();
+  return Boolean(url && anonKey);
 }
 
 export function createClient() {
-  if (!isSupabaseConfigured()) {
-    return null;
-  }
-  return createBrowserClient(maybeGetSupabaseUrl()!, maybeGetSupabaseAnonKey()!);
+  const { url, anonKey } = getBrowserConfig();
+  if (!url || !anonKey) return null;
+  return createBrowserClient(url, anonKey);
 }

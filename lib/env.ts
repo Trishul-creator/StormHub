@@ -78,9 +78,22 @@ export function getEmailDeliveryMode(env: Env = process.env): "disabled" | "outb
 export function isAssistantEnabled(env: Env = process.env): boolean {
   const aiEnabled = clean(env.AI_FEATURES_ENABLED)?.toLowerCase();
   const groqEnabled = clean(env.GROQ_ENABLED)?.toLowerCase();
-  if (aiEnabled === "false" || aiEnabled === "0" || groqEnabled === "false" || groqEnabled === "0") return false;
+  const dataSharingApproved = clean(env.AI_DATA_SHARING_APPROVED)?.toLowerCase();
+  if (aiEnabled !== "true" || groqEnabled !== "true" || dataSharingApproved !== "true") return false;
   if (isExplicitStagingE2E(env)) return false;
   return Boolean(clean(env.GROQ_API_KEY));
+}
+
+export function isCaptchaEnabled(env: Env = process.env): boolean {
+  return Boolean(clean(env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY) && clean(env.HCAPTCHA_SECRET_KEY));
+}
+
+export function getHcaptchaSecret(env: Env = process.env): string | null {
+  return clean(env.HCAPTCHA_SECRET_KEY) ?? null;
+}
+
+export function getPublicSiteUrl(env: Env = process.env): string {
+  return clean(env.NEXT_PUBLIC_SITE_URL) ?? "https://stormhubapp.com";
 }
 
 export function getGroqApiKey(env: Env = process.env): string | null {

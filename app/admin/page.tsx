@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth";
 import { getAdminAnalytics, getPendingApprovals } from "@/lib/data";
-import { Users, School, FileText, BarChart3 } from "lucide-react";
+import { Users, School, FileText, BarChart3, History, UserRoundX } from "lucide-react";
 import { redirect } from "next/navigation";
 
 const adminLinks = [
@@ -11,6 +11,8 @@ const adminLinks = [
   { href: "/admin/schools", icon: School, title: "Schools", description: "School configuration (single-school for now)" },
   { href: "/admin/content", icon: FileText, title: "Content Moderation", description: "Global approval queue" },
   { href: "/manage/analytics", icon: BarChart3, title: "Analytics", description: "Platform-wide metrics" },
+  { href: "/admin/audit", icon: History, title: "Audit Log", description: "Review immutable administrative history" },
+  { href: "/admin/deletion-requests", icon: UserRoundX, title: "Deletion Requests", description: "Review account lifecycle requests" },
 ];
 
 export default async function AdminPage() {

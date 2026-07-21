@@ -1,7 +1,7 @@
 -- Add durable signup throttling and complete support inbox policies.
 
 CREATE TABLE IF NOT EXISTS public.signup_attempts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ip_hash TEXT,
   email_hash TEXT NOT NULL,
   was_successful BOOLEAN NOT NULL DEFAULT FALSE,

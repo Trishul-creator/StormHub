@@ -8,11 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { submitFeedback } from "@/lib/actions";
 import { toast } from "@/hooks/use-toast";
+import { Captcha } from "@/components/auth/captcha";
 
 const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "stormhubsupport@gmail.com";
 
 export default function ContactPage() {
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -23,6 +25,7 @@ export default function ContactPage() {
       email: form.get("email") as string,
       category: form.get("category") as string,
       message: form.get("message") as string,
+      captchaToken,
     });
     setLoading(false);
     if (result.success) {
@@ -76,6 +79,7 @@ export default function ContactPage() {
           <Label htmlFor="message">Message</Label>
           <Textarea id="message" name="message" required rows={5} className="mt-1" />
         </div>
+        <Captcha onToken={setCaptchaToken} />
         <Button type="submit" disabled={loading}>{loading ? "Sending..." : "Send message"}</Button>
       </form>
     </div>

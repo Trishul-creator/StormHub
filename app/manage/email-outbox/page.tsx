@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireAuth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { retryEmailOutbox } from "@/lib/actions";
 import { getEmailOutbox } from "@/lib/notifications";
 import { formatDateTime, humanizeLabel } from "@/lib/utils";
@@ -17,7 +17,7 @@ async function retryQueuedEmail() {
 }
 
 export default async function EmailOutboxPage() {
-  const { profile } = await requireAuth("/manage/email-outbox");
+  const { profile } = await requireAdmin();
   if (profile.role !== "super_admin") redirect("/manage?error=super_admin_required");
 
   const items = await getEmailOutbox();

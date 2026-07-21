@@ -97,6 +97,7 @@ const stagingSchools = [
     city: "Staging",
     state: "ST",
     mascot: "Storm",
+    allowed_email_domains: ["stormhub.test"],
   },
   {
     id: "b0000000-0000-4000-8000-000000000002",
@@ -105,6 +106,7 @@ const stagingSchools = [
     city: "Staging",
     state: "ST",
     mascot: "Lightning",
+    allowed_email_domains: ["stormhub.test"],
   },
 ] as const;
 
@@ -136,13 +138,23 @@ const school1Clubs = [
 ] as const;
 
 async function assertRequiredTablesExist(admin: SupabaseAdmin) {
-  const requiredTables = ["schools", "school_settings", "clubs", "opportunities", "profiles"] as const;
+  const requiredRelations = [
+    { table: "schools", columns: "id,allowed_email_domains" },
+    { table: "school_settings", columns: "school_id" },
+    { table: "clubs", columns: "id" },
+    { table: "opportunities", columns: "id" },
+    { table: "profiles", columns: "id,account_status,graduation_year" },
+    { table: "account_deletion_requests", columns: "id" },
+    { table: "admin_audit_log", columns: "id" },
+    { table: "digest_deliveries", columns: "id" },
+    { table: "request_attempts", columns: "id" },
+  ] as const;
 
-  for (const table of requiredTables) {
-    const { error } = await admin.from(table).select("*").limit(1);
+  for (const { table, columns } of requiredRelations) {
+    const { error } = await admin.from(table).select(columns).limit(1);
     if (error) {
       throw new Error(
-        `Staging schema is missing. Apply base schema/migrations to staging first. Missing or inaccessible table: ${table}.`
+        `Staging schema is missing ${table} (${columns}). Apply the migration chain from docs/PRODUCTION_ROLLOUT.md before rerunning E2E. Provider message: ${error.message}`
       );
     }
   }
@@ -319,6 +331,15 @@ async function assertAuthUserReady(admin: { auth: SupabaseAdmin["auth"] }, userI
   }
 }
 
+async function resetDedicatedAdminFactors(admin: { auth: SupabaseAdmin["auth"] }, userId: string) {
+  const { data, error } = await admin.auth.admin.mfa.listFactors({ userId });
+  if (error) throw error;
+  for (const factor of data.factors) {
+    const { error: deleteError } = await admin.auth.admin.mfa.deleteFactor({ userId, id: factor.id });
+    if (deleteError) throw deleteError;
+  }
+}
+
 async function main() {
   assertSafeToMutate();
 
@@ -331,9 +352,10 @@ async function main() {
 
   for (const user of users) {
     const schoolId = user.schoolSlug ? schoolIds.get(user.schoolSlug)! : null;
+    const authSchoolId = schoolId ?? schoolIds.get("school1")!;
     const metadata = {
       full_name: user.fullName,
-      school_id: schoolId,
+      school_id: authSchoolId,
       grade_level: user.gradeLevel ? String(user.gradeLevel) : undefined,
     };
 
@@ -359,6 +381,9 @@ async function main() {
 
     if (!userId) throw new Error(`Could not create or find ${user.email}.`);
     await assertAuthUserReady(admin, userId, user.email);
+    if (user.role === "admin" || user.role === "super_admin") {
+      await resetDedicatedAdminFactors(admin, userId);
+    }
 
     const { error: profileError } = await admin.from("profiles").upsert({
       id: userId,
@@ -386,6 +411,18 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : "Staging E2E setup failed.");
+  console.error(formatSetupError(error));
   process.exit(1);
 });
+
+function formatSetupError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const details = error as Record<string, unknown>;
+    return ["code", "message", "details", "hint"]
+      .map((key) => typeof details[key] === "string" ? `${key}: ${details[key]}` : null)
+      .filter(Boolean)
+      .join(" | ") || "Staging E2E setup failed with an unknown provider error.";
+  }
+  return typeof error === "string" ? error : "Staging E2E setup failed.";
+}

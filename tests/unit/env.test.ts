@@ -52,11 +52,21 @@ describe("environment resolver", () => {
   });
 
   it("disables assistant without Groq or in explicit staging E2E", () => {
-    expect(isAssistantEnabled({ GROQ_API_KEY: "key" })).toBe(true);
-    expect(getGroqApiKey({ GROQ_API_KEY: "key" })).toBe("key");
-    expect(isAssistantEnabled({ GROQ_API_KEY: "key", E2E_ENVIRONMENT: "staging" })).toBe(false);
-    expect(isAssistantEnabled({ GROQ_API_KEY: "key", AI_FEATURES_ENABLED: "false" })).toBe(false);
-    expect(isAssistantEnabled({ GROQ_API_KEY: "key", GROQ_ENABLED: "false" })).toBe(false);
+    const approvedEnv = {
+      GROQ_API_KEY: "key",
+      AI_FEATURES_ENABLED: "true",
+      GROQ_ENABLED: "true",
+      AI_DATA_SHARING_APPROVED: "true",
+    };
+
+    expect(isAssistantEnabled({ GROQ_API_KEY: "key" })).toBe(false);
+    expect(getGroqApiKey({ GROQ_API_KEY: "key" })).toBeNull();
+    expect(isAssistantEnabled(approvedEnv)).toBe(true);
+    expect(getGroqApiKey(approvedEnv)).toBe("key");
+    expect(isAssistantEnabled({ ...approvedEnv, E2E_ENVIRONMENT: "staging" })).toBe(false);
+    expect(isAssistantEnabled({ ...approvedEnv, AI_FEATURES_ENABLED: "false" })).toBe(false);
+    expect(isAssistantEnabled({ ...approvedEnv, GROQ_ENABLED: "false" })).toBe(false);
+    expect(isAssistantEnabled({ ...approvedEnv, AI_DATA_SHARING_APPROVED: "false" })).toBe(false);
     expect(isAssistantEnabled({})).toBe(false);
   });
 });

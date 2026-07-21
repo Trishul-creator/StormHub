@@ -24,7 +24,7 @@ export default async function DigestPage() {
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <PageHeader
         title="Weekly Digest"
-        description="Preview newsletter content for school announcements. Copy and paste into your school newsletter."
+        description="Preview the school summary sent each Monday to users who enabled the weekly digest."
       />
       <DigestPreview
         opportunities={opportunities.filter((item) => item.status === "approved" && item.visibility === "public")}

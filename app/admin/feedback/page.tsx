@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { requireAuth } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { getFeedbackItems } from "@/lib/data";
 import { SUPPORT_EMAIL } from "@/lib/schools";
 import { formatDateTime, humanizeLabel } from "@/lib/utils";
@@ -25,7 +25,7 @@ const statuses: Array<{ label: string; value?: FeedbackStatus }> = [
 ];
 
 export default async function SupportInboxPage({ searchParams }: SupportInboxPageProps) {
-  const { profile } = await requireAuth("/admin/feedback");
+  const { profile } = await requireAdmin();
   if (profile.role !== "super_admin") redirect("/admin?error=super_admin_required");
 
   const params = await searchParams;

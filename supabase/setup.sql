@@ -1,4 +1,5 @@
--- StormHub complete setup — run this entire file in Supabase SQL Editor
+-- LEGACY REFERENCE ONLY. Do not use for new or production databases.
+-- StormHub complete setup — superseded by supabase/migrations
 -- Order: schema → policies → seed
 
 -- ========== SCHEMA ==========
