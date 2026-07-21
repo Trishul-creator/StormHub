@@ -93,7 +93,14 @@ export function getHcaptchaSecret(env: Env = process.env): string | null {
 }
 
 export function getPublicSiteUrl(env: Env = process.env): string {
-  return clean(env.NEXT_PUBLIC_SITE_URL) ?? "https://stormhubapp.com";
+  return clean(env.NEXT_PUBLIC_SITE_URL)
+    ?? clean(env.NEXT_PUBLIC_APP_URL)
+    ?? clean(env.APP_URL)
+    ?? "https://stormhubapp.com";
+}
+
+export function getAuthCallbackUrl(env: Env = process.env): string {
+  return new URL("/auth/callback", getPublicSiteUrl(env)).toString();
 }
 
 export function getGroqApiKey(env: Env = process.env): string | null {

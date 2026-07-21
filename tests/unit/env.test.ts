@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getAuthCallbackUrl,
   getEmailDeliveryMode,
   getGroqApiKey,
   getSupabaseAnonKey,
@@ -49,6 +50,18 @@ describe("environment resolver", () => {
     expect(getEmailDeliveryMode({ E2E_ENVIRONMENT: "staging", EMAIL_DELIVERY_MODE: "send" })).toBe("outbox_only");
     expect(getEmailDeliveryMode({ EMAIL_DELIVERY_MODE: "send", RESEND_API_KEY: "key" })).toBe("send");
     expect(getEmailDeliveryMode({ EMAIL_PROVIDER: "disabled" })).toBe("disabled");
+  });
+
+  it("builds email confirmation callbacks from the configured public site", () => {
+    expect(getAuthCallbackUrl({ NEXT_PUBLIC_SITE_URL: "https://stormhubapp.com/" })).toBe(
+      "https://stormhubapp.com/auth/callback"
+    );
+    expect(getAuthCallbackUrl({ NEXT_PUBLIC_SITE_URL: "http://localhost:3000" })).toBe(
+      "http://localhost:3000/auth/callback"
+    );
+    expect(getAuthCallbackUrl({ NEXT_PUBLIC_APP_URL: "https://preview.stormhubapp.com/" })).toBe(
+      "https://preview.stormhubapp.com/auth/callback"
+    );
   });
 
   it("disables assistant without Groq or in explicit staging E2E", () => {

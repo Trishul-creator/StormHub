@@ -51,6 +51,7 @@ import {
 } from "@/lib/signup-security";
 import { verifyCaptchaToken } from "@/lib/captcha";
 import { checkDurableRateLimit, markRateLimitAttemptSuccessful } from "@/lib/request-rate-limit";
+import { getAuthCallbackUrl } from "@/lib/env";
 
 const DEMO_USER_COOKIE = "stormhub_demo_user";
 const DEMO_EMAIL_COOKIE = "stormhub_demo_email";
@@ -1642,6 +1643,7 @@ export async function supabaseSignUp(
     password,
     options: {
       data: { full_name: normalizedFullName, grade_level: normalizedGrade, school_id: schoolId },
+      emailRedirectTo: getAuthCallbackUrl(),
       ...(botProof?.captchaToken ? { captchaToken: botProof.captchaToken } : {}),
     },
   });

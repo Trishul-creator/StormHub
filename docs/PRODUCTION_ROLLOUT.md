@@ -71,7 +71,11 @@ supabase db push
 6. Add `https://stormhubapp.com/auth/callback` as a redirect URL. Add the exact staging
    callback URL as well; do not allow an unrestricted production wildcard.
 7. Enable email confirmation. Keep secure email changes enabled.
-8. Send a signup confirmation and password-reset email to an address outside the Supabase team.
+8. Leave the default confirmation template using `{{ .ConfirmationURL }}`. If the template was
+   customized, make sure its confirmation link still uses `{{ .ConfirmationURL }}` rather than
+   linking directly to `{{ .SiteURL }}`; StormHub sends users through `/auth/callback` to establish
+   their session and profile safely.
+9. Send a signup confirmation and password-reset email to an address outside the Supabase team.
 
 For application email, set these Vercel Production and Preview variables:
 
