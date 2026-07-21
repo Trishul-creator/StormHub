@@ -3,24 +3,42 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { KeyRound, Loader2, ShieldCheck } from "lucide-react";
+import { KeyRound, Loader2, ShieldCheck, Smartphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type Factor = { id: string; status: string; friendly_name?: string };
+type QrCodeImage = { src: string; width: number; height: number };
 
 const SVG_DATA_URL_PREFIX = "data:image/svg+xml;utf-8,";
 
-function normalizeQrCode(qrCode: string) {
+function normalizeQrCode(qrCode: string): QrCodeImage {
   const trimmed = qrCode.trim();
-  if (!trimmed.startsWith(SVG_DATA_URL_PREFIX)) return trimmed;
+  if (!trimmed.startsWith(SVG_DATA_URL_PREFIX)) {
+    return { src: trimmed, width: 219, height: 219 };
+  }
 
   const svg = trimmed.slice(SVG_DATA_URL_PREFIX.length).trim();
-  return svg.startsWith("<")
-    ? `${SVG_DATA_URL_PREFIX}${encodeURIComponent(svg)}`
-    : trimmed;
+  const width = Number(svg.match(/\bwidth=["']?(\d+)/i)?.[1]) || 219;
+  const height = Number(svg.match(/\bheight=["']?(\d+)/i)?.[1]) || width;
+  return {
+    src: svg.startsWith("<")
+      ? `${SVG_DATA_URL_PREFIX}${encodeURIComponent(svg)}`
+      : trimmed,
+    width: Math.min(Math.max(width, 128), 320),
+    height: Math.min(Math.max(height, 128), 320),
+  };
+}
+
+function normalizeAuthenticatorUri(uri: string) {
+  try {
+    const normalized = uri.trim();
+    return new URL(normalized).protocol === "otpauth:" ? normalized : null;
+  } catch {
+    return null;
+  }
 }
 
 export function MfaSetup() {
@@ -32,7 +50,8 @@ export function MfaSetup() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [factorId, setFactorId] = useState<string | null>(null);
-  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [qrCode, setQrCode] = useState<QrCodeImage | null>(null);
+  const [authenticatorUri, setAuthenticatorUri] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +116,7 @@ export function MfaSetup() {
       const { data, error: enrollError } = await supabase.auth.mfa.enroll({
         factorType: "totp",
         friendlyName: "StormHub administrator",
+        issuer: "StormHub",
       });
       if (enrollError) {
         setError(enrollError.message);
@@ -104,6 +124,7 @@ export function MfaSetup() {
       }
       setFactorId(data.id);
       setQrCode(normalizeQrCode(data.totp.qr_code));
+      setAuthenticatorUri(normalizeAuthenticatorUri(data.totp.uri));
       setSecret(data.totp.secret);
     } catch {
       setError("Authenticator setup is temporarily unavailable. Try again.");
@@ -152,7 +173,25 @@ export function MfaSetup() {
 
       {qrCode && (
         <div className="space-y-3 text-center">
-          <Image src={qrCode} alt="Authenticator setup QR code" width={192} height={192} unoptimized className="mx-auto" />
+          <p className="text-sm text-muted-foreground">
+            Scan this inside an authenticator app. A regular camera or browser cannot open an authenticator link.
+          </p>
+          <Image
+            src={qrCode.src}
+            alt="Authenticator setup QR code"
+            width={qrCode.width}
+            height={qrCode.height}
+            unoptimized
+            className="mx-auto h-auto max-w-full"
+          />
+          {authenticatorUri && (
+            <Button asChild type="button" variant="outline" className="w-full">
+              <a href={authenticatorUri}>
+                <Smartphone className="h-4 w-4" />
+                Open authenticator app
+              </a>
+            </Button>
+          )}
           {secret && <p className="break-all font-mono text-xs text-muted-foreground">Manual key: {secret}</p>}
         </div>
       )}
