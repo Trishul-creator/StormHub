@@ -40,7 +40,7 @@ export default async function SettingsPage() {
           <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5" /> Account and privacy</CardTitle>
         </CardHeader>
         <CardContent>
-          <AccountControls role={profile.role} />
+          <AccountControls />
         </CardContent>
       </Card>
     </div>

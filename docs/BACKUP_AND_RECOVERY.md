@@ -39,7 +39,7 @@ psql "$RESTORE_DATABASE_URL" -v ON_ERROR_STOP=1 -f data.sql
 
 4. Verify row counts for schools, profiles, clubs, memberships, events, approvals, audit rows, and
    deletion requests.
-5. Point a local StormHub instance at the disposable database and test student sign-in, admin MFA,
+5. Point a local StormHub instance at the disposable database and test confirmed-email student and admin sign-in,
    school isolation, RSVP, bookmark, and approval history.
 6. Record recovery point, elapsed recovery time, errors, operator, and date.
 7. Delete the disposable project and temporary credentials after sign-off.

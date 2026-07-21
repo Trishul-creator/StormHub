@@ -73,9 +73,8 @@ Public specs run without credentials. Authenticated specs skip unless env vars a
 `test:e2e:readonly` runs only public read-only specs and does not require staging credentials.
 `test:e2e:staging` runs guarded staging setup and then the E2E suite.
 The staging setup script idempotently seeds `school1`, `school2`, the minimal
-School 1 clubs/opportunities, and fake E2E users. It resets MFA factors only for
-the dedicated E2E admin accounts so Playwright can enroll and verify TOTP through
-the real UI on every run. It should only fail for
+School 1 clubs/opportunities, and confirmed-email fake E2E users. Every role uses the same
+email/password sign-in flow and no MFA factors are created or reset. It should only fail for
 missing staging schema/migration tables, not for missing seed rows.
 
 Mutating E2E specs must not run against production. Any E2E test that creates,
@@ -141,7 +140,7 @@ Additional E2E/security targets:
 
 `supabase/tests/database/rls.test.sql` runs against a fresh local database in CI.
 The pgTAP suite covers anonymous access, active and suspended students, teacher
-sponsors, school admins, super admins, MFA assurance levels, cross-school data,
+sponsors, school admins, super admins, confirmed-email sessions, cross-school data,
 public-form direct inserts, school email domains, and immutable audit history.
 
 Run locally:
