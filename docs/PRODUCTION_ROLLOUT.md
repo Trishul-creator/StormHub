@@ -111,15 +111,35 @@ using the service-role database client.
 
 ## 4. Enable Admin MFA
 
-1. In Supabase, open **Authentication > Multi-Factor Authentication**.
-2. Enable TOTP enrollment and TOTP verification.
-3. Deploy the application code before applying the hardening migration.
-4. Have every admin and super admin sign in and open `/auth/mfa`.
-5. Scan the QR code with an authenticator app, enter the six-digit code, and store recovery access
-   according to district policy.
-6. Confirm an AAL1 admin is redirected to `/auth/mfa` and an AAL2 admin can open `/admin`.
+Students and teachers use password sign-in plus the email confirmation already enabled in Supabase.
+Only admins and super admins are required to complete MFA. New administrator enrollment uses SMS;
+an administrator who already has a verified TOTP factor can continue using it.
+
+Phone MFA is a paid Supabase Advanced MFA feature and SMS delivery also incurs charges from the SMS
+provider. Confirm district approval for both costs before enabling it.
+
+1. Create a Twilio Messaging Service and attach a sending phone number that can send to every country
+   where an administrator may be located.
+2. In Supabase, open **Authentication > Providers > Phone** and select **Twilio** as the SMS provider.
+3. Enter the Twilio **Account SID**, **Auth Token**, and **Message Service SID**. These come from the
+   Twilio Console and Messaging Service; they are not the Resend SMTP credentials.
+4. Keep phone signup disabled. StormHub uses phone messaging only as an administrator second factor.
+5. In **Authentication > Multi-Factor Authentication**, enable Phone enrollment and Phone
+   verification. Keep TOTP enrollment and verification enabled during the transition so existing
+   administrators are not locked out.
+6. In Supabase Auth rate limits, keep SMS requests at no more than 10 per hour and the per-number
+   resend interval at 60 seconds or longer.
+7. In Vercel Production variables, set `NEXT_PUBLIC_ADMIN_MFA_METHOD=sms` and redeploy. Preview/staging
+   may use `NEXT_PUBLIC_ADMIN_MFA_METHOD=totp` so automated tests never send real SMS.
+8. Have each admin and super admin use an individual account, sign in, and open `/auth/mfa`. Enter a
+   mobile number in E.164 format, such as `+13125550198`, then verify the six-digit texted code.
+9. Confirm an AAL1 admin is redirected to `/auth/mfa`, an incorrect/expired code is rejected, resend is
+   throttled, and an AAL2 admin can open `/admin`.
+10. Test one real SMS on each supported carrier. Record the provider delivery log and the successful
+    AAL2 login as pilot evidence.
 
 Do not share one administrator account. Every administrator needs an individual account and factor.
+Do not disable TOTP until every existing administrator has enrolled and verified a phone factor.
 
 ## 5. Apply The Migration Chain
 

@@ -75,7 +75,9 @@ Public specs run without credentials. Authenticated specs skip unless env vars a
 The staging setup script idempotently seeds `school1`, `school2`, the minimal
 School 1 clubs/opportunities, and fake E2E users. It resets MFA factors only for
 the dedicated E2E admin accounts so Playwright can enroll and verify TOTP through
-the real UI on every run. It should only fail for
+the real UI on every run. Staging sets `NEXT_PUBLIC_ADMIN_MFA_METHOD=totp`; production uses
+`NEXT_PUBLIC_ADMIN_MFA_METHOD=sms`. Real SMS delivery is a manual pilot gate because CI must not
+send messages or depend on a carrier. It should only fail for
 missing staging schema/migration tables, not for missing seed rows.
 
 Mutating E2E specs must not run against production. Any E2E test that creates,

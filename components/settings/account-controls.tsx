@@ -31,7 +31,7 @@ export function AccountControls({ role }: { role: UserRole }) {
       </Button>
       {(role === "admin" || role === "super_admin") && (
         <Button variant="outline" asChild>
-          <Link href="/auth/mfa"><KeyRound className="h-4 w-4" /> Authenticator settings</Link>
+          <Link href="/auth/mfa"><KeyRound className="h-4 w-4" /> Sign-in verification</Link>
         </Button>
       )}
       <Button variant="outline" onClick={requestDeletion} disabled={pending}>

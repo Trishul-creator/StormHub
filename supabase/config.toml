@@ -198,7 +198,7 @@ password_requirements = "lower_upper_letters_digits"
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
 email_sent = 2
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
-sms_sent = 30
+sms_sent = 10
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
 anonymous_users = 30
 # Number of sessions that can be refreshed in a 5 minute interval per IP address.
@@ -262,7 +262,7 @@ enable_confirmations = false
 # Template for sending OTP to users
 template = "Your code is {{ `{{ .Code }}` }}"
 # Controls the minimum amount of time that must pass before sending another sms otp.
-max_frequency = "5s"
+max_frequency = "60s"
 
 # Use pre-defined map of phone number to OTP for testing.
 # [auth.sms.test_otp]
@@ -305,11 +305,11 @@ verify_enabled = true
 
 # Configure MFA via Phone Messaging
 [auth.mfa.phone]
-enroll_enabled = false
-verify_enabled = false
+enroll_enabled = true
+verify_enabled = true
 otp_length = 6
-template = "Your code is {{ `{{ .Code }}` }}"
-max_frequency = "5s"
+template = "Your StormHub administrator verification code is {{ `{{ .Code }}` }}"
+max_frequency = "60s"
 
 # Configure MFA via WebAuthn
 # [auth.mfa.web_authn]

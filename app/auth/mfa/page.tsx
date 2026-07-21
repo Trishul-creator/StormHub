@@ -13,7 +13,7 @@ export default async function MfaPage() {
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5" /> Admin verification</CardTitle>
-          <CardDescription>Use an authenticator app before opening privileged school or platform controls.</CardDescription>
+          <CardDescription>Verify by text message or an existing authenticator factor before opening privileged controls.</CardDescription>
         </CardHeader>
         <CardContent><MfaSetup /></CardContent>
       </Card>
