@@ -331,15 +331,6 @@ async function assertAuthUserReady(admin: { auth: SupabaseAdmin["auth"] }, userI
   }
 }
 
-async function resetDedicatedAdminFactors(admin: { auth: SupabaseAdmin["auth"] }, userId: string) {
-  const { data, error } = await admin.auth.admin.mfa.listFactors({ userId });
-  if (error) throw error;
-  for (const factor of data.factors) {
-    const { error: deleteError } = await admin.auth.admin.mfa.deleteFactor({ userId, id: factor.id });
-    if (deleteError) throw deleteError;
-  }
-}
-
 async function main() {
   assertSafeToMutate();
 
@@ -381,10 +372,6 @@ async function main() {
 
     if (!userId) throw new Error(`Could not create or find ${user.email}.`);
     await assertAuthUserReady(admin, userId, user.email);
-    if (user.role === "admin" || user.role === "super_admin") {
-      await resetDedicatedAdminFactors(admin, userId);
-    }
-
     const { error: profileError } = await admin.from("profiles").upsert({
       id: userId,
       email: user.email,

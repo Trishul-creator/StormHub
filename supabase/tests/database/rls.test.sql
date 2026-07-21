@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(31);
+SELECT plan(33);
 
 UPDATE public.schools
 SET allowed_email_domains = ARRAY['school-a.edu']
@@ -188,13 +188,17 @@ SELECT set_config(
   TRUE
 );
 SET LOCAL ROLE authenticated;
-SELECT is((SELECT count(*) FROM public.profiles), 1::BIGINT, 'AAL1 school admins have no administrative profile access');
-SELECT is((SELECT count(*) FROM public.account_deletion_requests), 0::BIGINT, 'AAL1 school admins cannot read deletion requests');
-SELECT throws_ok(
+SELECT ok(public.has_admin_mfa(), 'confirmed-email admin sessions pass the retired MFA compatibility gate');
+SELECT is((SELECT count(*) FROM public.profiles), 3::BIGINT, 'confirmed-email school admins can read users in their school only');
+SELECT is(
+  (SELECT count(*) FROM public.profiles WHERE school_id = 'b0000000-0000-4000-8000-000000000002'),
+  0::BIGINT,
+  'confirmed-email school admins still cannot read another school profiles'
+);
+SELECT is((SELECT count(*) FROM public.account_deletion_requests), 1::BIGINT, 'confirmed-email school admins can read same-school deletion requests');
+SELECT lives_ok(
   $$SELECT public.admin_set_account_status('10000000-0000-4000-8000-000000000001', 'suspended')$$,
-  'P0001',
-  'MFA-verified administrator access required',
-  'AAL1 admins cannot use privileged account RPCs'
+  'confirmed-email school admins can use authorized account RPCs'
 );
 RESET ROLE;
 
@@ -204,11 +208,11 @@ SELECT set_config(
   TRUE
 );
 SET LOCAL ROLE authenticated;
-SELECT is((SELECT count(*) FROM public.profiles), 3::BIGINT, 'AAL2 school admins can read users in their school only');
-SELECT is((SELECT count(*) FROM public.account_deletion_requests), 1::BIGINT, 'AAL2 school admins can read same-school deletion requests');
+SELECT is((SELECT count(*) FROM public.profiles), 3::BIGINT, 'higher-assurance school admin sessions retain same-school access');
+SELECT is((SELECT count(*) FROM public.account_deletion_requests), 1::BIGINT, 'higher-assurance school admin sessions retain deletion-request access');
 SELECT lives_ok(
   $$UPDATE public.account_deletion_requests SET status = 'rejected', reviewed_by = '30000000-0000-4000-8000-000000000001', reviewed_at = NOW() WHERE user_id = '10000000-0000-4000-8000-000000000001'$$,
-  'AAL2 school admins can review same-school deletion requests'
+  'school admins can review same-school deletion requests'
 );
 SELECT is(
   (SELECT count(*) FROM public.profiles WHERE school_id = 'b0000000-0000-4000-8000-000000000002'),
@@ -255,7 +259,7 @@ SELECT set_config(
   TRUE
 );
 SET LOCAL ROLE authenticated;
-SELECT is((SELECT count(*) FROM public.profiles), 1::BIGINT, 'AAL1 super admins have no platform-wide access');
+SELECT is((SELECT count(*) FROM public.profiles), 5::BIGINT, 'confirmed-email super admins can read profiles across schools');
 RESET ROLE;
 
 SELECT set_config(
@@ -264,7 +268,7 @@ SELECT set_config(
   TRUE
 );
 SET LOCAL ROLE authenticated;
-SELECT is((SELECT count(*) FROM public.profiles), 5::BIGINT, 'AAL2 super admins can read profiles across schools');
+SELECT is((SELECT count(*) FROM public.profiles), 5::BIGINT, 'higher-assurance super admin sessions retain platform-wide access');
 SELECT lives_ok(
   $$SELECT public.admin_set_account_status('10000000-0000-4000-8000-000000000002', 'suspended')$$,
   'super admins can manage users across schools'

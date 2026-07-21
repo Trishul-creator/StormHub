@@ -176,49 +176,15 @@ export async function requireAuth(redirectTo?: string): Promise<AuthContext & { 
   return auth as AuthContext & { userId: string; profile: Profile };
 }
 
-export async function getMfaAssuranceLevel(): Promise<{
-  currentLevel: "aal1" | "aal2" | null;
-  nextLevel: "aal1" | "aal2" | null;
-}> {
-  if (isDemoMode()) return { currentLevel: "aal2", nextLevel: "aal2" };
-  const supabase = await createClient();
-  if (!supabase) return { currentLevel: null, nextLevel: null };
-  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  return {
-    currentLevel: normalizeAal(data?.currentLevel),
-    nextLevel: normalizeAal(data?.nextLevel),
-  };
-}
-
-function normalizeAal(value: unknown): "aal1" | "aal2" | null {
-  if (value === "aal1") return "aal1";
-  if (value === "aal2") return "aal2";
-  return null;
-}
-
-async function requirePrivilegedMfa(profile: Profile, redirectTo: string): Promise<void> {
-  if (!isAdminRoleForMfa(profile.role) || isDemoMode()) return;
-  const assurance = await getMfaAssuranceLevel();
-  if (assurance.currentLevel !== "aal2") {
-    redirect(`/auth/mfa?redirect=${encodeURIComponent(redirectTo)}`);
-  }
-}
-
-function isAdminRoleForMfa(role: UserRole): boolean {
-  return role === "admin" || role === "super_admin";
-}
-
 export async function requireAdmin(): Promise<AuthContext & { userId: string; profile: Profile }> {
   const auth = await requireAuth("/admin");
   if (!canAccessAdmin(auth.profile)) redirect("/dashboard?error=admin_required");
-  await requirePrivilegedMfa(auth.profile, "/admin");
   return auth;
 }
 
 export async function requireManager(): Promise<AuthContext & { userId: string; profile: Profile }> {
   const auth = await requireAuth("/manage");
   if (!(await hasManagementAccess(auth.profile))) redirect("/dashboard?error=manager_required");
-  await requirePrivilegedMfa(auth.profile, "/manage");
   return auth;
 }
 
@@ -242,14 +208,12 @@ export async function hasManagementAccess(profile: Profile | null): Promise<bool
 export async function requireAnalyticsAccess(): Promise<AuthContext & { userId: string; profile: Profile }> {
   const auth = await requireAuth("/manage/analytics");
   if (!canAccessManageAnalytics(auth.profile)) redirect("/manage?error=admin_required");
-  await requirePrivilegedMfa(auth.profile, "/manage/analytics");
   return auth;
 }
 
 export async function requireApprover(): Promise<AuthContext & { userId: string; profile: Profile }> {
   const auth = await requireAuth("/manage/approvals");
   if (!canApproveContent(auth.profile)) redirect("/manage?error=approver_required");
-  await requirePrivilegedMfa(auth.profile, "/manage/approvals");
   return auth;
 }
 

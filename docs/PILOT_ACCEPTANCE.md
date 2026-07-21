@@ -28,8 +28,8 @@ On one district-managed Chromebook and one physical phone:
 
 ## Administrative Checks
 
-- AAL1 admin is redirected to MFA; SMS enrollment/challenge reaches AAL2 and an existing TOTP factor remains usable.
-- SMS resend is throttled, an invalid or expired code is rejected, and provider delivery logs contain no unexpected sends.
+- Unconfirmed accounts cannot sign in; confirmed student, teacher, admin, and super-admin accounts can sign in.
+- No role is asked for a phone number, SMS code, or authenticator code.
 - School admin cannot see or modify another school.
 - Super admin can explicitly select a school and can see platform audit/support views.
 - Suspend/reactivate a test student and confirm session/access behavior.

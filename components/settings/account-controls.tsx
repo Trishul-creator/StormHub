@@ -1,14 +1,12 @@
 "use client";
 
 import { useTransition } from "react";
-import Link from "next/link";
-import { Download, KeyRound, Loader2, Trash2 } from "lucide-react";
+import { Download, Loader2, Trash2 } from "lucide-react";
 import { requestAccountDeletion } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-import type { UserRole } from "@/types/database";
 
-export function AccountControls({ role }: { role: UserRole }) {
+export function AccountControls() {
   const [pending, startTransition] = useTransition();
 
   function requestDeletion() {
@@ -29,11 +27,6 @@ export function AccountControls({ role }: { role: UserRole }) {
       <Button variant="outline" asChild>
         <a href="/api/account/export"><Download className="h-4 w-4" /> Export my data</a>
       </Button>
-      {(role === "admin" || role === "super_admin") && (
-        <Button variant="outline" asChild>
-          <Link href="/auth/mfa"><KeyRound className="h-4 w-4" /> Sign-in verification</Link>
-        </Button>
-      )}
       <Button variant="outline" onClick={requestDeletion} disabled={pending}>
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
         Request account deletion
