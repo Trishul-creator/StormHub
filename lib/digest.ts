@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 type DigestSchool = { id: string; name: string; short_name?: string | null; slug: string };
 type DigestEvent = { title: string; starts_at: string; location?: string | null };
-type DigestOpportunity = { title: string; deadline?: string | null; slug: string };
+type DigestOpportunity = { title: string; deadline?: string | null; event_date?: string | null; slug: string };
 type DigestAnnouncement = { title: string; created_at?: string | null };
 type DigestClub = { name: string; slug: string };
 
@@ -37,10 +37,12 @@ export function buildWeeklyDigestBody(content: DigestContent): string {
       return `${event.title} - ${date}${event.location ? ` at ${event.location}` : ""}`;
     })),
     section("Opportunities and deadlines", content.opportunities.map((opportunity) => {
-      const deadline = opportunity.deadline
-        ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "America/Chicago" }).format(new Date(opportunity.deadline))
-        : "No deadline listed";
-      return `${opportunity.title} - ${deadline}\nOpen in StormHub: ${siteUrl}/s/${content.school.slug}/opportunities`;
+      const dateFormatter = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "America/Chicago" });
+      const dates = [
+        opportunity.event_date ? `Date: ${dateFormatter.format(new Date(opportunity.event_date))}` : null,
+        opportunity.deadline ? `Deadline: ${dateFormatter.format(new Date(opportunity.deadline))}` : null,
+      ].filter(Boolean);
+      return `${opportunity.title} - ${dates.length > 0 ? dates.join(" · ") : "No date listed"}\nOpen in StormHub: ${siteUrl}/s/${content.school.slug}/opportunities`;
     })),
     section("Recent announcements", content.announcements.map((announcement) => announcement.title)),
     section("Featured clubs", content.clubs.map((club) => `${club.name}\nOpen in StormHub: ${siteUrl}/s/${content.school.slug}/clubs/${club.slug}`)),
@@ -144,7 +146,7 @@ async function loadDigestContent(schoolId: string, now: Date): Promise<DigestCon
   const [school, events, opportunities, announcements, clubs] = await Promise.all([
     admin.from("schools").select("id,name,short_name,slug").eq("id", schoolId).single(),
     admin.from("events").select("title,starts_at,location").eq("school_id", schoolId).eq("status", "approved").eq("visibility", "public").gte("starts_at", nowIso).lte("starts_at", futureIso).order("starts_at").limit(8),
-    admin.from("opportunities").select("title,deadline,slug").eq("school_id", schoolId).eq("status", "approved").eq("visibility", "public").or(`deadline.is.null,deadline.gte.${nowIso}`).order("deadline").limit(8),
+    admin.from("opportunities").select("title,deadline,event_date,slug").eq("school_id", schoolId).eq("status", "approved").eq("visibility", "public").or(`deadline.is.null,deadline.gte.${nowIso}`).order("deadline").limit(8),
     admin.from("club_announcements").select("title,created_at,clubs!inner(school_id)").eq("clubs.school_id", schoolId).eq("status", "approved").eq("visibility", "public").gte("created_at", recentIso).order("created_at", { ascending: false }).limit(8),
     admin.from("clubs").select("name,slug").eq("school_id", schoolId).eq("is_featured", true).eq("is_listed", true).in("status", ["interest_open", "active"]).limit(6),
   ]);

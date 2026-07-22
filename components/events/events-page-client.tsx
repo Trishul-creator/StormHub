@@ -30,12 +30,12 @@ import { Button } from "@/components/ui/button";
 import { EventCard } from "@/components/events/event-card";
 import { EventTypeBadge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
-import type { Event } from "@/types/database";
+import type { Event, Opportunity } from "@/types/database";
 import { EVENT_TYPES } from "@/lib/utils";
 
 interface EventsPageClientProps {
   events: Event[];
-  deadlines: Event[];
+  opportunities: Opportunity[];
   isLoggedIn: boolean;
   rsvpIds: string[];
   userClubIds: string[];
@@ -44,6 +44,20 @@ interface EventsPageClientProps {
 
 type SourceFilter = "all" | "clubs" | "school";
 type View = "calendar" | "agenda";
+type CalendarItem = {
+  id: string;
+  kind: "event" | "opportunity";
+  title: string;
+  starts_at: string;
+  event_type: Event["event_type"];
+  href: string;
+  dateLabel?: "Opportunity" | "Deadline";
+  description?: string | null;
+  location?: string | null;
+  club_id?: string | null;
+  club?: Event["club"];
+  event?: Event;
+};
 
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -59,34 +73,34 @@ const eventColors: Record<string, string> = {
 };
 
 function CalendarEvent({
-  event,
+  item,
   hasRsvp = false,
   compact = false,
 }: {
-  event: Event;
+  item: CalendarItem;
   hasRsvp?: boolean;
   compact?: boolean;
 }) {
   return (
     <Link
-      href={`/events/${event.id}`}
-      title={`${format(parseISO(event.starts_at), "h:mm a")} — ${event.title}`}
+      href={item.href}
+      title={`${format(parseISO(item.starts_at), "h:mm a")} — ${item.title}`}
       className={cn(
         "block truncate rounded-md border px-1.5 py-1 text-[11px] font-medium leading-tight transition hover:-translate-y-px hover:shadow-sm",
-        eventColors[event.event_type] ?? eventColors.other,
+        eventColors[item.event_type] ?? eventColors.other,
         hasRsvp && "border-green-300 bg-green-100 text-green-900 ring-1 ring-green-400",
         compact && "px-1 py-0.5 text-[10px]"
       )}
     >
-      <span className="mr-1">{format(parseISO(event.starts_at), "h:mm")}</span>
-      {event.title}
+      <span className="mr-1">{format(parseISO(item.starts_at), "h:mm")}</span>
+      {item.title}
     </Link>
   );
 }
 
 export function EventsPageClient({
   events,
-  deadlines,
+  opportunities,
   isLoggedIn,
   rsvpIds,
   userClubIds,
@@ -101,16 +115,59 @@ export function EventsPageClient({
   const clubIdSet = useMemo(() => new Set(userClubIds), [userClubIds]);
   const rsvpSet = useMemo(() => new Set(rsvpIds), [rsvpIds]);
 
+  const calendarItems = useMemo<CalendarItem[]>(() => [
+    ...events.map((event) => ({
+      id: event.id,
+      kind: "event" as const,
+      title: event.title,
+      starts_at: event.starts_at,
+      event_type: event.event_type,
+      href: `/events/${event.id}`,
+      description: event.description,
+      location: event.location,
+      club_id: event.club_id,
+      club: event.club,
+      event,
+    })),
+    ...opportunities.flatMap((opportunity): CalendarItem[] => {
+      const shared = {
+        kind: "opportunity" as const,
+        href: `/opportunities/${opportunity.slug}`,
+        description: opportunity.summary,
+        club_id: opportunity.club_id,
+      };
+      return [
+        ...(opportunity.event_date ? [{
+          ...shared,
+          id: `opportunity-${opportunity.id}-date`,
+          title: opportunity.title,
+          starts_at: opportunity.event_date,
+          event_type: "other" as const,
+          dateLabel: "Opportunity" as const,
+          location: opportunity.location,
+        }] : []),
+        ...(opportunity.deadline ? [{
+          ...shared,
+          id: `opportunity-${opportunity.id}-deadline`,
+          title: `${opportunity.title} deadline`,
+          starts_at: opportunity.deadline,
+          event_type: "deadline" as const,
+          dateLabel: "Deadline" as const,
+        }] : []),
+      ];
+    }),
+  ], [events, opportunities]);
+
   const filtered = useMemo(
     () =>
-      events.filter((event) => {
-        if (typeFilter && event.event_type !== typeFilter) return false;
-        const isMyClubEvent = Boolean(event.club_id && clubIdSet.has(event.club_id));
+      calendarItems.filter((item) => {
+        if (typeFilter && item.event_type !== typeFilter) return false;
+        const isMyClubEvent = Boolean(item.club_id && clubIdSet.has(item.club_id));
         if (sourceFilter === "clubs" && !isMyClubEvent) return false;
-        if (sourceFilter === "school" && event.club_id) return false;
+        if (sourceFilter === "school" && item.club_id) return false;
         return true;
       }),
-    [clubIdSet, events, sourceFilter, typeFilter]
+    [calendarItems, clubIdSet, sourceFilter, typeFilter]
   );
 
   const calendarDays = eachDayOfInterval({
@@ -118,14 +175,15 @@ export function EventsPageClient({
     end: endOfWeek(endOfMonth(visibleMonth)),
   });
 
-  const selectedEvents = filtered.filter((event) =>
-    isSameDay(parseISO(event.starts_at), selectedDay)
+  const selectedEvents = filtered.filter((item) =>
+    isSameDay(parseISO(item.starts_at), selectedDay)
   );
-  const monthEvents = filtered.filter((event) =>
-    isSameMonth(parseISO(event.starts_at), visibleMonth)
+  const monthEvents = filtered.filter((item) =>
+    isSameMonth(parseISO(item.starts_at), visibleMonth)
   );
-  const upcomingDeadlines = deadlines
-    .filter((event) => parseISO(event.starts_at) >= new Date())
+  const upcomingDeadlines = calendarItems
+    .filter((item) => item.event_type === "deadline" && parseISO(item.starts_at) >= new Date())
+    .sort((a, b) => parseISO(a.starts_at).getTime() - parseISO(b.starts_at).getTime())
     .slice(0, 3);
 
   function changeMonth(nextMonth: Date) {
@@ -262,16 +320,16 @@ export function EventsPageClient({
             </div>
             <div className="grid grid-cols-7">
               {calendarDays.map((day) => {
-                const dayEvents = filtered.filter((event) =>
-                  isSameDay(parseISO(event.starts_at), day)
+                const dayEvents = filtered.filter((item) =>
+                  isSameDay(parseISO(item.starts_at), day)
                 );
                 const selected = isSameDay(day, selectedDay);
-                const hasRsvpEvent = dayEvents.some((event) => rsvpSet.has(event.id));
+                const hasRsvpEvent = dayEvents.some((item) => item.kind === "event" && rsvpSet.has(item.id));
                 return (
                   <div
                     key={day.toISOString()}
                     className={cn(
-                      "min-h-24 border-b border-r p-1.5 text-left align-top transition hover:bg-storm-light/30 sm:min-h-32 sm:p-2",
+                      "relative min-h-24 border-b border-r p-1.5 text-left align-top transition hover:bg-storm-light/30 sm:min-h-32 sm:p-2",
                       !isSameMonth(day, visibleMonth) && "bg-slate-50/70 text-muted-foreground",
                       hasRsvpEvent && "bg-green-50/70",
                       selected && "bg-blue-50/70 ring-2 ring-inset ring-storm-electric/40"
@@ -283,25 +341,28 @@ export function EventsPageClient({
                       aria-label={`Show events for ${format(day, "MMMM d, yyyy")}`}
                       aria-pressed={selected}
                       aria-current={isToday(day) ? "date" : undefined}
+                      className="absolute inset-0 z-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-storm-electric"
+                    />
+                    <div
                       className={cn(
-                        "mb-1.5 flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold",
+                        "pointer-events-none relative z-10 mb-1.5 flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold",
                         isToday(day) && "bg-storm-electric text-white",
                         selected && !isToday(day) && "bg-storm-navy text-white"
                       )}
                     >
                       {format(day, "d")}
-                    </button>
-                    <div className="space-y-1">
-                      {dayEvents.slice(0, 3).map((event) => (
+                    </div>
+                    <div className="relative z-10 space-y-1">
+                      {dayEvents.slice(0, 3).map((item) => (
                         <CalendarEvent
-                          key={event.id}
-                          event={event}
-                          hasRsvp={rsvpSet.has(event.id)}
+                          key={item.id}
+                          item={item}
+                          hasRsvp={item.kind === "event" && rsvpSet.has(item.id)}
                           compact={calendarDays.length > 35}
                         />
                       ))}
                       {dayEvents.length > 3 && (
-                        <div className="px-1 text-[10px] font-medium text-muted-foreground">
+                        <div className="pointer-events-none px-1 text-[10px] font-medium text-muted-foreground">
                           +{dayEvents.length - 3} more
                         </div>
                       )}
@@ -335,40 +396,51 @@ export function EventsPageClient({
                     Nothing scheduled for this day.
                   </div>
                 ) : (
-                  selectedEvents.map((event) => {
+                  selectedEvents.map((item) => {
                     const isMyClub = Boolean(
-                      event.club_id && clubIdSet.has(event.club_id)
+                      item.club_id && clubIdSet.has(item.club_id)
                     );
                     return (
                       <Link
-                        key={event.id}
-                        href={`/events/${event.id}`}
+                        key={item.id}
+                        href={item.href}
                         className="block rounded-xl border p-3 transition hover:border-storm-electric/40 hover:shadow-sm"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-sm font-semibold text-storm-navy">
-                            {event.title}
+                            {item.title}
                           </p>
-                          <EventTypeBadge type={event.event_type} />
+                          {item.dateLabel ? (
+                            <span className={cn(
+                              "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium",
+                              item.dateLabel === "Deadline"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-slate-100 text-slate-800"
+                            )}>
+                              {item.dateLabel}
+                            </span>
+                          ) : (
+                            <EventTypeBadge type={item.event_type} />
+                          )}
                         </div>
                         <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                           <p className="flex items-center gap-1.5">
                             <Clock3 className="h-3.5 w-3.5" />
-                            {format(parseISO(event.starts_at), "h:mm a")}
+                            {format(parseISO(item.starts_at), "h:mm a")}
                           </p>
-                          {event.location && (
+                          {item.location && (
                             <p className="flex items-center gap-1.5">
                               <MapPin className="h-3.5 w-3.5" />
-                              {event.location}
+                              {item.location}
                             </p>
                           )}
                           <p className="flex items-center gap-1.5">
-                            {event.club ? (
+                            {item.club ? (
                               <Users className="h-3.5 w-3.5" />
                             ) : (
                               <School className="h-3.5 w-3.5" />
                             )}
-                            {event.club?.name ?? "School-wide"}
+                            {item.club?.name ?? (item.kind === "opportunity" ? "Opportunity" : "School-wide")}
                             {isMyClub && " · Your club"}
                           </p>
                         </div>
@@ -386,7 +458,7 @@ export function EventsPageClient({
                   {upcomingDeadlines.map((deadline) => (
                     <Link
                       key={deadline.id}
-                      href={`/events/${deadline.id}`}
+                      href={deadline.href}
                       className="block text-sm text-amber-900 hover:underline"
                     >
                       <span className="font-medium">{deadline.title}</span>
@@ -408,10 +480,10 @@ export function EventsPageClient({
             </div>
           ) : (
             Array.from(
-              new Set(monthEvents.map((event) => format(parseISO(event.starts_at), "yyyy-MM-dd")))
+              new Set(monthEvents.map((item) => format(parseISO(item.starts_at), "yyyy-MM-dd")))
             ).map((dateKey) => {
               const dayEvents = monthEvents.filter(
-                (event) => format(parseISO(event.starts_at), "yyyy-MM-dd") === dateKey
+                (item) => format(parseISO(item.starts_at), "yyyy-MM-dd") === dateKey
               );
               return (
                 <section key={dateKey}>
@@ -429,15 +501,50 @@ export function EventsPageClient({
                     </h3>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {dayEvents.map((event) => (
-                      <EventCard
-                        key={event.id}
-                        event={event}
-                        isLoggedIn={isLoggedIn}
-                        hasRsvp={rsvpSet.has(event.id)}
-                        canParticipate={canParticipate}
-                      />
-                    ))}
+                    {dayEvents.map((item) => item.event ? (
+                        <EventCard
+                          key={item.id}
+                          event={item.event}
+                          isLoggedIn={isLoggedIn}
+                          hasRsvp={rsvpSet.has(item.id)}
+                          canParticipate={canParticipate}
+                        />
+                      ) : (
+                        <Link
+                          key={item.id}
+                          href={item.href}
+                          className="rounded-xl border bg-white p-5 transition hover:border-storm-electric/40 hover:shadow-md"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <h4 className="font-semibold text-storm-navy">{item.title}</h4>
+                            <span className={cn(
+                              "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium",
+                              item.dateLabel === "Deadline"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-slate-100 text-slate-800"
+                            )}>
+                              {item.dateLabel}
+                            </span>
+                          </div>
+                          {item.description && (
+                            <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                              {item.description}
+                            </p>
+                          )}
+                          <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                            <p className="flex items-center gap-1.5">
+                              <Clock3 className="h-3.5 w-3.5" />
+                              {format(parseISO(item.starts_at), "h:mm a")}
+                            </p>
+                            {item.location && (
+                              <p className="flex items-center gap-1.5">
+                                <MapPin className="h-3.5 w-3.5" />
+                                {item.location}
+                              </p>
+                            )}
+                          </div>
+                        </Link>
+                      ))}
                   </div>
                 </section>
               );
