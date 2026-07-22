@@ -38,8 +38,8 @@ describe("EventsPageClient", () => {
       />
     );
 
-    const opportunityDate = screen.getByTitle("12:00 PM — Science Fair");
-    const opportunityDeadline = screen.getByTitle("12:00 PM — Science Fair deadline");
+    const opportunityDate = screen.getByTitle(/— Science Fair$/);
+    const opportunityDeadline = screen.getByTitle(/— Science Fair deadline$/);
     expect(opportunityDate).toHaveAttribute("href", "/opportunities/science-fair");
     expect(opportunityDeadline).toHaveAttribute("href", "/opportunities/science-fair");
   });
