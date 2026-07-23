@@ -21,7 +21,13 @@ export function DigestPreview({ opportunities, events, clubs, announcements, sch
 Generated: ${formatDate(new Date())}
 
 📌 NEW OPPORTUNITIES
-${opportunities.slice(0, 5).map((o) => `• ${o.title}${o.deadline ? ` (Deadline: ${formatDate(o.deadline)})` : ""}`).join("\n")}
+${opportunities.slice(0, 5).map((opportunity) => {
+    const dates = [
+      opportunity.event_date ? `Date: ${formatDate(opportunity.event_date)}` : null,
+      opportunity.deadline ? `Deadline: ${formatDate(opportunity.deadline)}` : null,
+    ].filter(Boolean);
+    return `• ${opportunity.title}${dates.length > 0 ? ` (${dates.join(" · ")})` : ""}`;
+  }).join("\n")}
 
 📣 CLUB ANNOUNCEMENTS
 ${announcements.slice(0, 5).map((a) => `• ${a.club?.name ? `${a.club.name}: ` : ""}${a.title}`).join("\n")}

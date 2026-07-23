@@ -59,9 +59,9 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-lg font-semibold text-storm-navy mb-2">Your rights</h2>
           <p>
-            You can export your account data or submit a deletion request from Settings. School administrators
-            review deletion requests according to district retention requirements. Operational audit records may
-            be retained after account deletion when required for security and accountability.
+            You can export your account data from Settings. Contact your school administrator with account
+            lifecycle or deletion questions. Operational audit records may be retained after account deletion
+            when required for security and accountability.
           </p>
         </section>
 
