@@ -1,6 +1,7 @@
 import type {
   Club,
   ClubAnnouncement,
+  ClubAssignment,
   ClubResource,
   Event,
   Opportunity,
@@ -501,6 +502,39 @@ export const demoAnnouncements: ClubAnnouncement[] = [
     visibility: "members",
     status: "approved",
     published_at: daysFromNow(-3),
+  },
+];
+
+export const demoAssignments: ClubAssignment[] = [
+  {
+    id: "ca000001-0000-4000-8000-000000000001",
+    club_id: "c0000001-0000-4000-8000-000000000001",
+    author_id: "demo-teacher",
+    title: "Science Bowl practice set",
+    instructions:
+      "Complete the linked practice set and submit a short note describing the two topics you want to review at our next meeting.",
+    due_at: daysFromNow(4, 16),
+    points_possible: 20,
+    attachment_url: "https://science.osti.gov/wdts/nsb/Regional-Competitions/Resources/HS-Sample-Questions",
+    status: "published",
+    published_at: daysFromNow(-1),
+    created_at: daysFromNow(-1),
+    updated_at: daysFromNow(-1),
+  },
+  {
+    id: "ca000001-0000-4000-8000-000000000002",
+    club_id: "c0000001-0000-4000-8000-000000000002",
+    author_id: "demo-teacher",
+    title: "Weekly problem reflection",
+    instructions:
+      "Choose one problem from this week's set. Share your solution link and explain the key idea you used.",
+    due_at: daysFromNow(7, 16),
+    points_possible: 10,
+    attachment_url: null,
+    status: "published",
+    published_at: daysFromNow(-2),
+    created_at: daysFromNow(-2),
+    updated_at: daysFromNow(-2),
   },
 ];
 

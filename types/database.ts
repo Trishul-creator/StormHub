@@ -18,6 +18,8 @@ export type ContentStatus =
 export type Visibility = "public" | "members" | "officers" | "private" | "unlisted";
 
 export type MembershipStatus = "pending" | "active" | "rejected" | "left";
+export type AssignmentStatus = "draft" | "published" | "closed" | "archived";
+export type AssignmentSubmissionStatus = "draft" | "submitted" | "returned";
 
 export type MembershipRole =
   | "member"
@@ -42,6 +44,8 @@ export type NotificationType =
   | "club_event_created"
   | "club_event_updated"
   | "club_event_canceled"
+  | "club_assignment_created"
+  | "club_assignment_graded"
   | "club_opportunity_created"
   | "opportunity_deadline_soon"
   | "approval_needed"
@@ -157,6 +161,49 @@ export interface ClubResource {
   status: ContentStatus;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface ClubAssignment {
+  id: string;
+  club_id: string;
+  author_id?: string | null;
+  title: string;
+  instructions: string;
+  due_at?: string | null;
+  points_possible: number;
+  attachment_url?: string | null;
+  status: AssignmentStatus;
+  published_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  submission?: ClubAssignmentSubmission | null;
+  submission_count?: number;
+  returned_count?: number;
+}
+
+export interface ClubAssignmentSubmission {
+  id: string;
+  assignment_id: string;
+  student_id: string;
+  submission_text?: string | null;
+  attachment_url?: string | null;
+  status: AssignmentSubmissionStatus;
+  submitted_at?: string | null;
+  grade_points?: number | null;
+  feedback?: string | null;
+  graded_by?: string | null;
+  graded_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  student?: Pick<Profile, "id" | "full_name" | "avatar_url"> | null;
+}
+
+export interface ClubMemberDirectoryEntry {
+  user_id: string;
+  full_name: string;
+  avatar_url?: string | null;
+  membership_role: MembershipRole;
+  joined_at?: string | null;
 }
 
 export interface Opportunity {
@@ -366,6 +413,7 @@ export interface AnalyticsSummary {
 export interface StudentDashboard {
   memberships: ClubMembership[];
   upcomingEvents: Event[];
+  upcomingAssignments: (ClubAssignment & { club?: Club })[];
   savedOpportunities: Opportunity[];
   recommendedOpportunities: Opportunity[];
   recentAnnouncements: (ClubAnnouncement & { club?: Club })[];

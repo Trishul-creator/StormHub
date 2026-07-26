@@ -161,6 +161,19 @@ export function canManageClubRoster(
   return user.role === "teacher" && canManageClub(user, club, membership);
 }
 
+export function canManageClubCoursework(
+  user: Profile | null,
+  club: Club | string,
+  membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
+): boolean {
+  if (!user) return false;
+  if (user.role === "super_admin") return true;
+  if (user.role === "admin") {
+    return typeof club !== "string" && !!user.school_id && user.school_id === club.school_id;
+  }
+  return user.role === "teacher" && canManageClub(user, club, membership);
+}
+
 export function canCreateOpportunity(user: Profile | null): boolean {
   return canAccessAdmin(user);
 }

@@ -7,6 +7,7 @@ import {
   demoEvents,
   demoOpportunities,
   demoAnnouncements,
+  demoAssignments,
   demoMemberResources,
   demoWorkshops,
   attachClubToItems,
@@ -15,6 +16,9 @@ import {
 import type {
   Club,
   ClubAnnouncement,
+  ClubAssignment,
+  ClubAssignmentSubmission,
+  ClubMemberDirectoryEntry,
   ClubMembership,
   ClubResource,
   Event,
@@ -194,8 +198,19 @@ export async function getUserClubMembership(
 ): Promise<ClubMembership | null> {
   if (!userId) return null;
   if (isDemoMode()) {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const raw = cookieStore.get("stormhub_demo_memberships")?.value;
+    let joinedSlugs = demoState.memberships;
+    if (raw) {
+      try {
+        joinedSlugs = new Set(JSON.parse(raw) as string[]);
+      } catch {
+        joinedSlugs = new Set();
+      }
+    }
     const club = demoClubs.find((c) => c.id === clubId);
-    if (club && demoState.memberships.has(club.slug)) {
+    if (club && joinedSlugs.has(club.slug)) {
       return {
         id: `demo-membership-${clubId}`,
         club_id: clubId,
@@ -284,6 +299,165 @@ export async function getClubManagedContent(
     return [];
   }
   return (data as Array<ClubAnnouncement | ClubResource | Event>) ?? [];
+}
+
+function normalizeAssignment(row: ClubAssignment): ClubAssignment {
+  return {
+    ...row,
+    points_possible: Number(row.points_possible),
+    submission: row.submission
+      ? {
+          ...row.submission,
+          grade_points:
+            row.submission.grade_points === null || row.submission.grade_points === undefined
+              ? null
+              : Number(row.submission.grade_points),
+        }
+      : row.submission,
+  };
+}
+
+export async function getClubAssignments(
+  clubId: string,
+  options: { userId?: string | null; includeArchived?: boolean } = {}
+): Promise<ClubAssignment[]> {
+  if (isDemoMode()) {
+    return demoAssignments
+      .filter((assignment) => assignment.club_id === clubId)
+      .filter((assignment) => options.includeArchived || assignment.status !== "archived")
+      .map(normalizeAssignment);
+  }
+
+  const supabase = await createClient();
+  if (!supabase) return [];
+
+  let query = supabase
+    .from("club_assignments")
+    .select("*")
+    .eq("club_id", clubId);
+  if (!options.includeArchived) query = query.neq("status", "archived");
+
+  const { data, error } = await query
+    .order("due_at", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("[getClubAssignments]", error.message);
+    return [];
+  }
+
+  const assignments = ((data as ClubAssignment[]) ?? []).map(normalizeAssignment);
+  if (!options.userId || assignments.length === 0) return assignments;
+
+  const { data: submissions, error: submissionError } = await supabase
+    .from("club_assignment_submissions")
+    .select("*")
+    .eq("student_id", options.userId)
+    .in("assignment_id", assignments.map((assignment) => assignment.id));
+  if (submissionError) {
+    console.error("[getClubAssignments submissions]", submissionError.message);
+    return assignments;
+  }
+
+  const submissionMap = new Map(
+    ((submissions as ClubAssignmentSubmission[]) ?? []).map((submission) => [
+      submission.assignment_id,
+      submission,
+    ])
+  );
+  return assignments.map((assignment) =>
+    normalizeAssignment({ ...assignment, submission: submissionMap.get(assignment.id) ?? null })
+  );
+}
+
+export async function getClubAssignment(
+  assignmentId: string,
+  userId?: string | null
+): Promise<ClubAssignment | null> {
+  if (isDemoMode()) {
+    const assignment = demoAssignments.find((item) => item.id === assignmentId);
+    return assignment ? normalizeAssignment(assignment) : null;
+  }
+
+  const supabase = await createClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("club_assignments")
+    .select("*")
+    .eq("id", assignmentId)
+    .maybeSingle();
+  if (error || !data) {
+    if (error) console.error("[getClubAssignment]", error.message);
+    return null;
+  }
+
+  const assignment = normalizeAssignment(data as ClubAssignment);
+  if (!userId) return assignment;
+
+  const { data: submission } = await supabase
+    .from("club_assignment_submissions")
+    .select("*")
+    .eq("assignment_id", assignmentId)
+    .eq("student_id", userId)
+    .maybeSingle();
+  return normalizeAssignment({
+    ...assignment,
+    submission: (submission as ClubAssignmentSubmission | null) ?? null,
+  });
+}
+
+export async function getClubAssignmentSubmissions(
+  assignmentId: string
+): Promise<ClubAssignmentSubmission[]> {
+  if (isDemoMode()) return [];
+  const supabase = await createClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("club_assignment_submissions")
+    .select("*, student:profiles!club_assignment_submissions_student_id_fkey(id,full_name,avatar_url)")
+    .eq("assignment_id", assignmentId)
+    .order("submitted_at", { ascending: false, nullsFirst: false });
+  if (error) {
+    console.error("[getClubAssignmentSubmissions]", error.message);
+    return [];
+  }
+  return ((data as ClubAssignmentSubmission[]) ?? []).map((submission) => ({
+    ...submission,
+    grade_points:
+      submission.grade_points === null || submission.grade_points === undefined
+        ? null
+        : Number(submission.grade_points),
+  }));
+}
+
+export async function getClubMemberDirectory(clubId: string): Promise<ClubMemberDirectoryEntry[]> {
+  if (isDemoMode()) {
+    return [
+      {
+        user_id: "demo-teacher",
+        full_name: "Club Sponsor",
+        avatar_url: null,
+        membership_role: "sponsor",
+        joined_at: new Date().toISOString(),
+      },
+      {
+        user_id: "demo-student",
+        full_name: "Demo Student",
+        avatar_url: null,
+        membership_role: "member",
+        joined_at: new Date().toISOString(),
+      },
+    ];
+  }
+  const supabase = await createClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("get_club_member_directory", {
+    club_uuid: clubId,
+  });
+  if (error) {
+    console.error("[getClubMemberDirectory]", error.message);
+    return [];
+  }
+  return (data as ClubMemberDirectoryEntry[]) ?? [];
 }
 
 export async function getRecentAnnouncements(
@@ -700,6 +874,7 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
     return {
       memberships: [],
       upcomingEvents: [],
+      upcomingAssignments: [],
       savedOpportunities: [],
       recommendedOpportunities: [],
       recentAnnouncements: [],
@@ -765,10 +940,18 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
         club: demoClubs.find((c) => c.id === a.club_id),
       }))
       .slice(0, 5);
+    const upcomingAssignments = demoAssignments
+      .filter((assignment) => clubIds.includes(assignment.club_id))
+      .map((assignment) => ({
+        ...assignment,
+        club: demoClubs.find((club) => club.id === assignment.club_id),
+      }))
+      .slice(0, 5);
 
     return {
       memberships,
       upcomingEvents,
+      upcomingAssignments,
       savedOpportunities,
       recommendedOpportunities,
       recentAnnouncements,
@@ -780,6 +963,7 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
     return {
       memberships: [],
       upcomingEvents: [],
+      upcomingAssignments: [],
       savedOpportunities: [],
       recommendedOpportunities: [],
       recentAnnouncements: [],
@@ -873,9 +1057,40 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
     recentAnnouncements = (announcements as (ClubAnnouncement & { club?: Club })[]) ?? [];
   }
 
+  let upcomingAssignments: (ClubAssignment & { club?: Club })[] = [];
+  if (clubIds.length > 0) {
+    const { data: assignmentRows } = await supabase
+      .from("club_assignments")
+      .select("*, club:clubs(*)")
+      .in("club_id", clubIds)
+      .eq("status", "published")
+      .order("due_at", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(10);
+    const assignments = ((assignmentRows as (ClubAssignment & { club?: Club })[]) ?? [])
+      .map((assignment) => normalizeAssignment(assignment));
+    if (assignments.length > 0) {
+      const { data: submissionRows } = await supabase
+        .from("club_assignment_submissions")
+        .select("*")
+        .eq("student_id", userId)
+        .in("assignment_id", assignments.map((assignment) => assignment.id));
+      const submissionMap = new Map(
+        ((submissionRows as ClubAssignmentSubmission[]) ?? []).map((submission) => [
+          submission.assignment_id,
+          submission,
+        ])
+      );
+      upcomingAssignments = assignments.map((assignment) =>
+        normalizeAssignment({ ...assignment, submission: submissionMap.get(assignment.id) ?? null })
+      );
+    }
+  }
+
   return {
     memberships: schoolMemberships,
     upcomingEvents,
+    upcomingAssignments,
     savedOpportunities,
     recommendedOpportunities,
     recentAnnouncements,
@@ -944,10 +1159,14 @@ export async function getMemberClubData(slug: string, userId: string | null, clu
   const club = clubOverride ?? await getClubBySlug(slug);
   if (!club) return null;
   const membership = await getUserClubMembership(userId, club.id);
-  const announcements = await getClubAnnouncements(club.id, "members");
-  const resources = await getClubResourcesByClubId(club.id);
-  const events = await getClubEvents(club.id, true);
-  return { club, membership, announcements, resources, events };
+  const [announcements, resources, events, assignments, directory] = await Promise.all([
+    getClubAnnouncements(club.id, "members"),
+    getClubResourcesByClubId(club.id),
+    getClubEvents(club.id, true),
+    getClubAssignments(club.id, { userId }),
+    getClubMemberDirectory(club.id),
+  ]);
+  return { club, membership, announcements, resources, events, assignments, directory };
 }
 
 export async function trackAnalytics(

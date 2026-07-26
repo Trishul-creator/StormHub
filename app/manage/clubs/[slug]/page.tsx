@@ -2,12 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { getManagedClubBySlug, getClubManagedContent, getClubMemberCount } from "@/lib/data";
+import { getManagedClubBySlug, getClubAssignments, getClubManagedContent, getClubMemberCount } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
 import { getSchoolById } from "@/lib/schools";
-import { Users, Megaphone, Calendar, FileText, Pencil, Eye, ArrowRight } from "lucide-react";
+import { Users, Megaphone, Calendar, FileText, Pencil, Eye, ArrowRight, ClipboardList } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import type { ClubAnnouncement, ClubResource, Event } from "@/types/database";
+import { canManageClubCoursework } from "@/lib/permissions";
 
 interface ManageClubPageProps {
   params: Promise<{ slug: string }>;
@@ -17,13 +18,15 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
   const { slug } = await params;
   const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
-  await requireClubManager(club);
-  const [school, memberCount, announcements, events, resources] = await Promise.all([
+  const { profile, membership } = await requireClubManager(club);
+  const canManageCoursework = canManageClubCoursework(profile, club, membership);
+  const [school, memberCount, announcements, events, resources, assignments] = await Promise.all([
     getSchoolById(club.school_id),
     getClubMemberCount(club.id),
     getClubManagedContent(club.id, "announcement") as Promise<ClubAnnouncement[]>,
     getClubManagedContent(club.id, "event") as Promise<Event[]>,
     getClubManagedContent(club.id, "resource") as Promise<ClubResource[]>,
+    canManageCoursework ? getClubAssignments(club.id) : Promise.resolve([]),
   ]);
   const publicHref = school ? `/s/${school.slug}/clubs/${club.slug}` : `/clubs/${club.slug}`;
   const isPubliclyVisible =
@@ -33,7 +36,10 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
 
   const links = [
     { href: `/manage/clubs/${slug}/edit`, icon: Pencil, label: "Edit profile" },
-    { href: `/manage/clubs/${slug}/announcements`, icon: Megaphone, label: "Create Announcement" },
+    { href: `/manage/clubs/${slug}/announcements`, icon: Megaphone, label: "Create club post" },
+    ...(canManageCoursework
+      ? [{ href: `/manage/clubs/${slug}/coursework`, icon: ClipboardList, label: "Coursework & grading" }]
+      : []),
     { href: `/manage/clubs/${slug}/events`, icon: Calendar, label: "Create Event" },
     { href: `/manage/clubs/${slug}/resources`, icon: FileText, label: "Create Resource" },
     { href: `/manage/clubs/${slug}/members`, icon: Users, label: "Members" },
@@ -84,7 +90,31 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
         ))}
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-3">
+      <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        {canManageCoursework && <section className="rounded-xl border bg-white p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-semibold text-storm-navy">Coursework</h2>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={`/manage/clubs/${slug}/coursework`}>Manage <ArrowRight className="h-3.5 w-3.5" /></Link>
+            </Button>
+          </div>
+          <div className="space-y-3">
+            {assignments.slice(0, 3).map((assignment) => (
+              <Link
+                key={assignment.id}
+                href={`/manage/clubs/${slug}/coursework/${assignment.id}`}
+                className="block rounded-lg border p-3 transition-colors hover:bg-storm-light/30"
+              >
+                <p className="text-sm font-medium">{assignment.title}</p>
+                <p className="mt-1 text-xs capitalize text-muted-foreground">{assignment.status}</p>
+              </Link>
+            ))}
+            {!assignments.length && (
+              <p className="text-sm text-muted-foreground">No assignments yet.</p>
+            )}
+          </div>
+        </section>}
+
         <section className="rounded-xl border bg-white p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold text-storm-navy">Recent announcements</h2>

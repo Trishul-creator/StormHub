@@ -15,6 +15,7 @@ import {
   canDeleteUser,
   canEditRole,
   canManageClub,
+  canManageClubCoursework,
   canManageClubRoster,
   isAdminRole,
 } from "@/lib/permissions";
@@ -26,6 +27,9 @@ import type {
   Profile,
   UserRole,
   AccountStatus,
+  AssignmentStatus,
+  ClubAssignment,
+  ClubAssignmentSubmission,
   FeedbackStatus,
 } from "@/types/database";
 import { slugify } from "@/lib/utils";
@@ -1012,6 +1016,256 @@ export async function submitContent(data: {
   revalidatePath("/calendar");
   revalidatePath("/opportunities");
   return { success: true, approved: trustedPost };
+}
+
+function normalizeHttpUrl(value?: string | null): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getCourseworkManagerContext(clubSlug: string) {
+  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  if (!supabase || !profile) return { error: "Please sign in." } as const;
+  const club = await getManagedClubBySlug(clubSlug);
+  if (!club) return { error: "Club not found." } as const;
+  const { data: membership } = await supabase
+    .from("club_memberships")
+    .select("club_id,status,role")
+    .eq("club_id", club.id)
+    .eq("user_id", profile.id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!canManageClubCoursework(profile, club, membership as ClubMembership | null)) {
+    return { error: "Only the teacher sponsor or a school administrator can manage assignments." } as const;
+  }
+  return { supabase, profile, club, membership } as const;
+}
+
+export async function createClubAssignment(data: {
+  clubSlug: string;
+  title: string;
+  instructions: string;
+  dueAt?: string | null;
+  pointsPossible: number;
+  attachmentUrl?: string | null;
+  publishNow?: boolean;
+}): Promise<{ success: boolean; error?: string; assignmentId?: string }> {
+  if (isDemoMode()) return { success: true, assignmentId: "demo-assignment" };
+  const context = await getCourseworkManagerContext(data.clubSlug);
+  if ("error" in context) return { success: false, error: context.error };
+
+  const title = data.title.trim();
+  const instructions = data.instructions.trim();
+  if (!title || title.length > 200) {
+    return { success: false, error: "Assignment title must be between 1 and 200 characters." };
+  }
+  if (instructions.length > 20000) {
+    return { success: false, error: "Assignment instructions are too long." };
+  }
+  const pointsPossible = Number(data.pointsPossible);
+  if (!Number.isFinite(pointsPossible) || pointsPossible < 0 || pointsPossible > 10000) {
+    return { success: false, error: "Points possible must be between 0 and 10,000." };
+  }
+
+  let dueAt: string | null = null;
+  if (data.dueAt) {
+    const parsedDueAt = new Date(data.dueAt);
+    if (Number.isNaN(parsedDueAt.getTime())) {
+      return { success: false, error: "Choose a valid due date and time." };
+    }
+    dueAt = parsedDueAt.toISOString();
+  }
+
+  const attachmentUrl = normalizeHttpUrl(data.attachmentUrl);
+  if (data.attachmentUrl?.trim() && !attachmentUrl) {
+    return { success: false, error: "The assignment link must be a valid http or https URL." };
+  }
+  const publishNow = data.publishNow !== false;
+  const { data: assignment, error } = await context.supabase
+    .from("club_assignments")
+    .insert({
+      club_id: context.club.id,
+      author_id: context.profile.id,
+      title,
+      instructions,
+      due_at: dueAt,
+      points_possible: pointsPossible,
+      attachment_url: attachmentUrl,
+      status: publishNow ? "published" : "draft",
+      published_at: publishNow ? new Date().toISOString() : null,
+    })
+    .select("id")
+    .single();
+  if (error) return { success: false, error: friendlyError(error, "Could not create the assignment.") };
+
+  if (publishNow) {
+    await createNotificationsForClubMembers({
+      clubId: context.club.id,
+      type: "club_assignment_created",
+      importance: "normal",
+      title,
+      message: `${context.club.name} posted a new assignment${dueAt ? ` due ${new Date(dueAt).toLocaleDateString()}` : ""}.`,
+      link: `/clubs/${context.club.slug}/member/assignments/${assignment.id}`,
+      sendEmail: false,
+    });
+  }
+
+  revalidatePath(`/manage/clubs/${context.club.slug}`);
+  revalidatePath(`/manage/clubs/${context.club.slug}/coursework`);
+  revalidatePath(`/clubs/${context.club.slug}/member`);
+  return { success: true, assignmentId: assignment.id };
+}
+
+export async function updateClubAssignmentStatus(data: {
+  clubSlug: string;
+  assignmentId: string;
+  status: Extract<AssignmentStatus, "published" | "closed" | "archived">;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: true };
+  const context = await getCourseworkManagerContext(data.clubSlug);
+  if ("error" in context) return { success: false, error: context.error };
+
+  const { data: existing } = await context.supabase
+    .from("club_assignments")
+    .select("id,status,title")
+    .eq("id", data.assignmentId)
+    .eq("club_id", context.club.id)
+    .maybeSingle();
+  if (!existing) return { success: false, error: "Assignment not found." };
+
+  const update: Record<string, unknown> = { status: data.status };
+  if (data.status === "published" && existing.status === "draft") {
+    update.published_at = new Date().toISOString();
+  }
+  const { error } = await context.supabase
+    .from("club_assignments")
+    .update(update)
+    .eq("id", data.assignmentId)
+    .eq("club_id", context.club.id);
+  if (error) return { success: false, error: friendlyError(error, "Could not update the assignment.") };
+
+  if (data.status === "published" && existing.status === "draft") {
+    await createNotificationsForClubMembers({
+      clubId: context.club.id,
+      type: "club_assignment_created",
+      importance: "normal",
+      title: existing.title,
+      message: `${context.club.name} posted a new assignment.`,
+      link: `/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`,
+      sendEmail: false,
+    });
+  }
+
+  revalidatePath(`/manage/clubs/${context.club.slug}`);
+  revalidatePath(`/manage/clubs/${context.club.slug}/coursework`);
+  revalidatePath(`/manage/clubs/${context.club.slug}/coursework/${data.assignmentId}`);
+  revalidatePath(`/clubs/${context.club.slug}/member`);
+  revalidatePath(`/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`);
+  return { success: true };
+}
+
+export async function submitClubAssignment(data: {
+  clubSlug: string;
+  assignmentId: string;
+  submissionText?: string | null;
+  attachmentUrl?: string | null;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: true };
+  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  if (!supabase || !profile) return { success: false, error: "Please sign in." };
+  if (profile.role !== "student") {
+    return { success: false, error: "Only student members can submit club assignments." };
+  }
+
+  const attachmentUrl = normalizeHttpUrl(data.attachmentUrl);
+  if (data.attachmentUrl?.trim() && !attachmentUrl) {
+    return { success: false, error: "The submission link must be a valid http or https URL." };
+  }
+  const submissionText = data.submissionText?.trim() || null;
+  if (!submissionText && !attachmentUrl) {
+    return { success: false, error: "Add a written response or submission link." };
+  }
+
+  const { data: assignment } = await supabase
+    .from("club_assignments")
+    .select("id,club_id")
+    .eq("id", data.assignmentId)
+    .maybeSingle();
+  const club = await getManagedClubBySlug(data.clubSlug);
+  if (!assignment || !club || assignment.club_id !== club.id) {
+    return { success: false, error: "Assignment not found." };
+  }
+
+  const { error } = await supabase.rpc("submit_club_assignment", {
+    assignment_uuid: data.assignmentId,
+    submitted_text: submissionText,
+    submitted_url: attachmentUrl,
+  });
+  if (error) return { success: false, error: friendlyError(error, "Could not submit the assignment.") };
+
+  revalidatePath(`/clubs/${club.slug}/member`);
+  revalidatePath(`/clubs/${club.slug}/member/assignments/${data.assignmentId}`);
+  revalidatePath(`/manage/clubs/${club.slug}/coursework`);
+  revalidatePath(`/manage/clubs/${club.slug}/coursework/${data.assignmentId}`);
+  return { success: true };
+}
+
+export async function gradeClubAssignmentSubmission(data: {
+  clubSlug: string;
+  assignmentId: string;
+  submissionId: string;
+  gradePoints: number;
+  feedback?: string | null;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: true };
+  const context = await getCourseworkManagerContext(data.clubSlug);
+  if ("error" in context) return { success: false, error: context.error };
+  const { data: submission } = await context.supabase
+    .from("club_assignment_submissions")
+    .select("id,student_id,assignment_id")
+    .eq("id", data.submissionId)
+    .eq("assignment_id", data.assignmentId)
+    .maybeSingle();
+  const { data: assignment } = await context.supabase
+    .from("club_assignments")
+    .select("*")
+    .eq("id", data.assignmentId)
+    .eq("club_id", context.club.id)
+    .maybeSingle();
+  if (!submission || !assignment) return { success: false, error: "Submission not found." };
+
+  const { error } = await context.supabase.rpc("grade_club_assignment_submission", {
+    submission_uuid: data.submissionId,
+    awarded_points: data.gradePoints,
+    grader_feedback: data.feedback?.trim() || null,
+  });
+  if (error) return { success: false, error: friendlyError(error, "Could not return this grade.") };
+
+  const typedAssignment = assignment as ClubAssignment;
+  const typedSubmission = submission as Pick<ClubAssignmentSubmission, "student_id">;
+  await createNotification({
+    recipientUserId: typedSubmission.student_id,
+    type: "club_assignment_graded",
+    importance: "normal",
+    title: `${typedAssignment.title} was graded`,
+    message: `Your work in ${context.club.name} has been returned with a grade and feedback.`,
+    link: `/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`,
+    clubId: context.club.id,
+  });
+
+  revalidatePath(`/manage/clubs/${context.club.slug}/coursework`);
+  revalidatePath(`/manage/clubs/${context.club.slug}/coursework/${data.assignmentId}`);
+  revalidatePath(`/clubs/${context.club.slug}/member`);
+  revalidatePath(`/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`);
+  return { success: true };
 }
 
 export async function updateUserRoleAndClubs(data: {

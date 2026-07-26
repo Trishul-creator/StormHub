@@ -13,7 +13,7 @@ import { getSchoolForProfile } from "@/lib/schools";
 import { redirect } from "next/navigation";
 
 const manageLinks = [
-  { href: "/manage/clubs", icon: Users, title: "Manage Clubs", description: "Edit club profiles and view members" },
+  { href: "/manage/clubs", icon: Users, title: "Manage Clubs", description: "Manage club profiles, coursework, posts, and members" },
   { href: "/manage/clubs/drafts", icon: Users, title: "Draft Clubs", description: "Review prepared clubs before publishing them" },
   { href: "/manage/opportunities", icon: Zap, title: "Opportunities", description: "Post school-wide sign-ups and applications" },
   { href: "/manage/approvals", icon: CheckSquare, title: "Approval Queue", description: "Review pending content" },
@@ -93,6 +93,7 @@ export default async function ManagePage() {
                 <CardContent className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" asChild><Link href={`/manage/clubs/${club.slug}/members`}>Roster</Link></Button>
                   <Button size="sm" variant="outline" asChild><Link href={`/manage/clubs/${club.slug}/announcements`}>Post</Link></Button>
+                  <Button size="sm" variant="outline" asChild><Link href={`/manage/clubs/${club.slug}/coursework`}>Coursework</Link></Button>
                   <Button size="sm" variant="outline" asChild><Link href={`/manage/clubs/${club.slug}/events`}>Events</Link></Button>
                 </CardContent>
               </Card>
