@@ -147,6 +147,7 @@ function isClubUpdateNotification(type: NotificationType): boolean {
     "club_event_created",
     "club_event_updated",
     "club_event_canceled",
+    "club_assignment_created",
     "club_opportunity_created",
   ].includes(type);
 }

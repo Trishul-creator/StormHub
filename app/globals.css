@@ -31,13 +31,125 @@
   * {
     @apply border-border;
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     @apply bg-background text-foreground antialiased;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 12% -10%, hsl(var(--primary) / 0.08), transparent 28rem),
+      radial-gradient(circle at 88% 8%, hsl(214 100% 70% / 0.08), transparent 24rem);
+    background-attachment: fixed;
+  }
+  ::selection {
+    @apply bg-storm-electric/20 text-storm-navy;
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .route-transition {
+    min-height: inherit;
+    transform-origin: 50% 1rem;
+  }
+
+  .interactive-card {
+    @apply transition-[transform,box-shadow,border-color] duration-300 ease-out;
+  }
+
+  .motion-block {
+    transform-origin: 50% 0;
+  }
+
+  .skip-link {
+    @apply fixed left-4 top-3 z-[200] -translate-y-20 rounded-lg bg-storm-navy px-4 py-2 text-sm font-semibold text-white shadow-xl transition-transform focus:translate-y-0;
+  }
+}
+
+@keyframes route-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.997);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes block-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.99);
+  }
+  72% {
+    opacity: 1;
+    transform: translateY(2px) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes soft-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 8px hsl(var(--primary) / 0.08);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .route-transition {
+    animation: route-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .motion-block,
+  .motion-stagger > * {
+    opacity: 0;
+    animation: block-drop 520ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  }
+
+  .motion-stagger > *:nth-child(2) { animation-delay: 45ms; }
+  .motion-stagger > *:nth-child(3) { animation-delay: 90ms; }
+  .motion-stagger > *:nth-child(4) { animation-delay: 135ms; }
+  .motion-stagger > *:nth-child(5) { animation-delay: 180ms; }
+  .motion-stagger > *:nth-child(6) { animation-delay: 225ms; }
+
+  .motion-block:nth-child(2) { animation-delay: 45ms; }
+  .motion-block:nth-child(3) { animation-delay: 90ms; }
+  .motion-block:nth-child(4) { animation-delay: 135ms; }
+  .motion-block:nth-child(5) { animation-delay: 180ms; }
+  .motion-block:nth-child(6) { animation-delay: 225ms; }
+
+  /* Let a staggered wrapper carry the motion instead of animating its card twice. */
+  .motion-stagger > * > .motion-block {
+    opacity: 1;
+    animation: none;
+  }
+
+  .motion-soft-pulse {
+    animation: soft-pulse 2.8s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

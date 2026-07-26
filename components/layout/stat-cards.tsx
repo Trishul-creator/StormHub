@@ -17,9 +17,9 @@ export function StatCards({ clubsCount, eventsCount, opportunitiesCount, student
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="motion-stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {stats.map((s) => (
-        <div key={s.label} className="rounded-xl bg-white/10 backdrop-blur p-6 text-center">
+        <div key={s.label} className="interactive-card rounded-xl bg-white/10 p-6 text-center backdrop-blur hover:bg-white/15 hover:shadow-lg motion-safe:hover:-translate-y-1 motion-reduce:transform-none">
           <s.icon className="mx-auto mb-2 h-6 w-6 text-storm-electric" />
           <div className="text-3xl font-bold text-white">{s.value}</div>
           <div className="text-sm text-storm-silver">{s.label}</div>
