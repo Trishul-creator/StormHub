@@ -35,7 +35,11 @@ export function BookmarkButton({
   if (!isLoggedIn) {
     return (
       <Button size={size} variant="outline" asChild className={className}>
-        <a href="/auth/sign-in?redirect=/opportunities">
+        <a
+          href="/auth/sign-in?redirect=/opportunities"
+          aria-label={size === "icon" ? "Sign in to save opportunity" : undefined}
+          title={size === "icon" ? "Sign in to save opportunity" : undefined}
+        >
           <Bookmark className="h-4 w-4" />
           {size !== "icon" && "Sign in to save"}
         </a>
