@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(37);
+SELECT plan(40);
 
 UPDATE public.schools
 SET allowed_email_domains = ARRAY['school-a.edu']
@@ -180,7 +180,13 @@ SELECT throws_ok(
   'Teacher sponsor or administrator access required',
   'teacher sponsors cannot manage another school roster'
 );
+SELECT lives_ok(
+  $$INSERT INTO public.account_deletion_requests (user_id, school_id, reason) VALUES ('20000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001', 'Teacher self-service request')$$,
+  'teachers can request deletion for their own account'
+);
 RESET ROLE;
+DELETE FROM public.account_deletion_requests
+WHERE user_id = '20000000-0000-4000-8000-000000000001';
 
 SELECT set_config(
   'request.jwt.claims',
@@ -204,6 +210,10 @@ SELECT lives_ok(
   $$SELECT public.set_school_signup_domains('a0000000-0000-4000-8000-000000000001', ARRAY['school-a.edu'])$$,
   'school admins can update accepted email domains for their own school'
 );
+SELECT lives_ok(
+  $$INSERT INTO public.account_deletion_requests (user_id, school_id, reason) VALUES ('30000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001', 'Admin self-service request')$$,
+  'school admins can request deletion for their own account'
+);
 SELECT throws_ok(
   $$SELECT public.set_school_signup_domains('b0000000-0000-4000-8000-000000000002', ARRAY['example.com'])$$,
   'P0001',
@@ -211,6 +221,8 @@ SELECT throws_ok(
   'school admins cannot update another school signup domains'
 );
 RESET ROLE;
+DELETE FROM public.account_deletion_requests
+WHERE user_id = '30000000-0000-4000-8000-000000000001';
 
 SELECT set_config(
   'request.jwt.claims',
@@ -270,7 +282,13 @@ SELECT set_config(
 );
 SET LOCAL ROLE authenticated;
 SELECT is((SELECT count(*) FROM public.profiles), 5::BIGINT, 'confirmed-email super admins can read profiles across schools');
+SELECT lives_ok(
+  $$INSERT INTO public.account_deletion_requests (user_id, school_id, reason) VALUES ('40000000-0000-4000-8000-000000000001', NULL, 'Super admin self-service request')$$,
+  'super admins can request deletion for their own account'
+);
 RESET ROLE;
+DELETE FROM public.account_deletion_requests
+WHERE user_id = '40000000-0000-4000-8000-000000000001';
 
 SELECT set_config(
   'request.jwt.claims',

@@ -6,7 +6,7 @@ export default function PrivacyPage() {
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <PageHeader title="Privacy" description={`How ${APP_NAME} protects your information.`} />
 
-      <div className="space-y-6 text-muted-foreground leading-relaxed">
+      <div className="motion-stagger space-y-6 text-muted-foreground leading-relaxed">
         <section>
           <h2 className="text-lg font-semibold text-storm-navy mb-2">What we collect</h2>
           <p>StormHub collects only what is needed for club participation and opportunity discovery:</p>
@@ -59,9 +59,10 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-lg font-semibold text-storm-navy mb-2">Your rights</h2>
           <p>
-            You can export your account data from Settings. Contact your school administrator with account
-            lifecycle or deletion questions. Operational audit records may be retained after account deletion
-            when required for security and accountability.
+            You can export your account data or submit a permanent deletion request from Settings. An authorized
+            administrator reviews deletion requests to prevent accidental loss and complete required record checks.
+            Operational audit records may be retained after account deletion when required for security and
+            accountability.
           </p>
         </section>
 
