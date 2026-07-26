@@ -3,32 +3,48 @@ import { describe, expect, it, vi } from "vitest";
 import { ManagementNavigation } from "@/components/manage/management-navigation";
 import { ClubManagementNavigation } from "@/components/manage/club-management-navigation";
 
+const navigationState = vi.hoisted(() => ({ pathname: "/manage" }));
+
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/manage/clubs/science-bowl/coursework",
+  usePathname: () => navigationState.pathname,
 }));
 
 describe("ManagementNavigation", () => {
   it("shows school administration tools to admins", () => {
+    navigationState.pathname = "/manage";
     render(<ManagementNavigation role="admin" canApprove canAdminister />);
 
     expect(screen.getByRole("navigation", { name: "Management" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Opportunities" })).toHaveAttribute("href", "/manage/opportunities");
     expect(screen.getByRole("link", { name: "Approvals" })).toHaveAttribute("href", "/manage/approvals");
     expect(screen.getByRole("link", { name: "Administration" })).toHaveAttribute("href", "/admin");
+    expect(screen.queryByRole("link", { name: "Overview" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Clubs" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Opportunities" })).not.toBeInTheDocument();
   });
 
-  it("keeps officer navigation scoped to clubs", () => {
+  it("does not render a redundant sub-menu for club officers", () => {
+    navigationState.pathname = "/manage";
     render(<ManagementNavigation role="student" canApprove={false} canAdminister={false} />);
 
-    expect(screen.getByRole("link", { name: "Overview" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Clubs" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Management" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Approvals" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Administration" })).not.toBeInTheDocument();
+  });
+
+  it("does not stack the school-management menu inside primary product sections", () => {
+    navigationState.pathname = "/manage/clubs";
+    const { rerender } = render(<ManagementNavigation role="admin" canApprove canAdminister />);
+    expect(screen.queryByRole("navigation", { name: "Management" })).not.toBeInTheDocument();
+
+    navigationState.pathname = "/manage/opportunities";
+    rerender(<ManagementNavigation role="admin" canApprove canAdminister />);
+    expect(screen.queryByRole("navigation", { name: "Management" })).not.toBeInTheDocument();
   });
 });
 
 describe("ClubManagementNavigation", () => {
   it("marks nested coursework pages active and preserves member access", () => {
+    navigationState.pathname = "/manage/clubs/science-bowl/coursework";
     render(
       <ClubManagementNavigation
         clubName="Science Bowl"
@@ -45,6 +61,7 @@ describe("ClubManagementNavigation", () => {
   });
 
   it("hides teacher-only areas from club officers", () => {
+    navigationState.pathname = "/manage/clubs/science-bowl";
     render(
       <ClubManagementNavigation
         clubName="Science Bowl"
