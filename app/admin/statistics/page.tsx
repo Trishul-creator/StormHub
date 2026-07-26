@@ -34,20 +34,20 @@ export default async function AdminStatisticsPage({ searchParams }: AdminStatist
         description={`Participation and activity signals for ${scopeName}.`}
       />
 
-      <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 dark:border-blue-900/70 dark:from-blue-950/50 dark:to-indigo-950/40 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
-          <div className="rounded-xl bg-white p-2.5 text-blue-700 shadow-sm">
+          <div className="rounded-xl bg-card p-2.5 text-blue-700 shadow-sm dark:text-blue-300">
             {selectedSchool ? <Building2 className="h-5 w-5" /> : <Globe2 className="h-5 w-5" />}
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-semibold text-storm-navy">{scopeName}</p>
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-xs font-medium text-blue-800">
+              <span className="inline-flex items-center gap-1 rounded-full bg-card/80 px-2.5 py-1 text-xs font-medium text-blue-800 dark:text-blue-200">
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Scope enforced
               </span>
             </div>
-            <p className="mt-1 text-sm text-blue-950/70">
+            <p className="mt-1 text-sm text-blue-950/70 dark:text-blue-200/75">
               {isSuperAdmin
                 ? selectedSchool
                   ? "This view is intentionally filtered to one school."
@@ -64,7 +64,7 @@ export default async function AdminStatisticsPage({ searchParams }: AdminStatist
               <select
                 name="school"
                 defaultValue={selectedSchool?.slug ?? ""}
-                className="mt-1 block h-10 w-full min-w-56 rounded-lg border border-blue-200 bg-white px-3 text-sm font-medium normal-case tracking-normal text-storm-navy shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                className="mt-1 block h-10 w-full min-w-56 rounded-lg border border-blue-200 bg-card px-3 text-sm font-medium normal-case tracking-normal text-storm-navy shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-blue-900"
               >
                 <option value="">All schools</option>
                 {schools.map((school) => (
@@ -80,7 +80,7 @@ export default async function AdminStatisticsPage({ searchParams }: AdminStatist
       {statistics ? (
         <StatisticsDashboard statistics={statistics} />
       ) : (
-        <div className="rounded-2xl border border-dashed bg-white px-6 py-16 text-center">
+        <div className="rounded-2xl border border-dashed bg-card px-6 py-16 text-center">
           <BarChart3 className="mx-auto h-10 w-10 text-muted-foreground" />
           <h2 className="mt-4 text-lg font-semibold text-storm-navy">Statistics are not available yet</h2>
           <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">

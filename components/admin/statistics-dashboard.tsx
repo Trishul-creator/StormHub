@@ -78,7 +78,7 @@ export function StatisticsDashboard({ statistics }: { statistics: AdminStatistic
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[1.45fr_0.85fr]">
-        <section className="motion-block overflow-hidden rounded-2xl border bg-white shadow-sm" aria-labelledby="activity-chart-title">
+        <section className="motion-block overflow-hidden rounded-2xl border bg-card shadow-sm" aria-labelledby="activity-chart-title">
           <div className="border-b px-5 py-4 sm:px-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -107,7 +107,7 @@ export function StatisticsDashboard({ statistics }: { statistics: AdminStatistic
           </div>
         </section>
 
-        <section className="motion-block rounded-2xl border bg-white p-5 shadow-sm sm:p-6" aria-labelledby="people-breakdown-title">
+        <section className="motion-block rounded-2xl border bg-card p-5 shadow-sm sm:p-6" aria-labelledby="people-breakdown-title">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 id="people-breakdown-title" className="text-lg font-semibold text-storm-navy">People by role</h2>
@@ -137,7 +137,7 @@ export function StatisticsDashboard({ statistics }: { statistics: AdminStatistic
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-        <section className="motion-block rounded-2xl border bg-white p-5 shadow-sm sm:p-6" aria-labelledby="club-status-title">
+        <section className="motion-block rounded-2xl border bg-card p-5 shadow-sm sm:p-6" aria-labelledby="club-status-title">
           <div>
             <h2 id="club-status-title" className="text-lg font-semibold text-storm-navy">Club status</h2>
             <p className="mt-1 text-sm text-muted-foreground">Where every club currently sits.</p>
@@ -166,7 +166,7 @@ export function StatisticsDashboard({ statistics }: { statistics: AdminStatistic
           </div>
         </section>
 
-        <section className="motion-block rounded-2xl border bg-white p-5 shadow-sm sm:p-6" aria-labelledby="active-clubs-title">
+        <section className="motion-block rounded-2xl border bg-card p-5 shadow-sm sm:p-6" aria-labelledby="active-clubs-title">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 id="active-clubs-title" className="text-lg font-semibold text-storm-navy">Most active clubs</h2>
@@ -219,9 +219,9 @@ export function StatisticsDashboard({ statistics }: { statistics: AdminStatistic
         </section>
       </div>
 
-      <section className="motion-block rounded-2xl border border-blue-100 bg-blue-50/70 px-5 py-4 text-sm text-blue-950">
+      <section className="motion-block rounded-2xl border border-blue-100 bg-blue-50/70 px-5 py-4 text-sm text-blue-950 dark:border-blue-900/70 dark:bg-blue-950/40 dark:text-blue-100">
         <p className="font-semibold">How “engaged” is calculated</p>
-        <p className="mt-1 text-blue-900/80">
+        <p className="mt-1 text-blue-900/80 dark:text-blue-200/75">
           A person counts once when they join a club, RSVP, save an item, submit coursework, or perform another tracked action during the last 30 days. Statistics are aggregated and do not expose individual activity.
         </p>
       </section>
@@ -251,7 +251,7 @@ function MetricCard({
   };
 
   return (
-    <div className="interactive-card rounded-2xl border bg-white p-5 shadow-sm hover:-translate-y-0.5 hover:shadow-md motion-reduce:transform-none">
+    <div className="interactive-card rounded-2xl border bg-card p-5 shadow-sm hover:-translate-y-0.5 hover:shadow-md motion-reduce:transform-none">
       <div className={cn("mb-4 flex h-10 w-10 items-center justify-center rounded-xl", tones[tone])}>
         <Icon className="h-5 w-5" />
       </div>

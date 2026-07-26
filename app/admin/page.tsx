@@ -1,32 +1,22 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/lib/auth";
 import { getAdminAnalytics, getPendingApprovals } from "@/lib/data";
-import { Users, School, FileText, BarChart3, History, UserRoundX } from "lucide-react";
+import { ArrowRight, CheckSquare2, Users } from "lucide-react";
 import { redirect } from "next/navigation";
-
-const adminLinks = [
-  { href: "/admin/users", icon: Users, title: "Users & Roles", description: "Manage student and staff accounts" },
-  { href: "/admin/schools", icon: School, title: "Schools", description: "Manage school workspaces and settings" },
-  { href: "/admin/content", icon: FileText, title: "Content Moderation", description: "Review the school-scoped approval queue" },
-  { href: "/admin/statistics", icon: BarChart3, title: "Statistics", description: "People, participation, and active-club trends" },
-  { href: "/admin/audit", icon: History, title: "Audit Log", description: "Review immutable administrative history" },
-  { href: "/admin/deletion-requests", icon: UserRoundX, title: "Deletion Requests", description: "Review account lifecycle requests" },
-];
 
 export default async function AdminPage() {
   const { profile } = await requireAdmin();
   if (profile.role === "super_admin") redirect("/admin/schools");
   const [analytics, pendingApprovals] = await Promise.all([getAdminAnalytics(), getPendingApprovals()]);
-  const visibleLinks = adminLinks.filter((link) => {
-    if (link.href === "/admin/schools") return profile.role === "super_admin";
-    return true;
-  });
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <PageHeader title="Admin Panel" description="School-wide administration for StormHub." />
+      <PageHeader
+        title="Administration overview"
+        description="A school-scoped operational snapshot. Use the administration menu above for statistics, users, moderation, and audit history."
+      />
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <AdminMetric label="Pending approvals" value={pendingApprovals.length} />
         <AdminMetric label="Active clubs" value={analytics.activeClubs} />
@@ -34,18 +24,21 @@ export default async function AdminPage() {
         <AdminMetric label="Student memberships" value={analytics.totalMemberships} />
         <AdminMetric label="Recent activity" value={analytics.recentActivity.length} />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {visibleLinks.map((link) => (
-          <Link key={link.href} href={link.href}>
-            <Card className="h-full hover:shadow-md transition-shadow">
-              <CardHeader>
-                <link.icon className="h-6 w-6 text-storm-electric mb-2" />
-                <CardTitle>{link.title}</CardTitle>
-                <CardDescription>{link.description}</CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
-        ))}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <AdminAction
+          icon={CheckSquare2}
+          title="Review content"
+          description={`${pendingApprovals.length} item${pendingApprovals.length === 1 ? "" : "s"} currently waiting for review.`}
+          href="/admin/content"
+          action="Open moderation"
+        />
+        <AdminAction
+          icon={Users}
+          title="Manage people"
+          description="Review accounts, roles, access status, and school membership."
+          href="/admin/users"
+          action="Open users & roles"
+        />
       </div>
     </div>
   );
@@ -53,9 +46,38 @@ export default async function AdminPage() {
 
 function AdminMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border bg-white p-4">
+    <div className="rounded-xl border bg-card p-4 shadow-sm">
       <p className="text-2xl font-bold text-storm-navy">{value}</p>
       <p className="text-sm text-muted-foreground">{label}</p>
     </div>
+  );
+}
+
+function AdminAction({
+  icon: Icon,
+  title,
+  description,
+  href,
+  action,
+}: {
+  icon: typeof Users;
+  title: string;
+  description: string;
+  href: string;
+  action: string;
+}) {
+  return (
+    <section className="flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-sm sm:flex-row sm:items-center">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-storm-electric/10 text-storm-electric">
+        <Icon className="h-5 w-5" aria-hidden="true" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <h2 className="font-semibold text-storm-navy">{title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      </div>
+      <Button variant="outline" size="sm" asChild>
+        <Link href={href}>{action} <ArrowRight className="h-4 w-4" /></Link>
+      </Button>
+    </section>
   );
 }

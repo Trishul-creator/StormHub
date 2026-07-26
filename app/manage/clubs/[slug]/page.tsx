@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { getManagedClubBySlug, getClubAssignments, getClubManagedContent, getClubMemberCount } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
 import { getSchoolById } from "@/lib/schools";
-import { Users, Megaphone, Calendar, FileText, Pencil, Eye, ArrowRight, ClipboardList } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import type { ClubAnnouncement, ClubResource, Event } from "@/types/database";
 import { canManageClubCoursework } from "@/lib/permissions";
@@ -34,26 +34,9 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
     club.visibility === "public" &&
     ["interest_open", "active"].includes(club.status);
 
-  const links = [
-    { href: `/manage/clubs/${slug}/edit`, icon: Pencil, label: "Edit profile" },
-    { href: `/manage/clubs/${slug}/announcements`, icon: Megaphone, label: "Create club post" },
-    ...(canManageCoursework
-      ? [{ href: `/manage/clubs/${slug}/coursework`, icon: ClipboardList, label: "Coursework & grading" }]
-      : []),
-    { href: `/manage/clubs/${slug}/events`, icon: Calendar, label: "Create Event" },
-    { href: `/manage/clubs/${slug}/resources`, icon: FileText, label: "Create Resource" },
-    { href: `/manage/clubs/${slug}/members`, icon: Users, label: "Members" },
-    { href: `/clubs/${slug}/member`, icon: Eye, label: "View club dashboard" },
-  ];
-
   return (
     <div className="container mx-auto px-4 py-8">
-      <PageHeader title={`Manage: ${club.name}`} description="Club management dashboard">
-        <Button size="sm" asChild>
-          <Link href={`/clubs/${slug}/member`}>
-            <Eye className="h-4 w-4" /> View club dashboard
-          </Link>
-        </Button>
+      <PageHeader title="Club overview" description={`Monitor ${club.name} content, classwork, events, resources, and membership.`}>
         {isPubliclyVisible ? (
           <Button variant="outline" size="sm" asChild>
             <Link href={publicHref}>View public page</Link>
@@ -76,22 +59,13 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
           </div>
           <div className="rounded-xl border border-zinc-800 bg-white/5 px-5 py-4">
             <p className="text-3xl font-bold">{memberCount}</p>
-            <p className="text-sm text-zinc-400">Active members</p>
+            <p className="text-sm text-zinc-400">Members</p>
           </div>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {links.map((link) => (
-          <Link key={link.href} href={link.href} className="rounded-xl border p-6 hover:shadow-md transition-shadow flex items-center gap-3">
-            <link.icon className="h-5 w-5 text-storm-electric" />
-            <span className="font-medium">{link.label}</span>
-          </Link>
-        ))}
-      </div>
-
-      <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        {canManageCoursework && <section className="rounded-xl border bg-white p-5">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        {canManageCoursework && <section className="rounded-xl border bg-card p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold text-storm-navy">Coursework</h2>
             <Button variant="ghost" size="sm" asChild>
@@ -115,7 +89,7 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
           </div>
         </section>}
 
-        <section className="rounded-xl border bg-white p-5">
+        <section className="rounded-xl border bg-card p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold text-storm-navy">Recent announcements</h2>
             <Button variant="ghost" size="sm" asChild>
@@ -137,7 +111,7 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
           </div>
         </section>
 
-        <section className="rounded-xl border bg-white p-5">
+        <section className="rounded-xl border bg-card p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold text-storm-navy">Upcoming calendar</h2>
             <Button variant="ghost" size="sm" asChild>
@@ -157,7 +131,7 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
           </div>
         </section>
 
-        <section className="rounded-xl border bg-white p-5">
+        <section className="rounded-xl border bg-card p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold text-storm-navy">Member resources</h2>
             <Button variant="ghost" size="sm" asChild>

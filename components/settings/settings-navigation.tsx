@@ -67,7 +67,7 @@ export function SettingsNavigation() {
 
   return (
     <aside className="min-w-0 max-w-full lg:sticky lg:top-24 lg:self-start">
-      <div className="max-w-full overflow-hidden rounded-2xl border bg-white/85 p-2 shadow-sm backdrop-blur">
+      <div className="max-w-full overflow-hidden rounded-2xl border bg-card/85 p-2 shadow-sm backdrop-blur">
         <div className="hidden border-b px-3 pb-4 pt-2 lg:block">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-storm-electric">
             Your preferences
@@ -99,7 +99,7 @@ export function SettingsNavigation() {
                 <span
                   className={cn(
                     "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
-                    isActive ? "bg-white/15 text-white" : "bg-storm-light/60 text-storm-blue group-hover:bg-white"
+                    isActive ? "bg-white/15 text-white" : "bg-storm-light/60 text-storm-blue group-hover:bg-card"
                   )}
                 >
                   <Icon className="h-4 w-4" />

@@ -3,9 +3,7 @@ import { ContentForm } from "@/components/forms/content-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { getManagedClubBySlug, getClubManagedContent } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Eye, Link as LinkIcon } from "lucide-react";
+import { Link as LinkIcon } from "lucide-react";
 import { StatusBadge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/utils";
 import { ArchiveContentButton } from "@/components/manage/archive-content-button";
@@ -23,13 +21,9 @@ export default async function ManageResourcesPage({ params }: PageProps) {
   const canDelete = canApproveClubContent(auth.profile, club, auth.membership);
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
-      <PageHeader title="Create Resource" description={`For ${club.name} members`}>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/clubs/${slug}/member`}><Eye className="h-4 w-4" /> View club dashboard</Link>
-        </Button>
-      </PageHeader>
+      <PageHeader title="Create resource" description={`Share links and materials with ${club.name} members.`} />
       <ContentForm type="resource" clubSlug={slug} />
-      <section className="mt-8 rounded-xl border bg-white p-5">
+      <section className="mt-8 rounded-xl border bg-card p-5 shadow-sm">
         <h2 className="font-semibold text-storm-navy">Previous resources</h2>
         <div className="mt-4 space-y-3">
           {resources.map((resource) => (

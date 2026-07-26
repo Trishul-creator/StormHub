@@ -19,7 +19,7 @@ export function NotificationList({ notifications }: { notifications: Notificatio
 
   if (notifications.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed bg-white p-12 text-center text-muted-foreground">
+      <div className="rounded-xl border border-dashed bg-card p-12 text-center text-muted-foreground">
         No notifications yet. Club updates will appear here.
       </div>
     );
@@ -59,7 +59,7 @@ export function NotificationList({ notifications }: { notifications: Notificatio
                     router.refresh();
                   })}
                   className={`block w-full rounded-xl border p-4 text-left transition hover:border-storm-electric/40 hover:shadow-sm ${
-                    notification.read_at ? "bg-white" : "bg-blue-50/60"
+                    notification.read_at ? "bg-card" : "bg-blue-50/60 dark:bg-blue-950/35"
                   }`}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">

@@ -31,7 +31,7 @@ export function StatCards({ clubsCount, eventsCount, opportunitiesCount, student
 
 export function StatCard({ label, value, icon: Icon }: { label: string; value: string | number; icon?: React.ComponentType<{ className?: string }> }) {
   return (
-    <div className="rounded-xl border bg-white p-6">
+    <div className="rounded-xl border bg-card p-6 shadow-sm">
       {Icon && <Icon className="mb-2 h-5 w-5 text-storm-electric" />}
       <div className="text-2xl font-bold text-storm-navy">{value}</div>
       <div className="text-sm text-muted-foreground">{label}</div>
@@ -41,7 +41,7 @@ export function StatCard({ label, value, icon: Icon }: { label: string; value: s
 
 export function DashboardCard({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="rounded-xl border bg-white p-6">
+    <div className="rounded-xl border bg-card p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="font-semibold text-storm-navy">{title}</h3>
         {action}

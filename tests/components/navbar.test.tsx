@@ -28,4 +28,12 @@ describe("Navbar", () => {
       expect(screen.getByRole("link", { name: /stormhub/i })).toHaveAttribute("href", "/");
     }
   );
+
+  it("keeps all public discovery destinations in the signed-out menu", () => {
+    render(<Navbar />);
+
+    expect(screen.getByRole("link", { name: "Clubs" })).toHaveAttribute("href", "/clubs");
+    expect(screen.getByRole("link", { name: "Calendar" })).toHaveAttribute("href", "/calendar");
+    expect(screen.getByRole("link", { name: "Opportunities" })).toHaveAttribute("href", "/opportunities");
+  });
 });

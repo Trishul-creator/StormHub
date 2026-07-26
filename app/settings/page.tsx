@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { requireAuth } from "@/lib/auth";
 import { Bell, Cloud, Palette, Shield, User } from "lucide-react";
 import { NotificationPreferencesForm } from "@/components/notifications/preferences-form";
@@ -42,7 +42,7 @@ export default async function SettingsPage() {
       <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8">
         <SettingsNavigation />
 
-        <main className="motion-stagger min-w-0 space-y-6">
+        <div className="motion-stagger min-w-0 space-y-6">
           <section id="profile" className="scroll-mt-24" aria-labelledby="profile-heading">
             <Card>
               <CardHeader className="border-b bg-storm-light/20">
@@ -51,7 +51,7 @@ export default async function SettingsPage() {
                     <User className="h-5 w-5" />
                   </div>
                   <div>
-                    <CardTitle id="profile-heading">Profile</CardTitle>
+                    <h2 id="profile-heading" className="font-semibold leading-none tracking-tight">Profile</h2>
                     <CardDescription className="mt-1">
                       Keep the details other members use to recognize you up to date.
                     </CardDescription>
@@ -72,7 +72,7 @@ export default async function SettingsPage() {
                     <Bell className="h-5 w-5" />
                   </div>
                   <div>
-                    <CardTitle id="notifications-heading">Notifications</CardTitle>
+                    <h2 id="notifications-heading" className="font-semibold leading-none tracking-tight">Notifications</h2>
                     <CardDescription className="mt-1">
                       Decide which activity reaches you in StormHub and by email.
                     </CardDescription>
@@ -93,7 +93,7 @@ export default async function SettingsPage() {
                     <Cloud className="h-5 w-5" />
                   </div>
                   <div>
-                    <CardTitle id="integrations-heading">Integrations</CardTitle>
+                    <h2 id="integrations-heading" className="font-semibold leading-none tracking-tight">Integrations</h2>
                     <CardDescription className="mt-1">
                       Connect only the services you want to use for coursework.
                     </CardDescription>
@@ -114,7 +114,7 @@ export default async function SettingsPage() {
                     <Palette className="h-5 w-5" />
                   </div>
                   <div>
-                    <CardTitle id="appearance-heading">Appearance</CardTitle>
+                    <h2 id="appearance-heading" className="font-semibold leading-none tracking-tight">Appearance</h2>
                     <CardDescription className="mt-1">
                       Choose light, dark, or your device&apos;s system setting.
                     </CardDescription>
@@ -135,7 +135,7 @@ export default async function SettingsPage() {
                     <Shield className="h-5 w-5" />
                   </div>
                   <div>
-                    <CardTitle id="account-heading">Account and privacy</CardTitle>
+                    <h2 id="account-heading" className="font-semibold leading-none tracking-tight">Account and privacy</h2>
                     <CardDescription className="mt-1">
                       Download your information or request permanent account deletion.
                     </CardDescription>
@@ -147,7 +147,7 @@ export default async function SettingsPage() {
               </CardContent>
             </Card>
           </section>
-        </main>
+        </div>
       </div>
     </div>
   );

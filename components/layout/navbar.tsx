@@ -19,6 +19,7 @@ const baseNavLinks = [
   { href: "/", label: "Home" },
   { href: "/clubs", label: "Clubs" },
   { href: "/calendar", label: "Calendar" },
+  { href: "/opportunities", label: "Opportunities" },
 ];
 
 interface NavbarProps {

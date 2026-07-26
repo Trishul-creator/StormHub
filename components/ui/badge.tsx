@@ -10,9 +10,9 @@ export function Badge({ className, variant = "default", ...props }: BadgeProps) 
     default: "bg-storm-electric/10 text-storm-electric border-storm-electric/20",
     secondary: "bg-storm-light text-storm-navy border-storm-silver/30",
     outline: "border border-storm-light text-storm-navy",
-    success: "bg-green-100 text-green-800 border-green-200",
-    warning: "bg-amber-100 text-amber-800 border-amber-200",
-    destructive: "bg-red-100 text-red-800 border-red-200",
+    success: "bg-green-100 text-green-800 border-green-200 dark:border-green-800 dark:bg-green-950/70 dark:text-green-200",
+    warning: "bg-amber-100 text-amber-800 border-amber-200 dark:border-amber-800 dark:bg-amber-950/70 dark:text-amber-200",
+    destructive: "bg-red-100 text-red-800 border-red-200 dark:border-red-800 dark:bg-red-950/70 dark:text-red-200",
   };
   return (
     <div

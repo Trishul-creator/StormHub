@@ -49,7 +49,7 @@ export function NotificationBell({
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border bg-white shadow-xl">
+        <div className="absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl">
           <div className="flex items-center justify-between border-b p-3">
             <div>
               <p className="font-semibold text-storm-navy">Notifications</p>
@@ -79,7 +79,7 @@ export function NotificationBell({
                   key={notification.id}
                   onClick={() => openNotification(notification)}
                   className={`block w-full border-b p-3 text-left transition hover:bg-storm-light/30 ${
-                    notification.read_at ? "bg-white" : "bg-blue-50/60"
+                    notification.read_at ? "bg-popover" : "bg-blue-50/60 dark:bg-blue-950/35"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
