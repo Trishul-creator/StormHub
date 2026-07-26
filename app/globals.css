@@ -24,6 +24,48 @@
     --input: 214 32% 91%;
     --ring: 224 76% 48%;
     --radius: 0.75rem;
+    --storm-navy: 219 68% 14%;
+    --storm-blue: 213 52% 25%;
+    --storm-electric: 224 76% 48%;
+    --storm-silver: 215 20% 65%;
+    --storm-light: 214 32% 91%;
+    --storm-gradient-start: 219 68% 14%;
+    --storm-gradient-mid: 213 52% 25%;
+    --accent-mint: 160 60% 94%;
+    --accent-violet: 250 70% 96%;
+    --accent-amber: 42 90% 94%;
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
+    --card: 222 37% 11%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 37% 11%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 217 91% 66%;
+    --primary-foreground: 222 47% 9%;
+    --secondary: 217 28% 17%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 28% 15%;
+    --muted-foreground: 215 20% 68%;
+    --accent: 217 91% 66%;
+    --accent-foreground: 222 47% 9%;
+    --destructive: 0 63% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 24% 22%;
+    --input: 217 24% 24%;
+    --ring: 217 91% 66%;
+    --storm-navy: 210 40% 96%;
+    --storm-blue: 214 32% 82%;
+    --storm-electric: 217 91% 66%;
+    --storm-silver: 215 20% 65%;
+    --storm-light: 217 28% 17%;
+    --storm-gradient-start: 222 47% 10%;
+    --storm-gradient-mid: 217 40% 22%;
+    --accent-mint: 160 35% 14%;
+    --accent-violet: 250 35% 16%;
+    --accent-amber: 42 40% 15%;
   }
 }
 
@@ -45,6 +87,37 @@
   ::selection {
     @apply bg-storm-electric/20 text-storm-navy;
   }
+
+  .dark .bg-white {
+    background-color: hsl(var(--card));
+  }
+  .dark .bg-white\/95 { background-color: hsl(var(--card) / 0.95); }
+  .dark .bg-white\/85 { background-color: hsl(var(--card) / 0.85); }
+  .dark .bg-white\/80 { background-color: hsl(var(--card) / 0.8); }
+  .dark .bg-white\/70 { background-color: hsl(var(--card) / 0.7); }
+  .dark .bg-blue-50,
+  .dark .bg-emerald-50,
+  .dark .bg-amber-50,
+  .dark .bg-violet-50 {
+    background-color: hsl(var(--muted));
+  }
+  .dark .bg-emerald-50\/50 { background-color: hsl(160 35% 14% / 0.7); }
+  .dark .bg-emerald-100 { background-color: hsl(160 45% 20%); }
+  .dark .bg-amber-100 { background-color: hsl(42 55% 20%); }
+  .dark .bg-blue-100 { background-color: hsl(217 45% 21%); }
+  .dark .bg-violet-100 { background-color: hsl(250 40% 22%); }
+  .dark .text-storm-navy { color: hsl(var(--foreground)); }
+  .dark .text-storm-navy\/70 { color: hsl(var(--foreground) / 0.72); }
+  .dark .text-storm-navy\/85 { color: hsl(var(--foreground) / 0.86); }
+  .dark .text-storm-blue { color: hsl(214 32% 82%); }
+  .dark .text-storm-electric { color: hsl(213 94% 72%); }
+  .dark .text-amber-800,
+  .dark .text-amber-700 { color: hsl(45 93% 68%); }
+  .dark .text-emerald-900,
+  .dark .text-emerald-800,
+  .dark .text-emerald-700 { color: hsl(155 70% 72%); }
+  .dark .text-blue-900 { color: hsl(213 94% 82%); }
+  .dark .text-violet-700 { color: hsl(250 95% 80%); }
 }
 
 @layer utilities {
@@ -68,6 +141,10 @@
   .skip-link {
     @apply fixed left-4 top-3 z-[200] -translate-y-20 rounded-lg bg-storm-navy px-4 py-2 text-sm font-semibold text-white shadow-xl transition-transform focus:translate-y-0;
   }
+
+  .accent-surface-mint { background-color: hsl(var(--accent-mint)); }
+  .accent-surface-violet { background-color: hsl(var(--accent-violet)); }
+  .accent-surface-amber { background-color: hsl(var(--accent-amber)); }
 }
 
 @keyframes route-enter {

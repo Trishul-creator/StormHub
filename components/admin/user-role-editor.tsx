@@ -78,10 +78,13 @@ export function UserRoleEditor({
   }
 
   function changeStatus(status: "active" | "suspended") {
+    if (status === "suspended" && !window.confirm(
+      `Ban ${user.full_name || user.email || "this account"}? They will be signed out and unable to sign in until an administrator restores the account.`
+    )) return;
     startTransition(async () => {
       const result = await updateUserAccountStatus(user.id, status);
       if (result.success) {
-        toast({ title: status === "active" ? "Account restored" : "Account suspended" });
+        toast({ title: status === "active" ? "Account restored" : "Account banned" });
         router.refresh();
       } else {
         toast({ title: "Could not update account", description: result.error, variant: "destructive" });
@@ -140,11 +143,11 @@ export function UserRoleEditor({
         </Button>
         {user.account_status === "suspended" || user.account_status === "deactivated" ? (
           <Button size="sm" variant="outline" onClick={() => changeStatus("active")} disabled={pending}>
-            <CheckCircle2 className="h-4 w-4" /> Reactivate
+            <CheckCircle2 className="h-4 w-4" /> Restore account
           </Button>
         ) : (
           <Button size="sm" variant="outline" onClick={() => changeStatus("suspended")} disabled={pending}>
-            <Ban className="h-4 w-4" /> Suspend
+            <Ban className="h-4 w-4" /> Ban account
           </Button>
         )}
         <Button size="sm" variant="destructive" onClick={removeUser} disabled={pending}>

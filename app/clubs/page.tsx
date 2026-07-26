@@ -32,11 +32,12 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
   });
 
   const filterOptions = CLUB_FILTER_GROUPS.map((g) => ({ label: g.label, value: g.label }));
-  const featuredHref = `?${new URLSearchParams({
+  const featuredParams = new URLSearchParams({
     ...(params.q ? { q: params.q } : {}),
     ...(school?.slug ? { school: school.slug } : {}),
-    featured: "true",
-  }).toString()}`;
+    ...(!featuredOnly ? { featured: "true" } : {}),
+  });
+  const featuredHref = featuredParams.size ? `?${featuredParams.toString()}` : "?";
 
   const manageableClubs = profile ? await getManageableClubs(profile) : [];
   const manageableSlugs = new Set(manageableClubs.map((club) => club.slug));
@@ -69,7 +70,12 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
 
       <div className="flex gap-8">
         <aside className="hidden w-56 shrink-0 lg:block">
-          <FilterSidebar title="Categories" options={filterOptions} activeValue={params.filter} />
+          <FilterSidebar
+            title="Categories"
+            options={filterOptions}
+            activeValue={params.filter === "featured" ? undefined : params.filter}
+            exclusiveParamNames={["featured", "category"]}
+          />
           <div className="mt-6">
             <a
               href={featuredHref}
@@ -81,7 +87,12 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
         </aside>
 
         <div className="flex-1">
-          <MobileFilterDrawer title="Filter clubs" options={filterOptions} activeValue={params.filter} />
+          <MobileFilterDrawer
+            title="Filter clubs"
+            options={filterOptions}
+            activeValue={params.filter === "featured" ? undefined : params.filter}
+            exclusiveParamNames={["featured", "category"]}
+          />
           <p className="mb-4 text-sm text-muted-foreground">{clubs.length} clubs found</p>
           {clubs.length === 0 ? (
             <EmptyState

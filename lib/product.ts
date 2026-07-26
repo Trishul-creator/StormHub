@@ -12,6 +12,7 @@ export interface OnboardingSignals {
   usersManaged?: number;
   activeClubs?: number;
   recentActivity?: number;
+  officerClubs?: number;
 }
 
 export interface OnboardingItem {
@@ -24,6 +25,31 @@ export interface OnboardingItem {
 
 export function getRoleOnboardingItems(role: UserRole, signals: OnboardingSignals = {}): OnboardingItem[] {
   if (role === "student") {
+    if ((signals.officerClubs ?? 0) > 0) {
+      return [
+        {
+          id: "open-officer-tools",
+          label: "Open your club command center",
+          description: "Review the tools available for the clubs you now help lead.",
+          href: "/manage/clubs",
+          status: "active",
+        },
+        {
+          id: "review-member-hub",
+          label: "Review the member experience",
+          description: "Check the announcements, assignments, events, and resources members can see.",
+          href: "/my-clubs",
+          status: "active",
+        },
+        {
+          id: "plan-first-update",
+          label: "Plan your first club update",
+          description: "Coordinate with the sponsor before posting an announcement or event.",
+          href: "/manage/clubs",
+          status: "active",
+        },
+      ];
+    }
     return [
       {
         id: "join-club",

@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(73);
+SELECT plan(78);
 
 SELECT is(
   (SELECT public FROM storage.buckets WHERE id = 'coursework-private'),
@@ -117,6 +117,20 @@ INSERT INTO public.events (
     'School B Event', NOW() + INTERVAL '1 day', 'approved', 'public'
   );
 
+INSERT INTO public.opportunities (
+  id, school_id, title, slug, status, visibility, action_label
+) VALUES
+  (
+    'a6000000-0000-4000-8000-000000000001',
+    'a0000000-0000-4000-8000-000000000001',
+    'School A Opportunity', 'school-a-opportunity', 'approved', 'public', 'RSVP'
+  ),
+  (
+    'b6000000-0000-4000-8000-000000000002',
+    'b0000000-0000-4000-8000-000000000002',
+    'School B Opportunity', 'school-b-opportunity', 'approved', 'public', 'Sign Up'
+  );
+
 SET LOCAL ROLE anon;
 SELECT is((SELECT count(*) FROM public.clubs), 2::BIGINT, 'anonymous users can read listed public clubs');
 SELECT is((SELECT count(*) FROM public.profiles), 0::BIGINT, 'anonymous users cannot read profiles');
@@ -167,6 +181,21 @@ SELECT throws_ok(
   'P0001',
   'Administrator access required',
   'students cannot access administrative statistics'
+);
+SELECT lives_ok(
+  $$INSERT INTO public.opportunity_signups (opportunity_id, user_id) VALUES ('a6000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001')$$,
+  'students can RSVP to an opportunity in their own school'
+);
+SELECT throws_ok(
+  $$INSERT INTO public.opportunity_signups (opportunity_id, user_id) VALUES ('b6000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001')$$,
+  '42501',
+  NULL,
+  'students cannot RSVP to another school opportunity'
+);
+SELECT is(
+  (SELECT count(*) FROM public.opportunity_signups),
+  1::BIGINT,
+  'students can read their own opportunity participation only'
 );
 RESET ROLE;
 
@@ -230,6 +259,12 @@ SELECT throws_ok(
 SELECT lives_ok(
   $$INSERT INTO public.account_deletion_requests (user_id, school_id, reason) VALUES ('20000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001', 'Teacher self-service request')$$,
   'teachers can request deletion for their own account'
+);
+SELECT throws_ok(
+  $$INSERT INTO public.opportunity_signups (opportunity_id, user_id) VALUES ('a6000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001')$$,
+  '42501',
+  NULL,
+  'teachers cannot create student opportunity signups'
 );
 RESET ROLE;
 DELETE FROM public.account_deletion_requests
@@ -522,6 +557,7 @@ SELECT throws_ok(
   'school admins cannot request statistics for another school'
 );
 SELECT is((SELECT count(*) FROM public.account_deletion_requests), 1::BIGINT, 'confirmed-email school admins can read same-school deletion requests');
+SELECT is((SELECT count(*) FROM public.opportunity_signups), 1::BIGINT, 'school admins can review opportunity signups in their own school');
 SELECT lives_ok(
   $$SELECT public.admin_set_account_status('10000000-0000-4000-8000-000000000001', 'suspended')$$,
   'confirmed-email school admins can use authorized account RPCs'

@@ -63,6 +63,8 @@ export function BookmarkButton({
       onClick={handleBookmark}
       disabled={pending || Boolean(isBookmarked && disableWhenBookmarked)}
       className={cn(className)}
+      aria-label={size === "icon" ? (isBookmarked ? "Remove from saved" : "Save opportunity") : undefined}
+      title={size === "icon" ? (isBookmarked ? "Remove from saved" : "Save opportunity") : undefined}
     >
       {pending ? (
         <Loader2 className="h-4 w-4 animate-spin" />

@@ -1,11 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Calendar, MapPin, ExternalLink } from "lucide-react";
+import { ArrowLeft, Calendar, CheckCircle2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryBadge } from "@/components/ui/badge";
 import { BookmarkButton } from "@/components/opportunities/bookmark-button";
+import { OpportunityParticipationButton } from "@/components/opportunities/opportunity-participation-button";
 import { getOpportunityBySlug } from "@/lib/data";
-import { getUserBookmarkIds } from "@/lib/actions";
+import { getUserBookmarkIds, getUserOpportunitySignupIds } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
 import { formatDate, isDeadlineSoon, opportunityActionLabel } from "@/lib/utils";
 
@@ -21,8 +22,11 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
   if (!opportunity) notFound();
 
   const canParticipate = profile?.role === "student" || !profile;
-  const bookmarkIds = canParticipate ? await getUserBookmarkIds(userId) : new Set<string>();
+  const [bookmarkIds, signedUpIds] = canParticipate
+    ? await Promise.all([getUserBookmarkIds(userId), getUserOpportunitySignupIds(userId)])
+    : [new Set<string>(), new Set<string>()];
   const isBookmarked = bookmarkIds.has(opportunity.id);
+  const isSignedUp = signedUpIds.has(opportunity.id);
   const actionLabel = opportunityActionLabel(opportunity.action_label);
 
   return (
@@ -42,14 +46,24 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
             opportunityId={opportunity.id}
             isLoggedIn={isLoggedIn}
             isBookmarked={isBookmarked}
-            inactiveLabel={actionLabel}
-            activeLabel="Done"
+            inactiveLabel="Save"
+            activeLabel="Saved"
+            disableWhenBookmarked={false}
           />
         )}
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
+          {isSignedUp && (
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+              <CheckCircle2 className="h-5 w-5 shrink-0" />
+              <div>
+                <p className="font-medium">{actionLabel.toLowerCase() === "rsvp" ? "Your RSVP is confirmed" : "You’re signed up"}</p>
+                <p className="text-sm text-emerald-800">StormHub will keep this opportunity highlighted for you.</p>
+              </div>
+            </div>
+          )}
           <div className="prose prose-sm max-w-none">
             <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{opportunity.description}</p>
           </div>
@@ -95,20 +109,14 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
               <p className="mt-1 text-sm flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{opportunity.location}</p>
             </div>
           )}
-          {opportunity.external_url && canParticipate && (
-            <Button asChild className="w-full">
-              <a href={opportunity.external_url} target="_blank" rel="noopener noreferrer">
-                {actionLabel} <ExternalLink className="h-4 w-4" />
-              </a>
-            </Button>
-          )}
-          {!opportunity.external_url && canParticipate && (
-            <BookmarkButton
+          {canParticipate && (
+            <OpportunityParticipationButton
               opportunityId={opportunity.id}
+              opportunitySlug={opportunity.slug}
+              actionLabel={actionLabel}
+              externalUrl={opportunity.external_url}
               isLoggedIn={isLoggedIn}
-              isBookmarked={isBookmarked}
-              inactiveLabel={actionLabel}
-              activeLabel="Done"
+              isSignedUp={isSignedUp}
               className="w-full"
             />
           )}

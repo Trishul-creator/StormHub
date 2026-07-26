@@ -600,6 +600,7 @@ export const demoState = {
   memberships: new Set<string>(),
   bookmarks: new Set<string>(),
   rsvps: new Set<string>(),
+  opportunitySignups: new Set<string>(),
   serviceHours: [] as Array<{
     id: string;
     title: string;

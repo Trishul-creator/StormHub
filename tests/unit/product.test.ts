@@ -35,6 +35,21 @@ describe("product helpers", () => {
     expect(items.find((item) => item.id === "manage-roster")?.status).toBe("locked");
   });
 
+  it("starts a fresh leadership checklist when a student is promoted in a club", () => {
+    const items = getRoleOnboardingItems("student", {
+      joinedClubs: 4,
+      savedOpportunities: 3,
+      rsvpedEvents: 2,
+      officerClubs: 1,
+    });
+
+    expect(items.map((item) => [item.id, item.status])).toEqual([
+      ["open-officer-tools", "active"],
+      ["review-member-hub", "active"],
+      ["plan-first-update", "active"],
+    ]);
+  });
+
   it("groups notifications by operational category", () => {
     const notifications: Notification[] = [
       notification("1", "approval_needed", null),

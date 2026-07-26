@@ -16,15 +16,28 @@ interface FilterSidebarProps {
   options: FilterOption[];
   activeValue?: string;
   paramName?: string;
+  exclusiveParamNames?: string[];
   className?: string;
 }
 
-export function FilterSidebar({ title = "Filter", options, activeValue, paramName = "filter", className }: FilterSidebarProps) {
+export function FilterSidebar({
+  title = "Filter",
+  options,
+  activeValue,
+  paramName = "filter",
+  exclusiveParamNames = [],
+  className,
+}: FilterSidebarProps) {
   const searchParams = useSearchParams();
   function hrefFor(value?: string) {
     const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set(paramName, value);
-    else params.delete(paramName);
+    if (value) {
+      params.set(paramName, value);
+      exclusiveParamNames.forEach((name) => params.delete(name));
+    } else {
+      params.delete(paramName);
+      exclusiveParamNames.forEach((name) => params.delete(name));
+    }
     const query = params.toString();
     return query ? `?${query}` : "?";
   }
@@ -59,7 +72,13 @@ export function FilterSidebar({ title = "Filter", options, activeValue, paramNam
   );
 }
 
-export function MobileFilterDrawer({ title, options, activeValue, paramName = "filter" }: FilterSidebarProps) {
+export function MobileFilterDrawer({
+  title,
+  options,
+  activeValue,
+  paramName = "filter",
+  exclusiveParamNames = [],
+}: FilterSidebarProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -75,7 +94,12 @@ export function MobileFilterDrawer({ title, options, activeValue, paramName = "f
               <h3 className="font-semibold">{title}</h3>
               <button onClick={() => setOpen(false)}><X className="h-5 w-5" /></button>
             </div>
-            <FilterSidebar options={options} activeValue={activeValue} paramName={paramName} />
+            <FilterSidebar
+              options={options}
+              activeValue={activeValue}
+              paramName={paramName}
+              exclusiveParamNames={exclusiveParamNames}
+            />
           </div>
         </div>
       )}

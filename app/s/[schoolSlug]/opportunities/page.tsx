@@ -3,16 +3,17 @@ import { notFound } from "next/navigation";
 import { OpportunityCard } from "@/components/opportunities/opportunity-card";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchBar } from "@/components/layout/search-bar";
+import { FilterSidebar, MobileFilterDrawer } from "@/components/layout/filter-sidebar";
 import { EmptyState } from "@/components/layout/empty-state";
 import { Button } from "@/components/ui/button";
-import { getOpportunities } from "@/lib/data";
-import { getUserBookmarkIds } from "@/lib/actions";
+import { getOpportunities, getOpportunityCategories } from "@/lib/data";
+import { getUserBookmarkIds, getUserOpportunitySignupIds } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
 import { getSchoolBySlug } from "@/lib/schools";
 
 interface SchoolOpportunitiesPageProps {
   params: Promise<{ schoolSlug: string }>;
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; closing?: string; grade?: string }>;
 }
 
 export default async function SchoolOpportunitiesPage({ params, searchParams }: SchoolOpportunitiesPageProps) {
@@ -21,10 +22,35 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
   if (!school) notFound();
 
   const { userId, isLoggedIn, profile } = await getAuthContext();
-  const opportunities = await getOpportunities({ schoolId: school.id, search: query.q });
+  const selectedGrade = query.grade ? Number(query.grade) : undefined;
+  const [allOpportunities, categories] = await Promise.all([
+    getOpportunities({
+      schoolId: school.id,
+      search: query.q,
+      category: query.category,
+      closingSoon: query.closing === "true",
+    }),
+    getOpportunityCategories(school.id),
+  ]);
+  const opportunities = Number.isFinite(selectedGrade)
+    ? allOpportunities.filter((opportunity) => {
+        const min = opportunity.grade_min ?? 9;
+        const max = opportunity.grade_max ?? 12;
+        return selectedGrade! >= min && selectedGrade! <= max;
+      })
+    : allOpportunities;
   const canParticipate = profile?.role === "student" && profile.school_id === school.id;
-  const bookmarkedIds = canParticipate ? await getUserBookmarkIds(userId) : new Set<string>();
+  const [bookmarkedIds, signedUpIds] = canParticipate
+    ? await Promise.all([getUserBookmarkIds(userId), getUserOpportunitySignupIds(userId)])
+    : [new Set<string>(), new Set<string>()];
   const canManage = profile?.role === "super_admin" || (profile?.role === "admin" && profile.school_id === school.id);
+  const filterOptions = categories.map((category) => ({ label: category, value: category }));
+  const closingParams = new URLSearchParams({
+    ...(query.q ? { q: query.q } : {}),
+    ...(query.grade ? { grade: query.grade } : {}),
+    ...(query.closing !== "true" ? { closing: "true" } : {}),
+  });
+  const closingHref = closingParams.size ? `?${closingParams.toString()}` : "?";
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -41,22 +67,77 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
       <div className="mb-6">
         <SearchBar placeholder="Search opportunities..." defaultValue={query.q} />
       </div>
-      <p className="mb-4 text-sm text-muted-foreground">{opportunities.length} opportunities</p>
-      {opportunities.length === 0 ? (
-        <EmptyState title="No opportunities found" description="This school has not published matching opportunities yet." actionLabel="Back to school home" actionHref={`/s/${school.slug}`} />
-      ) : (
-        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-          {opportunities.map((opportunity) => (
-            <OpportunityCard
-              key={opportunity.id}
-              opportunity={opportunity}
-              isLoggedIn={isLoggedIn}
-              isBookmarked={bookmarkedIds.has(opportunity.id)}
-              canParticipate={canParticipate}
-            />
-          ))}
+      <div className="flex gap-8">
+        <aside className="hidden w-56 shrink-0 lg:block">
+          <FilterSidebar
+            title="Category"
+            options={filterOptions}
+            activeValue={query.category}
+            paramName="category"
+            exclusiveParamNames={["closing"]}
+          />
+          <a
+            href={closingHref}
+            className={`mt-6 block rounded-lg px-3 py-2 text-sm ${
+              query.closing === "true"
+                ? "bg-amber-100 font-medium text-amber-800"
+                : "text-muted-foreground hover:bg-storm-light/50"
+            }`}
+          >
+            ⏰ Closing soon
+          </a>
+          <div className="mt-6">
+            <p className="mb-2 text-sm font-medium text-storm-navy">Grade</p>
+            {[9, 10, 11, 12].map((grade) => {
+              const gradeParams = new URLSearchParams({
+                ...(query.q ? { q: query.q } : {}),
+                ...(query.category ? { category: query.category } : {}),
+                ...(query.closing ? { closing: query.closing } : {}),
+                grade: String(grade),
+              });
+              return (
+                <a
+                  key={grade}
+                  href={`?${gradeParams.toString()}`}
+                  className={`block rounded-lg px-3 py-2 text-sm ${
+                    query.grade === String(grade)
+                      ? "bg-storm-electric/10 font-medium text-storm-electric"
+                      : "text-muted-foreground hover:bg-storm-light/50"
+                  }`}
+                >
+                  Grade {grade}
+                </a>
+              );
+            })}
+          </div>
+        </aside>
+        <div className="min-w-0 flex-1">
+          <MobileFilterDrawer
+            title="Filter opportunities"
+            options={filterOptions}
+            activeValue={query.category}
+            paramName="category"
+            exclusiveParamNames={["closing"]}
+          />
+          <p className="mb-4 text-sm text-muted-foreground">{opportunities.length} opportunities</p>
+          {opportunities.length === 0 ? (
+            <EmptyState title="No opportunities found" description="This school has not published matching opportunities yet." actionLabel="Back to school home" actionHref={`/s/${school.slug}`} />
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              {opportunities.map((opportunity) => (
+                <OpportunityCard
+                  key={opportunity.id}
+                  opportunity={opportunity}
+                  isLoggedIn={isLoggedIn}
+                  isBookmarked={bookmarkedIds.has(opportunity.id)}
+                  isSignedUp={signedUpIds.has(opportunity.id)}
+                  canParticipate={canParticipate}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -76,10 +76,19 @@ const DEMO_EMAIL_COOKIE = "stormhub_demo_email";
 const DEMO_MEMBERSHIPS_COOKIE = "stormhub_demo_memberships";
 const DEMO_BOOKMARKS_COOKIE = "stormhub_demo_bookmarks";
 const DEMO_RSVPS_COOKIE = "stormhub_demo_rsvps";
+const DEMO_OPPORTUNITY_SIGNUPS_COOKIE = "stormhub_demo_opportunity_signups";
 const DEMO_READ_NOTIFICATIONS_COOKIE = "stormhub_demo_read_notifications";
 
 function formatMembershipRole(role: MembershipRole): string {
   return role.replace(/_/g, " ");
+}
+
+function userRoleRank(role: UserRole): number {
+  return { student: 1, teacher: 2, admin: 3, super_admin: 4 }[role];
+}
+
+function membershipRoleRank(role: MembershipRole): number {
+  return { member: 1, officer: 2, president: 3, sponsor: 4 }[role];
 }
 
 function contentReviewLink(contentType: ApprovalContentType, content: Record<string, unknown> | null, club?: { slug: string } | null): string {
@@ -534,6 +543,120 @@ export async function bookmarkEntity(
   revalidatePath("/saved");
   revalidatePath("/dashboard");
   return { success: true, bookmarked: true };
+}
+
+export async function registerForOpportunity(
+  opportunityId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) {
+    const userId = await getDemoUserId();
+    const profile = await getCurrentProfile();
+    if (!userId) return { success: false, error: "Please sign in to participate." };
+    if (profile?.role !== "student") {
+      return { success: false, error: "Only student accounts can participate in opportunities." };
+    }
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(DEMO_OPPORTUNITY_SIGNUPS_COOKIE)?.value;
+    const signups = raw
+      ? new Set(JSON.parse(raw) as string[])
+      : new Set(demoState.opportunitySignups);
+    signups.add(opportunityId);
+    cookieStore.set(DEMO_OPPORTUNITY_SIGNUPS_COOKIE, JSON.stringify([...signups]), {
+      httpOnly: true,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+    });
+    demoState.opportunitySignups = signups;
+    revalidatePath("/opportunities");
+    return { success: true };
+  }
+
+  const supabase = await createClient();
+  if (!supabase) return { success: false, error: "Database not configured." };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Please sign in to participate." };
+  const profile = await createProfileIfMissing(user.id, user.email ?? "");
+  if (!profile || profile.role !== "student") {
+    return { success: false, error: "Only student accounts can participate in opportunities." };
+  }
+
+  const { data: opportunity, error: opportunityError } = await supabase
+    .from("opportunities")
+    .select("id,slug,school_id,status,visibility")
+    .eq("id", opportunityId)
+    .maybeSingle();
+  if (
+    opportunityError
+    || !opportunity
+    || opportunity.school_id !== profile.school_id
+    || opportunity.status !== "approved"
+    || opportunity.visibility !== "public"
+  ) {
+    return { success: false, error: "This opportunity is not available for your account." };
+  }
+
+  const { error } = await supabase.from("opportunity_signups").upsert(
+    {
+      opportunity_id: opportunityId,
+      user_id: user.id,
+      status: "registered",
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "opportunity_id,user_id" }
+  );
+  if (error) {
+    if (error.code === "42P01") {
+      return { success: false, error: "Apply the latest database migration before using opportunity sign-ups." };
+    }
+    return { success: false, error: friendlyError(error, "Could not complete this sign-up.") };
+  }
+
+  revalidatePath("/opportunities");
+  revalidatePath(`/opportunities/${opportunity.slug}`);
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+export async function cancelOpportunitySignup(
+  opportunityId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(DEMO_OPPORTUNITY_SIGNUPS_COOKIE)?.value;
+    const signups = raw
+      ? new Set(JSON.parse(raw) as string[])
+      : new Set(demoState.opportunitySignups);
+    signups.delete(opportunityId);
+    cookieStore.set(DEMO_OPPORTUNITY_SIGNUPS_COOKIE, JSON.stringify([...signups]), {
+      httpOnly: true,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+    });
+    demoState.opportunitySignups = signups;
+    revalidatePath("/opportunities");
+    return { success: true };
+  }
+
+  const supabase = await createClient();
+  if (!supabase) return { success: false, error: "Database not configured." };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Please sign in." };
+  const { data: opportunity } = await supabase
+    .from("opportunities")
+    .select("slug")
+    .eq("id", opportunityId)
+    .maybeSingle();
+  const { error } = await supabase
+    .from("opportunity_signups")
+    .delete()
+    .eq("opportunity_id", opportunityId)
+    .eq("user_id", user.id);
+  if (error) return { success: false, error: friendlyError(error, "Could not withdraw this sign-up.") };
+
+  revalidatePath("/opportunities");
+  if (opportunity?.slug) revalidatePath(`/opportunities/${opportunity.slug}`);
+  revalidatePath("/dashboard");
+  return { success: true };
 }
 
 export async function submitFeedback(data: {
@@ -1869,6 +1992,22 @@ export async function updateUserRoleAndClubs(data: {
   });
   if (error) return { success: false, error: friendlyError(error, "Could not update this user.") };
 
+  if (data.role !== target.role) {
+    const promoted = userRoleRank(data.role) > userRoleRank(target.role);
+    const roleLabel = data.role.replace("_", " ");
+    await createNotification({
+      recipientUserId: target.id,
+      type: "system_message",
+      importance: promoted ? "important" : "normal",
+      title: promoted ? `You were promoted to ${roleLabel}` : `Your account role is now ${roleLabel}`,
+      message: promoted
+        ? `An administrator promoted your StormHub account. Your homepage checklist has been reset for your new responsibilities.`
+        : `An administrator changed your StormHub account role to ${roleLabel}.`,
+      link: data.role === "super_admin" ? "/admin/schools" : data.role === "admin" || data.role === "teacher" ? "/manage" : "/dashboard",
+      sendEmail: promoted,
+    });
+  }
+
   revalidatePath("/admin/users");
   revalidatePath("/manage/clubs");
   revalidatePath("/dashboard");
@@ -2161,6 +2300,12 @@ export async function updateClubMember(data: {
     .select("full_name,email")
     .eq("id", data.userId)
     .maybeSingle();
+  const { data: targetMembership } = await supabase
+    .from("club_memberships")
+    .select("role,status")
+    .eq("club_id", data.clubId)
+    .eq("user_id", data.userId)
+    .maybeSingle();
   const targetName = targetProfile?.full_name ?? targetProfile?.email ?? "A club member";
   const nextRole = data.remove || data.ban ? "member" : (data.role ?? "member");
 
@@ -2200,16 +2345,19 @@ export async function updateClubMember(data: {
       clubId: club.id,
     });
   } else {
-    const isLeadershipRole = nextRole === "officer" || nextRole === "president";
+    const previousRole = (targetMembership?.role as MembershipRole | undefined) ?? "member";
+    const isPromotion = membershipRoleRank(nextRole) > membershipRoleRank(previousRole);
     await createNotification({
       recipientUserId: data.userId,
       type: "system_message",
-      importance: isLeadershipRole ? "important" : "normal",
-      title: `Club role updated: ${club.name}`,
-      message: `Your role in ${club.name} is now ${formatMembershipRole(nextRole)}.`,
+      importance: isPromotion ? "important" : "normal",
+      title: isPromotion ? `You were promoted in ${club.name}` : `Club role updated: ${club.name}`,
+      message: isPromotion
+        ? `Your role in ${club.name} is now ${formatMembershipRole(nextRole)}. Your homepage checklist has been reset for your new responsibilities.`
+        : `Your role in ${club.name} is now ${formatMembershipRole(nextRole)}.`,
       link: `/clubs/${club.slug}/member`,
       clubId: club.id,
-      sendEmail: isLeadershipRole,
+      sendEmail: isPromotion,
     });
     await createNotificationsForClubSponsors({
       clubId: club.id,
@@ -2670,6 +2818,31 @@ export async function getUserBookmarkIds(userId: string | null): Promise<Set<str
   if (!supabase) return new Set();
   const { data } = await supabase.from("bookmarks").select("opportunity_id").eq("user_id", userId);
   return new Set((data ?? []).map((b) => b.opportunity_id).filter(Boolean) as string[]);
+}
+
+export async function getUserOpportunitySignupIds(userId: string | null): Promise<Set<string>> {
+  if (!userId) return new Set();
+  if (isDemoMode()) {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(DEMO_OPPORTUNITY_SIGNUPS_COOKIE)?.value;
+    try {
+      return raw ? new Set(JSON.parse(raw) as string[]) : demoState.opportunitySignups;
+    } catch {
+      return demoState.opportunitySignups;
+    }
+  }
+  const supabase = await createClient();
+  if (!supabase) return new Set();
+  const { data, error } = await supabase
+    .from("opportunity_signups")
+    .select("opportunity_id")
+    .eq("user_id", userId)
+    .eq("status", "registered");
+  if (error) {
+    if (error.code !== "42P01") console.error("[getUserOpportunitySignupIds]", error.message);
+    return new Set();
+  }
+  return new Set((data ?? []).map((row) => row.opportunity_id).filter(Boolean) as string[]);
 }
 
 export async function getUserRsvpIds(userId: string | null): Promise<Set<string>> {

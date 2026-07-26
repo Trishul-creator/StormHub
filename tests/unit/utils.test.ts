@@ -48,7 +48,7 @@ describe("utility helpers", () => {
 
   it("normalizes opportunity action labels", () => {
     expect(opportunityActionLabel(null)).toBe("Sign Up");
-    expect(opportunityActionLabel("rsvp")).toBe("Sign Up");
+    expect(opportunityActionLabel("rsvp")).toBe("RSVP");
     expect(opportunityActionLabel("apply_now")).toBe("Apply Now");
   });
 

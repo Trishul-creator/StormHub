@@ -58,6 +58,8 @@ export default async function ManagePage() {
           title={profile.role === "teacher" ? "Teacher command checklist" : "Admin operating checklist"}
           description={profile.role === "teacher" ? "Keep club content and rosters ready for students." : "A quick operational pass before publishing or presenting the app."}
           items={checklist}
+          progressKey={`role:${profile.role}:${profile.onboarding_reset_at ?? profile.created_at ?? "initial"}`}
+          forceManualProgress={Boolean(profile.onboarding_reset_at)}
         />
       </div>
       {profile.role === "admin" && analytics && (

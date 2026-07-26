@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Bell, ChevronRight, Cloud, Shield, User } from "lucide-react";
+import { Bell, ChevronRight, Cloud, Palette, Shield, User } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const settingsSections = [
@@ -23,6 +23,12 @@ const settingsSections = [
     label: "Integrations",
     description: "Google Drive",
     icon: Cloud,
+  },
+  {
+    id: "appearance",
+    label: "Appearance",
+    description: "Light, dark, or system",
+    icon: Palette,
   },
   {
     id: "account",

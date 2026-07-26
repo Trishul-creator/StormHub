@@ -76,8 +76,10 @@ export function AccountControls({
               <AlertTriangle className="h-5 w-5" />
             </div>
             <div>
-              <p className="font-semibold text-red-950">Delete your account</p>
-              <p className="mt-1 max-w-xl text-sm text-red-900/75">
+              <p className="font-semibold text-red-950 dark:text-white">
+                Delete your account
+              </p>
+              <p className="mt-1 max-w-xl text-sm text-red-900/75 dark:text-white">
                 Request permanent removal of your login, profile, memberships, and personal data.
                 School-authored records may be retained without your identity.
               </p>

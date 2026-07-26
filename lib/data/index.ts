@@ -66,8 +66,7 @@ async function attachMemberCounts(clubs: Club[]): Promise<Club[]> {
     .from("club_memberships")
     .select("club_id")
     .in("club_id", ids)
-    .eq("status", "active")
-    .neq("role", "sponsor");
+    .eq("status", "active");
   const counts: Record<string, number> = {};
   (data ?? []).forEach((m: { club_id: string }) => {
     counts[m.club_id] = (counts[m.club_id] ?? 0) + 1;
@@ -96,15 +95,9 @@ export async function getClubs(filters?: {
       );
     }
     if (filters?.filterGroup) {
-      const groupMap: Record<string, string[]> = {
-        STEM: ["Science", "Math", "Engineering"],
-        "Music/Arts": ["Music", "Arts"],
-        Service: ["Service"],
-        Leadership: ["Leadership"],
-        Competition: ["Competition"],
-        "Language/Culture": ["Language/Culture"],
-      };
-      const cats = groupMap[filters.filterGroup] || [];
+      const cats: readonly string[] = CLUB_FILTER_GROUPS.find(
+        (item) => item.label === filters.filterGroup
+      )?.categories ?? [];
       clubs = clubs.filter((c) => c.category && cats.includes(c.category));
     }
     return clubs.filter(
@@ -185,14 +178,13 @@ export async function getClubMemberCount(clubId: string): Promise<number> {
     const club = demoClubs.find((c) => c.id === clubId);
     return club?.member_count ?? 0;
   }
-  const supabase = await createClient();
+  const supabase = createAdminClient() ?? await createClient();
   if (!supabase) return 0;
   const { count } = await supabase
     .from("club_memberships")
     .select("*", { count: "exact", head: true })
     .eq("club_id", clubId)
-    .eq("status", "active")
-    .neq("role", "sponsor");
+    .eq("status", "active");
   return count ?? 0;
 }
 

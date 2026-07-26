@@ -9,6 +9,12 @@ vi.mock("@/components/opportunities/bookmark-button", () => ({
   ),
 }));
 
+vi.mock("@/components/opportunities/opportunity-participation-button", () => ({
+  OpportunityParticipationButton: ({ actionLabel, isSignedUp }: { actionLabel: string; isSignedUp?: boolean }) => (
+    isSignedUp ? <span>Signed up</span> : <button>{actionLabel}</button>
+  ),
+}));
+
 const opportunity: Opportunity = {
   id: "opp-1",
   school_id: "school-1",
@@ -46,8 +52,19 @@ describe("OpportunityCard", () => {
     expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
   });
 
-  it("shows Done for already-saved opportunities", () => {
+  it("keeps saving separate from signup state", () => {
     render(<OpportunityCard opportunity={opportunity} isLoggedIn isBookmarked />);
-    expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Saved" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
+  });
+
+  it("highlights opportunities the student joined and removes the signup button", () => {
+    const { container } = render(
+      <OpportunityCard opportunity={opportunity} isLoggedIn isBookmarked={false} isSignedUp />
+    );
+    expect(screen.getByText("You're signed up")).toBeInTheDocument();
+    expect(screen.getByText("Signed up")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
+    expect(container.firstChild).toHaveClass("border-emerald-300");
   });
 });

@@ -40,6 +40,7 @@ describe("account export", () => {
     expect(payload.export_warnings).toEqual([]);
     expect(payload.profile.id).toBe("user-1");
     expect(payload.club_memberships).toEqual([]);
+    expect(payload.opportunity_signups).toEqual([]);
     expect(payload.assignment_submissions).toEqual([]);
     expect(payload.authored_assignments).toEqual([]);
     expect(payload.submission_attachments).toEqual([]);
