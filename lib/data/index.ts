@@ -17,7 +17,10 @@ import type {
   Club,
   ClubAnnouncement,
   ClubAssignment,
+  ClubAssignmentAttachment,
+  ClubAssignmentStudentCopy,
   ClubAssignmentSubmission,
+  ClubSubmissionAttachment,
   ClubMemberDirectoryEntry,
   ClubMembership,
   ClubResource,
@@ -305,6 +308,7 @@ function normalizeAssignment(row: ClubAssignment): ClubAssignment {
   return {
     ...row,
     points_possible: Number(row.points_possible),
+    submission_mode: row.submission_mode ?? "submission",
     submission: row.submission
       ? {
           ...row.submission,
@@ -375,7 +379,14 @@ export async function getClubAssignment(
 ): Promise<ClubAssignment | null> {
   if (isDemoMode()) {
     const assignment = demoAssignments.find((item) => item.id === assignmentId);
-    return assignment ? normalizeAssignment(assignment) : null;
+    return assignment
+      ? normalizeAssignment({
+          ...assignment,
+          attachments: assignment.attachments ?? [],
+          student_copies: assignment.student_copies ?? [],
+          submission_attachments: assignment.submission_attachments ?? [],
+        })
+      : null;
   }
 
   const supabase = await createClient();
@@ -391,17 +402,50 @@ export async function getClubAssignment(
   }
 
   const assignment = normalizeAssignment(data as ClubAssignment);
-  if (!userId) return assignment;
-
-  const { data: submission } = await supabase
-    .from("club_assignment_submissions")
+  const { data: attachmentRows, error: attachmentError } = await supabase
+    .from("club_assignment_attachments")
     .select("*")
     .eq("assignment_id", assignmentId)
-    .eq("student_id", userId)
-    .maybeSingle();
+    .order("created_at", { ascending: true });
+  if (attachmentError) {
+    console.error("[getClubAssignment attachments]", attachmentError.message);
+  }
+  const attachments = (attachmentRows as ClubAssignmentAttachment[] | null) ?? [];
+  if (!userId) return { ...assignment, attachments };
+
+  const [{ data: submission }, { data: submissionAttachmentRows }, { data: studentCopyRows }] =
+    await Promise.all([
+      supabase
+        .from("club_assignment_submissions")
+        .select("*")
+        .eq("assignment_id", assignmentId)
+        .eq("student_id", userId)
+        .maybeSingle(),
+      supabase
+        .from("club_submission_attachments")
+        .select("*")
+        .eq("assignment_id", assignmentId)
+        .eq("student_id", userId)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("club_assignment_student_copies")
+        .select("*")
+        .eq("assignment_id", assignmentId)
+        .eq("student_id", userId),
+    ]);
+  const submissionAttachments =
+    (submissionAttachmentRows as ClubSubmissionAttachment[] | null) ?? [];
   return normalizeAssignment({
     ...assignment,
-    submission: (submission as ClubAssignmentSubmission | null) ?? null,
+    attachments,
+    student_copies: (studentCopyRows as ClubAssignmentStudentCopy[] | null) ?? [],
+    submission_attachments: submissionAttachments,
+    submission: submission
+      ? {
+          ...(submission as ClubAssignmentSubmission),
+          attachments: submissionAttachments,
+        }
+      : null,
   });
 }
 
@@ -420,8 +464,40 @@ export async function getClubAssignmentSubmissions(
     console.error("[getClubAssignmentSubmissions]", error.message);
     return [];
   }
-  return ((data as ClubAssignmentSubmission[]) ?? []).map((submission) => ({
+  const submissions = (data as ClubAssignmentSubmission[]) ?? [];
+  if (submissions.length === 0) return [];
+  const [
+    { data: attachmentRows, error: attachmentError },
+    { data: studentCopyRows, error: studentCopyError },
+  ] = await Promise.all([
+    supabase
+      .from("club_submission_attachments")
+      .select("*")
+      .eq("assignment_id", assignmentId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("club_assignment_student_copies")
+      .select("*")
+      .eq("assignment_id", assignmentId),
+  ]);
+  if (attachmentError) {
+    console.error("[getClubAssignmentSubmissions attachments]", attachmentError.message);
+  }
+  if (studentCopyError) {
+    console.error("[getClubAssignmentSubmissions copies]", studentCopyError.message);
+  }
+  const attachmentsBySubmission = new Map<string, ClubSubmissionAttachment[]>();
+  for (const attachment of (attachmentRows as ClubSubmissionAttachment[] | null) ?? []) {
+    if (!attachment.submission_id) continue;
+    const current = attachmentsBySubmission.get(attachment.submission_id) ?? [];
+    current.push(attachment);
+    attachmentsBySubmission.set(attachment.submission_id, current);
+  }
+  return submissions.map((submission) => ({
     ...submission,
+    attachments: attachmentsBySubmission.get(submission.id) ?? [],
+    student_copies: ((studentCopyRows as ClubAssignmentStudentCopy[] | null) ?? [])
+      .filter((copy) => copy.student_id === submission.student_id),
     grade_points:
       submission.grade_points === null || submission.grade_points === undefined
         ? null

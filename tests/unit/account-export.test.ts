@@ -39,6 +39,10 @@ describe("account export", () => {
     expect(payload.club_memberships).toEqual([]);
     expect(payload.assignment_submissions).toEqual([]);
     expect(payload.authored_assignments).toEqual([]);
+    expect(payload.submission_attachments).toEqual([]);
+    expect(payload.assignment_attachments).toEqual([]);
+    expect(payload.student_drive_copies).toEqual([]);
+    expect(payload.google_drive_connection).toBeNull();
     expect(payload).not.toHaveProperty("account_deletion_requests");
     expect(createClientMock).not.toHaveBeenCalled();
   });

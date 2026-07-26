@@ -20,6 +20,9 @@ export type Visibility = "public" | "members" | "officers" | "private" | "unlist
 export type MembershipStatus = "pending" | "active" | "rejected" | "left";
 export type AssignmentStatus = "draft" | "published" | "closed" | "archived";
 export type AssignmentSubmissionStatus = "draft" | "submitted" | "returned";
+export type AssignmentSubmissionMode = "submission" | "completion";
+export type CourseworkAttachmentSource = "upload" | "google_drive";
+export type CourseworkCopyMode = "reference" | "student_copy";
 
 export type MembershipRole =
   | "member"
@@ -172,6 +175,7 @@ export interface ClubAssignment {
   due_at?: string | null;
   points_possible: number;
   attachment_url?: string | null;
+  submission_mode: AssignmentSubmissionMode;
   status: AssignmentStatus;
   published_at?: string | null;
   created_at: string;
@@ -179,6 +183,9 @@ export interface ClubAssignment {
   submission?: ClubAssignmentSubmission | null;
   submission_count?: number;
   returned_count?: number;
+  attachments?: ClubAssignmentAttachment[];
+  student_copies?: ClubAssignmentStudentCopy[];
+  submission_attachments?: ClubSubmissionAttachment[];
 }
 
 export interface ClubAssignmentSubmission {
@@ -196,6 +203,56 @@ export interface ClubAssignmentSubmission {
   created_at: string;
   updated_at: string;
   student?: Pick<Profile, "id" | "full_name" | "avatar_url"> | null;
+  attachments?: ClubSubmissionAttachment[];
+  student_copies?: ClubAssignmentStudentCopy[];
+}
+
+export interface ClubAssignmentAttachment {
+  id: string;
+  assignment_id: string;
+  uploaded_by?: string | null;
+  source_type: CourseworkAttachmentSource;
+  copy_mode: CourseworkCopyMode;
+  file_name: string;
+  mime_type?: string | null;
+  file_size?: number | null;
+  storage_path?: string | null;
+  external_url?: string | null;
+  google_file_id?: string | null;
+  created_at: string;
+}
+
+export interface ClubSubmissionAttachment {
+  id: string;
+  assignment_id: string;
+  submission_id?: string | null;
+  student_id: string;
+  source_type: CourseworkAttachmentSource;
+  file_name: string;
+  mime_type?: string | null;
+  file_size?: number | null;
+  storage_path?: string | null;
+  external_url?: string | null;
+  google_file_id?: string | null;
+  created_at: string;
+}
+
+export interface ClubAssignmentStudentCopy {
+  id: string;
+  assignment_id: string;
+  assignment_attachment_id: string;
+  student_id: string;
+  google_file_id: string;
+  file_name: string;
+  web_url: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GoogleDriveConnectionStatus {
+  configured: boolean;
+  connected: boolean;
+  google_email?: string | null;
 }
 
 export interface ClubMemberDirectoryEntry {

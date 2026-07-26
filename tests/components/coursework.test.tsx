@@ -24,6 +24,12 @@ vi.mock("@/hooks/use-toast", () => ({
 
 vi.mock("@/lib/actions", () => ({
   createClubAssignment: vi.fn(),
+  prepareCourseworkFileUpload: vi.fn(),
+  registerAssignmentGoogleDriveAttachment: vi.fn(),
+  registerCourseworkFileUpload: vi.fn(),
+  registerSubmissionGoogleDriveAttachment: vi.fn(),
+  removeCourseworkAttachment: vi.fn(),
+  updateClubAssignmentStatus: vi.fn(),
   gradeClubAssignmentSubmission: vi.fn(),
   submitClubAssignment: vi.fn(),
   submitContent: vi.fn(),
@@ -76,6 +82,7 @@ describe("club coursework controls", () => {
           instructions: "Explain two topics to review.",
           pointsPossible: 20,
           attachmentUrl: "https://example.com/questions",
+          submissionMode: "submission",
           publishNow: true,
         })
       );
@@ -113,6 +120,28 @@ describe("club coursework controls", () => {
         assignmentId: "assignment-1",
         submissionText: "Updated response",
         attachmentUrl: "https://example.com/work",
+      });
+    });
+  });
+
+  it("lets students mark completion-only work complete without an attachment", async () => {
+    render(
+      <SubmissionForm
+        clubSlug="science-bowl"
+        assignmentId="assignment-2"
+        submissionMode="completion"
+      />
+    );
+
+    expect(screen.getByText("No file or written response is required.")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Mark as complete" }));
+
+    await waitFor(() => {
+      expect(submitClubAssignment).toHaveBeenCalledWith({
+        clubSlug: "science-bowl",
+        assignmentId: "assignment-2",
+        submissionText: "",
+        attachmentUrl: "",
       });
     });
   });
