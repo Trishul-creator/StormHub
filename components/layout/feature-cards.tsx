@@ -13,12 +13,12 @@ const features = [
 
 export function FeatureCards() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="motion-stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {features.map((f) => (
-        <Card key={f.title} className="border-storm-light/50 hover:shadow-md transition-shadow">
+        <Card key={f.title} className="group border-storm-light/50">
           <CardContent className="p-6">
-            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-storm-electric/10">
-              <f.icon className="h-5 w-5 text-storm-electric" />
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-storm-electric/10 transition-[transform,background-color] duration-300 group-hover:scale-110 group-hover:bg-storm-electric/15 motion-reduce:transform-none">
+              <f.icon className="h-5 w-5 text-storm-electric transition-transform duration-300 group-hover:-rotate-3 motion-reduce:transform-none" />
             </div>
             <h3 className="font-semibold text-storm-navy">{f.title}</h3>
             <p className="mt-1 text-sm text-muted-foreground">{f.description}</p>

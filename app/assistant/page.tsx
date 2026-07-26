@@ -9,6 +9,7 @@ export default async function AssistantPage() {
   if (!auth.isLoggedIn) redirect("/auth/sign-in?redirect=/assistant");
 
   const configured = isAssistantEnabled();
+  if (!configured) redirect("/dashboard");
 
   return (
     <div className="container mx-auto px-4 py-8">
