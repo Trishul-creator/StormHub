@@ -5,7 +5,7 @@ ALTER TABLE public.club_assignments
     CHECK (submission_mode IN ('submission', 'completion'));
 
 CREATE TABLE IF NOT EXISTS public.club_assignment_attachments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   assignment_id UUID NOT NULL REFERENCES public.club_assignments(id) ON DELETE CASCADE,
   uploaded_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   source_type TEXT NOT NULL CHECK (source_type IN ('upload', 'google_drive')),
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS public.club_assignment_attachments (
 );
 
 CREATE TABLE IF NOT EXISTS public.club_submission_attachments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   assignment_id UUID NOT NULL REFERENCES public.club_assignments(id) ON DELETE CASCADE,
   submission_id UUID REFERENCES public.club_assignment_submissions(id) ON DELETE SET NULL,
   student_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS public.club_submission_attachments (
 );
 
 CREATE TABLE IF NOT EXISTS public.club_assignment_student_copies (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   assignment_id UUID NOT NULL REFERENCES public.club_assignments(id) ON DELETE CASCADE,
   assignment_attachment_id UUID NOT NULL
     REFERENCES public.club_assignment_attachments(id) ON DELETE CASCADE,
