@@ -467,6 +467,37 @@ export interface AnalyticsSummary {
   recentActivity: { type: string; description: string; created_at: string }[];
 }
 
+export interface AdminStatistics {
+  scopeSchoolId: string | null;
+  totalPeople: number;
+  activePeople: number;
+  engagedPeople30d: number;
+  newPeople30d: number;
+  totalClubs: number;
+  activeClubs: number;
+  activeMemberships: number;
+  upcomingEvents: number;
+  engagementEvents30d: number;
+  roleDistribution: { role: UserRole; count: number }[];
+  clubStatusDistribution: { status: ClubStatus; count: number }[];
+  monthlyActivity: {
+    month: string;
+    newPeople: number;
+    newMemberships: number;
+    engagementEvents: number;
+  }[];
+  topClubs: {
+    id: string;
+    name: string;
+    slug: string;
+    status: ClubStatus;
+    members: number;
+    recentEvents: number;
+    recentActivity: number;
+    score: number;
+  }[];
+}
+
 export interface StudentDashboard {
   memberships: ClubMembership[];
   upcomingEvents: Event[];

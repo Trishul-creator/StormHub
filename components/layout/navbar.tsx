@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import {
-  Bot, Menu, Search, X, Zap, LogOut, Settings, Shield,
+  Menu, Search, X, Zap, LogOut, Settings, Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/utils";
@@ -29,7 +29,6 @@ interface NavbarProps {
   notifications?: Notification[];
   unreadNotificationCount?: number;
   schoolSlug?: string | null;
-  assistantEnabled?: boolean;
 }
 
 export function Navbar({
@@ -41,7 +40,6 @@ export function Navbar({
   notifications = [],
   unreadNotificationCount = 0,
   schoolSlug,
-  assistantEnabled = false,
 }: NavbarProps) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -115,11 +113,6 @@ export function Navbar({
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/search" aria-label="Search"><Search className="h-4 w-4" /></Link>
               </Button>
-              {assistantEnabled && (
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/assistant"><Bot className="h-4 w-4 mr-1" />Assistant</Link>
-                </Button>
-              )}
               {canManage && role !== "super_admin" && primaryHref !== "/manage" && (
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/manage"><Shield className="h-4 w-4 mr-1" />Manage</Link>
@@ -178,7 +171,6 @@ export function Navbar({
             {isLoggedIn ? (
               <>
                 <Link href="/search" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Search</Link>
-                {assistantEnabled && <Link href="/assistant" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Assistant</Link>}
                 {canManage && role !== "super_admin" && primaryHref !== "/manage" && <Link href="/manage" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Manage</Link>}
                 <Link href="/notifications" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>
                   Notifications{unreadNotificationCount > 0 ? ` (${unreadNotificationCount})` : ""}

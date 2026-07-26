@@ -69,12 +69,23 @@ export function decryptGoogleToken(value: string): string {
   if (version !== "v1" || !iv || !tag || !encrypted) {
     throw new Error("Stored Google Drive credentials are invalid.");
   }
-  const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(iv, "base64url"));
-  decipher.setAuthTag(Buffer.from(tag, "base64url"));
+  const ivBytes = decodeCanonicalBase64Url(iv);
+  const tagBytes = decodeCanonicalBase64Url(tag);
+  const encryptedBytes = decodeCanonicalBase64Url(encrypted);
+  const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), ivBytes);
+  decipher.setAuthTag(tagBytes);
   return Buffer.concat([
-    decipher.update(Buffer.from(encrypted, "base64url")),
+    decipher.update(encryptedBytes),
     decipher.final(),
   ]).toString("utf8");
+}
+
+function decodeCanonicalBase64Url(value: string): Buffer {
+  const decoded = Buffer.from(value, "base64url");
+  if (!decoded.length || decoded.toString("base64url") !== value) {
+    throw new Error("Stored Google Drive credentials are invalid.");
+  }
+  return decoded;
 }
 
 function safeReturnTo(value?: string | null): string {

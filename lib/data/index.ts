@@ -33,6 +33,7 @@ import type {
   PendingApprovalItem,
   School,
   AdminUser,
+  AdminStatistics,
   FeedbackItem,
   ApprovalContentType,
 } from "@/types/database";
@@ -943,6 +944,98 @@ export async function getAdminAnalytics(): Promise<AnalyticsSummary> {
       created_at: a.created_at,
     })),
   };
+}
+
+function demoAdminStatistics(schoolId: string | null): AdminStatistics {
+  const activeMemberships = demoClubs.reduce((sum, club) => sum + (club.member_count ?? 0), 0);
+  const totalPeople = Math.max(activeMemberships + 14, 48);
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  const monthlyActivity = Array.from({ length: 6 }, (_, index) => {
+    const month = new Date(Date.UTC(
+      monthStart.getUTCFullYear(),
+      monthStart.getUTCMonth() - (5 - index),
+      1,
+    )).toISOString().slice(0, 7);
+    return {
+      month,
+      newPeople: [7, 10, 8, 14, 11, 16][index],
+      newMemberships: [12, 18, 15, 24, 21, 29][index],
+      engagementEvents: [28, 42, 39, 64, 58, 81][index],
+    };
+  });
+  const clubStatusDistribution = (["active", "interest_open", "draft", "paused", "archived"] as const)
+    .map((status) => ({
+      status,
+      count: demoClubs.filter((club) => club.status === status).length,
+    }));
+  const topClubs = demoClubs
+    .filter((club) => ["active", "interest_open"].includes(club.status))
+    .map((club) => {
+      const recentEvents = demoEvents.filter((event) => event.club_id === club.id).length;
+      const members = club.member_count ?? 0;
+      const recentActivity = Math.max(2, Math.round(members / 3));
+      return {
+        id: club.id,
+        name: club.name,
+        slug: club.slug,
+        status: club.status,
+        members,
+        recentEvents,
+        recentActivity,
+        score: members + (recentEvents * 3) + recentActivity,
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8);
+
+  return {
+    scopeSchoolId: schoolId,
+    totalPeople,
+    activePeople: totalPeople - 2,
+    engagedPeople30d: Math.min(totalPeople - 2, Math.max(activeMemberships, 32)),
+    newPeople30d: monthlyActivity.at(-1)?.newPeople ?? 0,
+    totalClubs: demoClubs.length,
+    activeClubs: demoClubs.filter((club) => club.status === "active" && club.is_active !== false).length,
+    activeMemberships,
+    upcomingEvents: demoEvents.length,
+    engagementEvents30d: monthlyActivity.at(-1)?.engagementEvents ?? 0,
+    roleDistribution: [
+      { role: "student", count: totalPeople - 10 },
+      { role: "teacher", count: 7 },
+      { role: "admin", count: 3 },
+      { role: "super_admin", count: 0 },
+    ],
+    clubStatusDistribution,
+    monthlyActivity,
+    topClubs,
+  };
+}
+
+export async function getScopedAdminStatistics(
+  profile: Profile,
+  requestedSchoolId?: string | null,
+): Promise<AdminStatistics | null> {
+  if (!isAdminRole(profile.role)) return null;
+
+  const schoolId = profile.role === "super_admin"
+    ? requestedSchoolId ?? null
+    : profile.school_id ?? null;
+  if (profile.role === "admin" && !schoolId) return null;
+
+  if (isDemoMode()) return demoAdminStatistics(schoolId);
+
+  const supabase = await createClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc("get_admin_statistics", {
+    requested_school_id: schoolId,
+  });
+  if (error) {
+    console.error("[getScopedAdminStatistics]", error.message);
+    return null;
+  }
+
+  return data as AdminStatistics;
 }
 
 export async function getStudentDashboard(userId: string | null): Promise<StudentDashboard> {
