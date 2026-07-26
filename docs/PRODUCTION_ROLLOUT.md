@@ -77,6 +77,24 @@ supabase db push
    their session and profile safely.
 9. Send a signup confirmation and password-reset email to an address outside the Supabase team.
 
+To reduce junk-folder placement:
+
+1. Send Auth mail from a dedicated address such as `auth@stormhubapp.com`, never Resend's shared
+   testing domain or a free Gmail address.
+2. In Resend, confirm that SPF and DKIM both show **Verified** for the exact sending domain.
+3. Publish a DMARC record for the organizational domain. Start with monitoring
+   (`v=DMARC1; p=none; rua=mailto:dmarc@stormhubapp.com`) and move to quarantine/reject only after
+   the reports show that Supabase/Resend mail aligns correctly.
+4. Keep the visible sender name and domain consistent (`StormHub <auth@stormhubapp.com>`), use the
+   concise confirmation subject/template in `supabase/templates/confirmation.html`, and avoid URL
+   shorteners or attachment-heavy Auth messages.
+5. Test Gmail, Outlook, and a district-managed mailbox. In each received message, inspect the
+   headers and require SPF, DKIM, and DMARC to report `PASS`.
+
+No application can guarantee inbox placement because the recipient's mail administrator controls
+filtering. Domain authentication, alignment, a stable sender reputation, and low complaint/bounce
+rates are the controls that materially improve delivery.
+
 The `RESEND_API_KEY` stored in Vercel is only used by StormHub's application-email worker. Supabase
 Auth cannot read Vercel environment variables, so enabling email confirmation before configuring
 Supabase SMTP causes registration to fail while Auth tries to send the confirmation message. In

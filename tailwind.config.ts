@@ -15,7 +15,7 @@ const config: Config = {
           blue: "#1E3A5F",
           electric: "#1D4ED8",
           silver: "#94A3B8",
-          light: "#E2E8F0",
+          light: "hsl(var(--storm-light))",
         },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
@@ -58,9 +58,9 @@ const config: Config = {
       },
       backgroundImage: {
         "storm-gradient":
-          "linear-gradient(135deg, #0B1D3A 0%, #1E3A5F 50%, #1D4ED8 100%)",
+          "linear-gradient(135deg, hsl(var(--storm-gradient-start)) 0%, hsl(var(--storm-gradient-mid)) 50%, hsl(var(--storm-electric)) 100%)",
         "storm-subtle":
-          "linear-gradient(180deg, #F8FAFC 0%, #EEF2FF 100%)",
+          "linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%)",
       },
     },
   },

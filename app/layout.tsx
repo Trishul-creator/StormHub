@@ -9,6 +9,7 @@ import { getAuthContext, hasManagementAccess } from "@/lib/auth";
 import { SetupBanner } from "@/components/layout/setup-banner";
 import { getUnreadNotificationCount, getUserNotifications } from "@/lib/notifications";
 import { getSchoolForProfile } from "@/lib/schools";
+import { ThemeScript } from "@/components/theme/theme-script";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,7 +29,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   ]);
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
       <body className={inter.className}>
         <a href="#main-content" className="skip-link">Skip to content</a>
         <Navbar

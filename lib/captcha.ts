@@ -9,9 +9,14 @@ export async function verifyCaptchaToken(
   remoteIp?: string | null
 ): Promise<CaptchaResult> {
   const secret = getHcaptchaSecret();
-  if (!secret) {
-    if (process.env.NODE_ENV !== "production") return { success: true };
-    return { success: false, error: "Security verification is not configured." };
+  const siteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim();
+  if (!secret && !siteKey) {
+    // Public support remains protected by durable IP/sender rate limits when
+    // CAPTCHA is intentionally disabled.
+    return { success: true };
+  }
+  if (!secret || !siteKey) {
+    return { success: false, error: "Security verification configuration is incomplete." };
   }
   if (!token) return { success: false, error: "Complete the security check." };
 

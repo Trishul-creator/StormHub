@@ -48,7 +48,9 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
                 <td className="p-4">{user.full_name || "Unnamed user"}</td>
                 <td className="p-4 text-muted-foreground">{user.email || "—"}</td>
                 <td className="p-4"><RoleBadge role={user.role} /></td>
-                <td className="p-4 capitalize">{user.account_status ?? "active"}</td>
+                <td className="p-4 capitalize">
+                  {user.account_status === "suspended" ? "banned" : user.account_status ?? "active"}
+                </td>
                 <td className="p-4 text-xs text-muted-foreground">
                   {user.club_assignments
                     .filter((assignment) => assignment.status === "active" && assignment.role !== "member")

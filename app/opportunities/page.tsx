@@ -4,7 +4,7 @@ import { SearchBar } from "@/components/layout/search-bar";
 import { FilterSidebar, MobileFilterDrawer } from "@/components/layout/filter-sidebar";
 import { EmptyState } from "@/components/layout/empty-state";
 import { getOpportunities, getOpportunityCategories } from "@/lib/data";
-import { getUserBookmarkIds } from "@/lib/actions";
+import { getUserBookmarkIds, getUserOpportunitySignupIds } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -43,9 +43,18 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
     : allOpportunities;
 
   const canParticipate = profile?.role === "student" || !profile;
-  const bookmarkedIds = canParticipate ? await getUserBookmarkIds(userId) : new Set<string>();
+  const [bookmarkedIds, signedUpIds] = canParticipate
+    ? await Promise.all([getUserBookmarkIds(userId), getUserOpportunitySignupIds(userId)])
+    : [new Set<string>(), new Set<string>()];
 
   const filterOptions = categories.map((category) => ({ label: category, value: category }));
+  const closingParams = new URLSearchParams({
+    ...(params.q ? { q: params.q } : {}),
+    ...(params.grade ? { grade: params.grade } : {}),
+    ...(selectedSchool?.slug ? { school: selectedSchool.slug } : {}),
+    ...(params.closing !== "true" ? { closing: "true" } : {}),
+  });
+  const closingHref = closingParams.size ? `?${closingParams.toString()}` : "?";
   const emptyActions = buildEmptyStateActions({
     surface: "opportunities",
     query: params.q,
@@ -79,15 +88,15 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
 
       <div className="flex gap-8">
         <aside className="hidden w-56 shrink-0 lg:block">
-          <FilterSidebar title="Category" options={filterOptions} activeValue={params.category} paramName="category" />
+          <FilterSidebar
+            title="Category"
+            options={filterOptions}
+            activeValue={params.category}
+            paramName="category"
+            exclusiveParamNames={["closing"]}
+          />
           <div className="mt-6 space-y-1">
-            <a href={`?${new URLSearchParams({
-              ...(params.q ? { q: params.q } : {}),
-              ...(params.category ? { category: params.category } : {}),
-              ...(params.grade ? { grade: params.grade } : {}),
-              ...(selectedSchool?.slug ? { school: selectedSchool.slug } : {}),
-              closing: "true",
-            }).toString()}`} className={`block rounded-lg px-3 py-2 text-sm ${params.closing === "true" ? "bg-amber-100 text-amber-800 font-medium" : "hover:bg-storm-light/50 text-muted-foreground"}`}>
+            <a href={closingHref} className={`block rounded-lg px-3 py-2 text-sm ${params.closing === "true" ? "bg-amber-100 text-amber-800 font-medium" : "hover:bg-storm-light/50 text-muted-foreground"}`}>
               ⏰ Closing soon
             </a>
           </div>
@@ -117,7 +126,13 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
         </aside>
 
         <div className="flex-1">
-          <MobileFilterDrawer title="Filter opportunities" options={filterOptions} activeValue={params.category} paramName="category" />
+          <MobileFilterDrawer
+            title="Filter opportunities"
+            options={filterOptions}
+            activeValue={params.category}
+            paramName="category"
+            exclusiveParamNames={["closing"]}
+          />
           <p className="mb-4 text-sm text-muted-foreground">{opportunities.length} opportunities</p>
           {opportunities.length === 0 ? (
             <EmptyState
@@ -133,6 +148,7 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
                   opportunity={opp}
                   isLoggedIn={isLoggedIn}
                   isBookmarked={bookmarkedIds.has(opp.id)}
+                  isSignedUp={signedUpIds.has(opp.id)}
                   canParticipate={canParticipate}
                 />
               ))}

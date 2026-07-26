@@ -1,25 +1,35 @@
 import Link from "next/link";
-import { Calendar, ExternalLink } from "lucide-react";
+import { Calendar, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { CategoryBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Opportunity } from "@/types/database";
 import { formatDate, isDeadlineSoon, opportunityActionLabel } from "@/lib/utils";
 import { BookmarkButton } from "@/components/opportunities/bookmark-button";
+import { OpportunityParticipationButton } from "@/components/opportunities/opportunity-participation-button";
 
 interface OpportunityCardProps {
   opportunity: Opportunity;
   isLoggedIn?: boolean;
   isBookmarked?: boolean;
+  isSignedUp?: boolean;
   canParticipate?: boolean;
 }
 
-export function OpportunityCard({ opportunity, isLoggedIn, isBookmarked, canParticipate = true }: OpportunityCardProps) {
+export function OpportunityCard({
+  opportunity,
+  isLoggedIn,
+  isBookmarked,
+  isSignedUp,
+  canParticipate = true,
+}: OpportunityCardProps) {
   const closingSoon = isDeadlineSoon(opportunity.deadline);
   const actionLabel = opportunityActionLabel(opportunity.action_label);
 
   return (
-    <Card className={`hover:shadow-md transition-shadow ${closingSoon ? "border-amber-300" : ""}`}>
+    <Card className={`hover:shadow-md transition-shadow ${
+      isSignedUp ? "border-emerald-300 bg-emerald-50/50" : closingSoon ? "border-amber-300" : ""
+    }`}>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-base">
@@ -30,6 +40,12 @@ export function OpportunityCard({ opportunity, isLoggedIn, isBookmarked, canPart
           {closingSoon && (
             <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
               Closing soon
+            </span>
+          )}
+          {isSignedUp && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+              <CheckCircle2 className="h-3 w-3" />
+              You&apos;re signed up
             </span>
           )}
         </div>
@@ -59,14 +75,28 @@ export function OpportunityCard({ opportunity, isLoggedIn, isBookmarked, canPart
           </Link>
         </Button>
         {canParticipate && (
-          <BookmarkButton
-            opportunityId={opportunity.id}
-            isLoggedIn={isLoggedIn}
-            isBookmarked={isBookmarked}
-            size="sm"
-            inactiveLabel={actionLabel}
-            activeLabel="Done"
-          />
+          <>
+            <BookmarkButton
+              opportunityId={opportunity.id}
+              isLoggedIn={isLoggedIn}
+              isBookmarked={isBookmarked}
+              size="icon"
+              activeLabel="Saved"
+              inactiveLabel="Save"
+              disableWhenBookmarked={false}
+              className="shrink-0"
+            />
+            <OpportunityParticipationButton
+              opportunityId={opportunity.id}
+              opportunitySlug={opportunity.slug}
+              actionLabel={actionLabel}
+              externalUrl={opportunity.external_url}
+              isLoggedIn={isLoggedIn}
+              isSignedUp={isSignedUp}
+              compact
+              className="shrink-0"
+            />
+          </>
         )}
       </CardFooter>
     </Card>

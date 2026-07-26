@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { supabaseResendConfirmation, supabaseSignUp } from "@/lib/actions";
 import { toast } from "@/hooks/use-toast";
 import { MailCheck, Zap } from "lucide-react";
 import { Captcha } from "@/components/auth/captcha";
+import { createClient } from "@/lib/supabase/client";
 
 interface SignUpSchool {
   id: string;
@@ -173,9 +174,41 @@ export function SignUpForm({
 }
 
 function EmailVerificationNotice({ email }: { email: string }) {
+  const router = useRouter();
   const [resending, setResending] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const captchaRequired = Boolean(process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim());
+
+  useEffect(() => {
+    const supabaseClient = createClient();
+    if (!supabaseClient) return;
+    const auth = supabaseClient.auth;
+    let active = true;
+
+    async function checkConfirmation() {
+      const { data } = await auth.getUser();
+      if (!active || !data.user) return;
+      setConfirmed(true);
+      router.replace("/dashboard");
+      router.refresh();
+    }
+
+    void checkConfirmation();
+    const interval = window.setInterval(() => void checkConfirmation(), 3_000);
+    const onFocus = () => void checkConfirmation();
+    window.addEventListener("focus", onFocus);
+    const { data: authListener } = auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN") void checkConfirmation();
+    });
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      authListener.subscription.unsubscribe();
+    };
+  }, [router]);
 
   async function resendConfirmation() {
     setResending(true);
@@ -201,8 +234,12 @@ function EmailVerificationNotice({ email }: { email: string }) {
       </CardHeader>
       <CardContent className="space-y-4 text-center">
         <p className="text-sm text-muted-foreground">
-          Open the link to verify your email and finish creating your account. Check your spam folder if it does not arrive.
+          Open the link to verify your email and finish creating your account. This page checks automatically and will continue as soon as confirmation finishes.
         </p>
+        <div className="flex items-center justify-center gap-2 rounded-lg bg-storm-light/40 px-3 py-2 text-xs text-muted-foreground" role="status">
+          <span className={`h-2 w-2 rounded-full ${confirmed ? "bg-emerald-500" : "animate-pulse bg-storm-electric"}`} />
+          {confirmed ? "Email confirmed — continuing…" : "Waiting for email confirmation…"}
+        </div>
         <Captcha onToken={setCaptchaToken} />
         <Button
           type="button"

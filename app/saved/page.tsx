@@ -5,13 +5,14 @@ import { requireAuth } from "@/lib/auth";
 import { PageHeader } from "@/components/layout/page-header";
 import { OpportunityCard } from "@/components/opportunities/opportunity-card";
 import { EmptyState } from "@/components/layout/empty-state";
-import { Bookmark } from "lucide-react";
+import { getUserOpportunitySignupIds } from "@/lib/actions";
 
 export default async function SavedPage() {
   const { userId, profile } = await requireAuth("/saved");
   if (profile.role !== "student") redirect("/dashboard");
 
   const dashboard = await getStudentDashboard(userId);
+  const signedUpIds = await getUserOpportunitySignupIds(userId);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -29,7 +30,13 @@ export default async function SavedPage() {
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {dashboard.savedOpportunities.map((opp) => (
-            <OpportunityCard key={opp.id} opportunity={opp} isLoggedIn isBookmarked />
+            <OpportunityCard
+              key={opp.id}
+              opportunity={opp}
+              isLoggedIn
+              isBookmarked
+              isSignedUp={signedUpIds.has(opp.id)}
+            />
           ))}
         </div>
       )}

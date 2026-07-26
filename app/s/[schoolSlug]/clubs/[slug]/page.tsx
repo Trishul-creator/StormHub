@@ -137,7 +137,7 @@ export default async function SchoolClubPage({ params }: SchoolClubPageProps) {
               )}
               <div>
                 <p className="font-medium text-storm-navy">Members</p>
-                <p className="text-muted-foreground">{memberCount} active students</p>
+                <p className="text-muted-foreground">{memberCount} people joined</p>
               </div>
             </div>
           </div>

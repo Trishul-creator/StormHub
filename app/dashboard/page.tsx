@@ -38,6 +38,8 @@ export default async function DashboardPage() {
             title="Teacher launch checklist"
             description="The fastest path to keeping club operations current."
             items={checklist}
+            progressKey={`role:${profile.role}:${profile.onboarding_reset_at ?? profile.created_at ?? "initial"}`}
+            forceManualProgress={Boolean(profile.onboarding_reset_at)}
           />
         </div>
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -69,10 +71,14 @@ export default async function DashboardPage() {
   }
 
   const dashboard = await getStudentDashboard(userId);
+  const officerMemberships = dashboard.memberships.filter(
+    (membership) => membership.role === "officer" || membership.role === "president"
+  );
   const checklist = getRoleOnboardingItems("student", {
     joinedClubs: dashboard.memberships.length,
     savedOpportunities: dashboard.savedOpportunities.length,
     rsvpedEvents: dashboard.upcomingEvents.length,
+    officerClubs: officerMemberships.length,
   });
   const firstCategory = dashboard.memberships.find((membership) => membership.club?.category)?.club?.category;
   const discoveryHints = buildDiscoveryHints({
@@ -92,9 +98,18 @@ export default async function DashboardPage() {
 
       <div className="mb-8">
         <RoleChecklist
-          title="Student launch checklist"
-          description="Set up your club feed, saved deadlines, and event plan."
+          title={officerMemberships.length ? "New club leader checklist" : "Student launch checklist"}
+          description={
+            officerMemberships.length
+              ? "Your responsibilities changed, so this checklist starts fresh with your club-leadership tools."
+              : "Set up your club feed, saved deadlines, and event plan."
+          }
           items={checklist}
+          progressKey={`role:${profile.role}:${profile.onboarding_reset_at ?? profile.created_at ?? "initial"}:${officerMemberships
+            .map((membership) => `${membership.club_id}:${membership.role}`)
+            .sort()
+            .join(",")}`}
+          forceManualProgress={Boolean(profile.onboarding_reset_at) || officerMemberships.length > 0}
         />
       </div>
 
@@ -111,21 +126,21 @@ export default async function DashboardPage() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-3 mb-8">
-        <div className="rounded-xl border bg-white p-4 flex items-center gap-3">
+        <div className="accent-surface-mint rounded-xl border p-4 flex items-center gap-3">
           <Users className="h-8 w-8 text-storm-electric" />
           <div>
             <p className="text-2xl font-bold">{dashboard.memberships.length}</p>
             <p className="text-sm text-muted-foreground">Joined clubs</p>
           </div>
         </div>
-        <div className="rounded-xl border bg-white p-4 flex items-center gap-3">
+        <div className="accent-surface-violet rounded-xl border p-4 flex items-center gap-3">
           <Calendar className="h-8 w-8 text-storm-electric" />
           <div>
             <p className="text-2xl font-bold">{dashboard.upcomingEvents.length}</p>
             <p className="text-sm text-muted-foreground">Upcoming events</p>
           </div>
         </div>
-        <div className="rounded-xl border bg-white p-4 flex items-center gap-3">
+        <div className="accent-surface-amber rounded-xl border p-4 flex items-center gap-3">
           <Bookmark className="h-8 w-8 text-storm-electric" />
           <div>
             <p className="text-2xl font-bold">{dashboard.savedOpportunities.length}</p>

@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Circle, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -14,12 +17,52 @@ export function RoleChecklist({
   title = "Start here",
   description = "A short checklist for the most useful next steps.",
   items,
+  progressKey,
+  forceManualProgress = false,
 }: {
   title?: string;
   description?: string;
   items: OnboardingItem[];
+  progressKey?: string;
+  forceManualProgress?: boolean;
 }) {
-  const completed = items.filter((item) => item.status === "done").length;
+  const storageKey = progressKey ? `stormhub:onboarding:${progressKey}` : null;
+  const [manualCompleted, setManualCompleted] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!storageKey) return;
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(storageKey) ?? "[]") as string[];
+      setManualCompleted(new Set(stored));
+    } catch {
+      setManualCompleted(new Set());
+    }
+  }, [storageKey]);
+
+  const displayedItems = useMemo(
+    () => items.map((item) => ({
+      ...item,
+      status: item.status === "locked"
+        ? "locked" as const
+        : manualCompleted.has(item.id)
+          ? "done" as const
+          : forceManualProgress
+            ? "active" as const
+            : item.status,
+    })),
+    [forceManualProgress, items, manualCompleted]
+  );
+  const completed = displayedItems.filter((item) => item.status === "done").length;
+
+  function recordProgress(itemId: string) {
+    if (!storageKey) return;
+    setManualCompleted((current) => {
+      const next = new Set(current);
+      next.add(itemId);
+      window.localStorage.setItem(storageKey, JSON.stringify([...next]));
+      return next;
+    });
+  }
 
   return (
     <section className="rounded-xl border bg-white p-5">
@@ -29,12 +72,12 @@ export function RoleChecklist({
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
         <div className="rounded-full bg-storm-light px-3 py-1 text-xs font-medium text-storm-navy">
-          {completed}/{items.length} complete
+          {completed}/{displayedItems.length} complete
         </div>
       </div>
 
       <div className="mt-4 grid gap-3">
-        {items.map((item) => {
+        {displayedItems.map((item) => {
           const Icon = statusIcon[item.status];
           return (
             <div
@@ -63,7 +106,13 @@ export function RoleChecklist({
                 disabled={item.status === "locked"}
                 asChild={item.status !== "locked"}
               >
-                {item.status === "locked" ? <span>Locked</span> : <Link href={item.href}>{item.status === "done" ? "View" : "Open"}</Link>}
+                {item.status === "locked" ? (
+                  <span>Locked</span>
+                ) : (
+                  <Link href={item.href} onClick={() => recordProgress(item.id)}>
+                    {item.status === "done" ? "View" : "Open"}
+                  </Link>
+                )}
               </Button>
             </div>
           );

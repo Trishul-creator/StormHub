@@ -26,7 +26,7 @@ export function humanizeLabel(value: string | null | undefined): string {
 export function opportunityActionLabel(label: string | null | undefined): string {
   const normalized = (label ?? "").trim();
   if (!normalized) return "Sign Up";
-  if (normalized.toLowerCase() === "rsvp") return "Sign Up";
+  if (normalized.toLowerCase() === "rsvp") return "RSVP";
   return humanizeLabel(normalized);
 }
 
@@ -81,8 +81,8 @@ export const OPPORTUNITY_CATEGORIES = [
 ] as const;
 
 export const CLUB_FILTER_GROUPS = [
-  { label: "STEM", categories: ["Science", "Math", "Engineering"] },
-  { label: "Music/Arts", categories: ["Music", "Arts"] },
+  { label: "STEM", categories: ["STEM", "Science", "Math", "Engineering", "Technology", "Computer Science"] },
+  { label: "Music/Arts", categories: ["Music", "Art", "Arts", "Theater", "Performing Arts"] },
   { label: "Service", categories: ["Service"] },
   { label: "Leadership", categories: ["Leadership"] },
   { label: "Competition", categories: ["Competition"] },

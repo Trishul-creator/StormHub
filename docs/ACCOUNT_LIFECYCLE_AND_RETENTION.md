@@ -5,12 +5,12 @@ District policy takes precedence over these pilot defaults. Approve the final sc
 ## Lifecycle
 
 - **Active:** can sign in and use role-authorized features.
-- **Suspended:** sign-in is banned and RLS blocks application data. Use for investigation or temporary access removal.
+- **Banned (stored as `suspended`):** sign-in is blocked and RLS blocks application data. Use for investigation or temporary access removal.
 - **Deactivated:** sign-in is banned after graduation or departure. Records remain for approved retention periods.
 - **Deletion requested:** user request awaiting administrator review. The profile remains active until reviewed.
 - **Deleted:** Auth account and profile are removed; nullable authored references are detached. Immutable audit records remain.
 
-Admins can suspend/reactivate same-school student and teacher accounts. Super admins can act across
+Admins can ban/restore same-school student and teacher accounts. Super admins can act across
 schools. Grade 12 cleanup deactivates active grade 12 students and records the graduation year.
 
 ## Proposed Pilot Retention
@@ -18,7 +18,7 @@ schools. Grade 12 cleanup deactivates active grade 12 students and records the g
 | Data | Proposed period |
 | --- | --- |
 | Active account/profile | While enrolled or employed |
-| Deactivated profile and participation records | 12 months after departure |
+| Deactivated profile, club memberships, event RSVPs, and opportunity sign-ups | 12 months after departure |
 | Pending deletion request | Resolve within 30 calendar days |
 | Completed/rejected deletion request metadata | 12 months |
 | Administrative audit log | 24 months |

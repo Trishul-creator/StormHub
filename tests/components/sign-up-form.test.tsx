@@ -4,11 +4,15 @@ import { SignUpForm } from "@/components/auth/sign-up-form";
 import { supabaseResendConfirmation, supabaseSignUp } from "@/lib/actions";
 
 const push = vi.fn();
+const replace = vi.fn();
 const refresh = vi.fn();
 const toast = vi.fn();
+const getUser = vi.fn();
+const unsubscribe = vi.fn();
+const onAuthStateChange = vi.fn(() => ({ data: { subscription: { unsubscribe } } }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push, refresh }),
+  useRouter: () => ({ push, replace, refresh }),
 }));
 
 vi.mock("@/hooks/use-toast", () => ({
@@ -20,14 +24,28 @@ vi.mock("@/lib/actions", () => ({
   supabaseResendConfirmation: vi.fn(),
 }));
 
+vi.mock("@/lib/supabase/client", () => ({
+  createClient: () => ({
+    auth: {
+      getUser,
+      onAuthStateChange,
+    },
+  }),
+}));
+
 describe("SignUpForm", () => {
   beforeEach(() => {
     vi.useRealTimers();
     vi.mocked(supabaseSignUp).mockResolvedValue({ success: true, needsConfirmation: true });
     vi.mocked(supabaseResendConfirmation).mockResolvedValue({ success: true });
     push.mockReset();
+    replace.mockReset();
     refresh.mockReset();
     toast.mockReset();
+    getUser.mockReset();
+    getUser.mockResolvedValue({ data: { user: null } });
+    unsubscribe.mockReset();
+    onAuthStateChange.mockClear();
   });
 
   it("submits signup to the server action instead of blocking in browser demo mode", async () => {
@@ -104,5 +122,21 @@ describe("SignUpForm", () => {
       title: "Confirmation sent",
       description: "Check your inbox for a new verification link.",
     });
+  });
+
+  it("automatically continues when the pending email becomes confirmed", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    render(<SignUpForm schools={[{ id: "school-1", name: "Storm High", slug: "storm-high" }]} />);
+
+    fireEvent.change(screen.getByLabelText("School"), { target: { value: "school-1" } });
+    fireEvent.change(screen.getByLabelText("Full name"), { target: { value: "Test Student" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "student@example.edu" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "StrongPassword123" } });
+    const loadedAt = document.querySelector<HTMLInputElement>('input[name="loadedAt"]')!;
+    fireEvent.change(loadedAt, { target: { value: String(Date.now() - 2000) } });
+    fireEvent.submit(screen.getByRole("button", { name: "Create account" }).closest("form")!);
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/dashboard"));
+    expect(refresh).toHaveBeenCalled();
   });
 });

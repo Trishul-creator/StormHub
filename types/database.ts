@@ -87,6 +87,7 @@ export interface Profile {
   role: UserRole;
   account_status?: AccountStatus;
   graduation_year?: number | null;
+  onboarding_reset_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -290,6 +291,15 @@ export interface Opportunity {
   created_at?: string;
   updated_at?: string;
   club?: Club | null;
+}
+
+export interface OpportunitySignup {
+  id: string;
+  opportunity_id: string;
+  user_id: string;
+  status: "registered" | "withdrawn";
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Event {

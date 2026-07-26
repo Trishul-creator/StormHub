@@ -13,6 +13,7 @@ import type { UserRole } from "@/types/database";
 import type { Notification } from "@/types/database";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { cn } from "@/lib/cn";
+import { ThemeToggle } from "@/components/theme/theme-controls";
 
 const baseNavLinks = [
   { href: "/", label: "Home" },
@@ -66,7 +67,6 @@ export function Navbar({
             { href: schoolCalendarHref, label: "Calendar" },
             { href: schoolOpportunitiesHref, label: "Opportunities" },
           ];
-  const brandHref = isLoggedIn ? primaryHref : "/";
   const isActivePath = (href: string) => {
     if (role === "super_admin" && href === primaryHref && pathname.startsWith("/admin")) return true;
     return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
@@ -80,9 +80,9 @@ export function Navbar({
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-white/95 shadow-sm transition-shadow duration-300 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+    <header className="sticky top-0 z-50 border-b bg-card/95 shadow-sm transition-shadow duration-300 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link href={brandHref} className="group flex items-center gap-2 font-bold text-storm-navy">
+        <Link href="/" className="group flex items-center gap-2 font-bold text-storm-navy">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-storm-gradient shadow-sm transition-[transform,box-shadow] duration-300 group-hover:rotate-3 group-hover:scale-105 group-hover:shadow-md motion-reduce:transform-none">
             <Zap className="h-4 w-4 text-white" />
           </div>
@@ -119,6 +119,7 @@ export function Navbar({
                 </Button>
               )}
               <NotificationBell notifications={notifications} unreadCount={unreadNotificationCount} />
+              <ThemeToggle />
               <Button variant="ghost" size="sm" asChild>
                 <Link
                   href="/settings"
@@ -135,6 +136,7 @@ export function Navbar({
             </>
           ) : (
             <>
+              <ThemeToggle />
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/auth/sign-in">Sign in</Link>
               </Button>
@@ -151,7 +153,7 @@ export function Navbar({
       </div>
 
       {open && (
-        <div className="animate-in border-t bg-white px-4 py-4 duration-200 fade-in slide-in-from-top-2 lg:hidden">
+        <div className="animate-in border-t bg-card px-4 py-4 duration-200 fade-in slide-in-from-top-2 lg:hidden">
           <nav className="flex flex-col gap-3">
             {navLinks.map((link) => (
               <Link
@@ -170,6 +172,7 @@ export function Navbar({
             <hr className="my-2" />
             {isLoggedIn ? (
               <>
+                <ThemeToggle showLabel />
                 <Link href="/search" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Search</Link>
                 {canManage && role !== "super_admin" && primaryHref !== "/manage" && <Link href="/manage" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Manage</Link>}
                 <Link href="/notifications" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>
@@ -190,6 +193,7 @@ export function Navbar({
               </>
             ) : (
               <>
+                <ThemeToggle showLabel />
                 <Link href="/auth/sign-in" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Sign in</Link>
                 <Link href="/auth/sign-up" className="text-sm font-medium py-2 text-storm-electric" onClick={() => setOpen(false)}>Get started</Link>
               </>

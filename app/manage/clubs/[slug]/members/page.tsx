@@ -21,7 +21,7 @@ export default async function ManageMembersPage({ params }: PageProps) {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <PageHeader title={`Members — ${club.name}`} description={`${count} active members`} />
+      <PageHeader title={`Members — ${club.name}`} description={`${count} people currently joined`} />
       <div className="overflow-hidden rounded-xl border">
         <table className="w-full text-sm">
           <thead className="bg-storm-light/50">
@@ -57,7 +57,7 @@ export default async function ManageMembersPage({ params }: PageProps) {
           </tbody>
         </table>
         {roster.length === 0 && (
-          <p className="p-6 text-center text-sm text-muted-foreground">No active members.</p>
+          <p className="p-6 text-center text-sm text-muted-foreground">No one has joined this club yet.</p>
         )}
       </div>
     </div>
