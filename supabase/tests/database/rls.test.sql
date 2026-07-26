@@ -3,7 +3,13 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(55);
+SELECT plan(67);
+
+SELECT is(
+  (SELECT public FROM storage.buckets WHERE id = 'coursework-private'),
+  FALSE,
+  'coursework uploads use a private storage bucket'
+);
 
 UPDATE public.schools
 SET allowed_email_domains = ARRAY['school-a.edu']
@@ -189,6 +195,21 @@ SELECT lives_ok(
     )$$,
   'teacher sponsors can create assignments for their club'
 );
+SELECT throws_ok(
+  $$INSERT INTO public.club_assignment_attachments (
+      assignment_id, uploaded_by, source_type, copy_mode, file_name, storage_path
+    ) VALUES (
+      'a3000000-0000-4000-8000-000000000001',
+      '20000000-0000-4000-8000-000000000001',
+      'upload',
+      'reference',
+      'bypass.pdf',
+      'bypass/path.pdf'
+    )$$,
+  '42501',
+  NULL,
+  'coursework managers cannot bypass server-authorized attachment registration'
+);
 SELECT is(
   (SELECT count(*) FROM public.get_club_member_directory('a1000000-0000-4000-8000-000000000001')),
   2::BIGINT,
@@ -208,6 +229,78 @@ RESET ROLE;
 DELETE FROM public.account_deletion_requests
 WHERE user_id = '20000000-0000-4000-8000-000000000001';
 
+INSERT INTO public.club_assignments (
+  id, club_id, author_id, title, instructions, points_possible,
+  submission_mode, status, published_at
+) VALUES (
+  'a3000000-0000-4000-8000-000000000002',
+  'a1000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
+  'Attend practice',
+  'Mark this complete after practice.',
+  5,
+  'completion',
+  'published',
+  NOW()
+);
+
+INSERT INTO public.club_assignment_attachments (
+  id, assignment_id, uploaded_by, source_type, copy_mode, file_name,
+  mime_type, file_size, storage_path, external_url, google_file_id
+) VALUES
+  (
+    'a4000000-0000-4000-8000-000000000001',
+    'a3000000-0000-4000-8000-000000000001',
+    '20000000-0000-4000-8000-000000000001',
+    'upload',
+    'reference',
+    'practice.pdf',
+    'application/pdf',
+    1024,
+    'a3000000-0000-4000-8000-000000000001/materials/teacher/practice.pdf',
+    NULL,
+    NULL
+  ),
+  (
+    'a4000000-0000-4000-8000-000000000002',
+    'a3000000-0000-4000-8000-000000000001',
+    '20000000-0000-4000-8000-000000000001',
+    'google_drive',
+    'student_copy',
+    'Reflection template',
+    'application/vnd.google-apps.document',
+    NULL,
+    NULL,
+    'https://docs.google.com/document/d/template',
+    'google-template'
+  );
+
+INSERT INTO public.club_submission_attachments (
+  id, assignment_id, submission_id, student_id, source_type, file_name,
+  mime_type, file_size, storage_path
+) VALUES (
+  'a5000000-0000-4000-8000-000000000001',
+  'a3000000-0000-4000-8000-000000000001',
+  NULL,
+  '10000000-0000-4000-8000-000000000001',
+  'upload',
+  'student-work.pdf',
+  'application/pdf',
+  2048,
+  'a3000000-0000-4000-8000-000000000001/submissions/student/student-work.pdf'
+);
+
+INSERT INTO public.club_assignment_student_copies (
+  assignment_id, assignment_attachment_id, student_id, google_file_id, file_name, web_url
+) VALUES (
+  'a3000000-0000-4000-8000-000000000001',
+  'a4000000-0000-4000-8000-000000000002',
+  '10000000-0000-4000-8000-000000000001',
+  'google-student-copy',
+  'Reflection template - Student A',
+  'https://docs.google.com/document/d/student-copy'
+);
+
 SELECT set_config(
   'request.jwt.claims',
   '{"sub":"10000000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}',
@@ -216,8 +309,37 @@ SELECT set_config(
 SET LOCAL ROLE authenticated;
 SELECT is(
   (SELECT count(*) FROM public.club_assignments),
-  1::BIGINT,
+  2::BIGINT,
   'active club members can read published assignments for their club'
+);
+SELECT is(
+  (SELECT count(*) FROM public.club_assignment_attachments),
+  2::BIGINT,
+  'active club members can read assignment materials for their club'
+);
+SELECT is(
+  (SELECT count(*) FROM public.club_submission_attachments),
+  1::BIGINT,
+  'students can read only their own private submission attachments'
+);
+SELECT is(
+  (SELECT count(*) FROM public.club_assignment_student_copies),
+  1::BIGINT,
+  'students can read only their own Google Drive copies'
+);
+SELECT throws_ok(
+  $$INSERT INTO public.club_submission_attachments (
+      assignment_id, student_id, source_type, file_name, storage_path
+    ) VALUES (
+      'a3000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+      'upload',
+      'bypass.pdf',
+      'bypass/submission.pdf'
+    )$$,
+  '42501',
+  NULL,
+  'students cannot bypass server-authorized private attachment registration'
 );
 SELECT lives_ok(
   $$SELECT public.submit_club_assignment(
@@ -231,6 +353,19 @@ SELECT is(
   (SELECT count(*) FROM public.club_assignment_submissions),
   1::BIGINT,
   'students can read their own submission'
+);
+SELECT lives_ok(
+  $$SELECT public.submit_club_assignment(
+      'a3000000-0000-4000-8000-000000000002',
+      NULL,
+      NULL
+    )$$,
+  'students can mark completion-only assignments complete without an attachment'
+);
+SELECT is(
+  (SELECT count(*) FROM public.club_assignment_submissions),
+  2::BIGINT,
+  'completion-only work is recorded as a private submission'
 );
 SELECT is(
   (SELECT count(*) FROM public.get_club_member_directory('a1000000-0000-4000-8000-000000000001')),
@@ -271,6 +406,21 @@ SELECT is(
   0::BIGINT,
   'students cannot read assignments for clubs they did not join'
 );
+SELECT is(
+  (SELECT count(*) FROM public.club_assignment_attachments),
+  0::BIGINT,
+  'students cannot read assignment files for clubs they did not join'
+);
+SELECT is(
+  (SELECT count(*) FROM public.club_submission_attachments),
+  0::BIGINT,
+  'students cannot read another student private attachments'
+);
+SELECT is(
+  (SELECT count(*) FROM public.club_assignment_student_copies),
+  0::BIGINT,
+  'students cannot read another student Google Drive copies'
+);
 SELECT throws_ok(
   $$SELECT * FROM public.get_club_member_directory('a1000000-0000-4000-8000-000000000001')$$,
   'P0001',
@@ -297,12 +447,18 @@ SELECT set_config(
 SET LOCAL ROLE authenticated;
 SELECT is(
   (SELECT count(*) FROM public.club_assignment_submissions),
-  1::BIGINT,
+  2::BIGINT,
   'teacher sponsors can review submissions for their club'
+);
+SELECT is(
+  (SELECT count(*) FROM public.club_submission_attachments),
+  1::BIGINT,
+  'teacher sponsors can review private attachments for their club'
 );
 SELECT lives_ok(
   $$SELECT public.grade_club_assignment_submission(
-      (SELECT id FROM public.club_assignment_submissions LIMIT 1),
+      (SELECT id FROM public.club_assignment_submissions
+        WHERE assignment_id = 'a3000000-0000-4000-8000-000000000001'),
       18,
       'Clear reasoning and a strong reflection.'
     )$$,
@@ -317,12 +473,14 @@ SELECT set_config(
 );
 SET LOCAL ROLE authenticated;
 SELECT is(
-  (SELECT grade_points FROM public.club_assignment_submissions LIMIT 1),
+  (SELECT grade_points FROM public.club_assignment_submissions
+    WHERE assignment_id = 'a3000000-0000-4000-8000-000000000001'),
   18::NUMERIC,
   'students can see their returned grade'
 );
 SELECT is(
-  (SELECT status FROM public.club_assignment_submissions LIMIT 1),
+  (SELECT status FROM public.club_assignment_submissions
+    WHERE assignment_id = 'a3000000-0000-4000-8000-000000000001'),
   'returned',
   'graded work is returned only to its student'
 );

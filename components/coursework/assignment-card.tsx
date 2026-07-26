@@ -20,7 +20,7 @@ export function AssignmentCard({
   const status = submission?.status === "returned"
     ? "Graded"
     : submission?.status === "submitted"
-      ? "Turned in"
+      ? assignment.submission_mode === "completion" ? "Complete" : "Turned in"
       : assignment.status === "draft"
         ? "Draft"
         : assignment.status === "closed"
@@ -52,7 +52,7 @@ export function AssignmentCard({
                 <span
                   className={cn(
                     "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium",
-                    status === "Graded" || status === "Turned in"
+                    status === "Graded" || status === "Turned in" || status === "Complete"
                       ? "bg-emerald-100 text-emerald-800"
                       : status === "Past due"
                         ? "bg-red-100 text-red-800"
@@ -72,6 +72,7 @@ export function AssignmentCard({
                   {assignment.due_at ? `Due ${formatDateTime(assignment.due_at)}` : "No due date"}
                 </span>
                 <span>{assignment.points_possible} points</span>
+                {assignment.submission_mode === "completion" && <span>Mark complete</span>}
                 {assignment.attachment_url && (
                   <span className="inline-flex items-center gap-1">
                     <Paperclip className="h-3 w-3" /> Resource

@@ -1,18 +1,20 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAuth } from "@/lib/auth";
-import { Bell, Shield, User } from "lucide-react";
+import { Bell, Cloud, Shield, User } from "lucide-react";
 import { NotificationPreferencesForm } from "@/components/notifications/preferences-form";
 import { getNotificationPreferences } from "@/lib/notifications";
 import { ProfileSettingsForm } from "@/components/settings/profile-settings-form";
 import { AccountControls } from "@/components/settings/account-controls";
 import { SettingsNavigation } from "@/components/settings/settings-navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getGoogleDriveConnectionStatus } from "@/lib/google-drive";
+import { GoogleDriveSettings } from "@/components/settings/google-drive-settings";
 
 export default async function SettingsPage() {
   const { profile } = await requireAuth("/settings");
   const supabase = await createClient();
-  const [preferences, deletionRequestResult] = await Promise.all([
+  const [preferences, deletionRequestResult, googleDriveStatus] = await Promise.all([
     getNotificationPreferences(profile.id),
     supabase
       ? supabase
@@ -23,6 +25,10 @@ export default async function SettingsPage() {
           .limit(1)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    getGoogleDriveConnectionStatus(profile.id).catch(() => ({
+      configured: false,
+      connected: false,
+    })),
   ]);
 
   return (
@@ -74,6 +80,27 @@ export default async function SettingsPage() {
               </CardHeader>
               <CardContent className="pt-6">
                 <NotificationPreferencesForm initial={preferences} role={profile.role} />
+              </CardContent>
+            </Card>
+          </section>
+
+          <section id="integrations" className="scroll-mt-24" aria-labelledby="integrations-heading">
+            <Card>
+              <CardHeader className="border-b bg-storm-light/20">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-storm-electric">
+                    <Cloud className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle id="integrations-heading">Integrations</CardTitle>
+                    <CardDescription className="mt-1">
+                      Connect only the services you want to use for coursework.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <GoogleDriveSettings status={googleDriveStatus} />
               </CardContent>
             </Card>
           </section>

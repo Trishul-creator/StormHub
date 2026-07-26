@@ -4,8 +4,11 @@ import {
   ArrowLeft,
   CalendarClock,
   CheckCircle2,
+  Cloud,
+  Download,
   ExternalLink,
   FileCheck2,
+  Paperclip,
   MessageSquareText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +22,7 @@ import {
 import { requireAuth } from "@/lib/auth";
 import { canManageClubCoursework } from "@/lib/permissions";
 import { formatDateTime } from "@/lib/utils";
+import { StudentDriveCopies } from "@/components/coursework/student-drive-copies";
 
 interface AssignmentPageProps {
   params: Promise<{ slug: string; assignmentId: string }>;
@@ -47,6 +51,12 @@ export default async function ClubAssignmentPage({ params }: AssignmentPageProps
     ? new Date(assignment.due_at).getTime() < Date.now()
     : false;
   const canSubmit = profile.role === "student" && Boolean(membership) && assignment.status === "published";
+  const templates = (assignment.attachments ?? []).filter(
+    (attachment) => attachment.source_type === "google_drive" && attachment.copy_mode === "student_copy"
+  );
+  const materials = (assignment.attachments ?? []).filter(
+    (attachment) => attachment.copy_mode !== "student_copy"
+  );
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-8">
@@ -65,6 +75,11 @@ export default async function ClubAssignmentPage({ params }: AssignmentPageProps
             <div>
               <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 <span>{assignment.points_possible} points</span>
+                {assignment.submission_mode === "completion" && (
+                  <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">
+                    Mark complete
+                  </span>
+                )}
                 {assignment.status === "closed" && (
                   <span className="rounded-full bg-storm-light px-2.5 py-1 text-xs font-medium text-storm-blue">
                     Closed
@@ -98,6 +113,61 @@ export default async function ClubAssignmentPage({ params }: AssignmentPageProps
                     <ExternalLink className="h-4 w-4" /> Open assignment resource
                   </a>
                 </Button>
+              )}
+              {materials.length > 0 && (
+                <div className="mt-6 border-t pt-5">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-storm-navy">
+                    <Paperclip className="h-4 w-4" /> Assignment materials
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {materials.map((attachment) => (
+                      <a
+                        key={attachment.id}
+                        href={attachment.source_type === "upload"
+                          ? `/api/coursework/files/assignment/${attachment.id}`
+                          : `/api/coursework/google/assignment-attachments/${attachment.id}/open`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex min-w-0 items-center gap-3 rounded-xl border bg-storm-light/15 p-3 text-sm font-medium text-storm-navy transition hover:border-storm-electric/40 hover:bg-blue-50/50"
+                      >
+                        {attachment.source_type === "upload"
+                          ? <Download className="h-4 w-4 shrink-0 text-storm-electric" />
+                          : <Cloud className="h-4 w-4 shrink-0 text-storm-electric" />}
+                        <span className="truncate">{attachment.file_name}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!canManageCoursework && templates.length > 0 && (
+                <StudentDriveCopies
+                  clubSlug={slug}
+                  assignmentId={assignment.id}
+                  templates={templates}
+                  existingCopies={assignment.student_copies ?? []}
+                  disabled={!canSubmit && !submission}
+                />
+              )}
+              {canManageCoursework && templates.length > 0 && (
+                <div className="mt-6 border-t pt-5">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-storm-navy">
+                    <Cloud className="h-4 w-4" /> Student-copy templates
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {templates.map((template) => (
+                      <a
+                        key={template.id}
+                        href={template.external_url ?? "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between gap-3 rounded-xl border bg-blue-50/40 p-3 text-sm font-medium text-storm-navy"
+                      >
+                        <span className="truncate">{template.file_name}</span>
+                        <ExternalLink className="h-4 w-4 shrink-0" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -160,7 +230,9 @@ export default async function ClubAssignmentPage({ params }: AssignmentPageProps
                         ) : (
                           <FileCheck2 className="h-4 w-4 text-storm-electric" />
                         )}
-                        {submission.status === "returned" ? "Graded" : "Turned in"}
+                        {submission.status === "returned"
+                          ? "Graded"
+                          : assignment.submission_mode === "completion" ? "Completed" : "Turned in"}
                       </p>
                       {submission.submitted_at && (
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -173,6 +245,8 @@ export default async function ClubAssignmentPage({ params }: AssignmentPageProps
                     clubSlug={slug}
                     assignmentId={assignment.id}
                     submission={submission}
+                    submissionMode={assignment.submission_mode}
+                    attachments={assignment.submission_attachments ?? []}
                     disabled={!canSubmit}
                   />
                 </>

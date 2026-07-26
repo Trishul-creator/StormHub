@@ -4,14 +4,18 @@ import {
   ArrowLeft,
   CalendarClock,
   CheckCircle2,
+  Cloud,
+  Download,
   ExternalLink,
   FileCheck2,
+  Paperclip,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AssignmentStatusActions } from "@/components/coursework/assignment-status-actions";
 import { GradeSubmissionForm } from "@/components/coursework/grade-submission-form";
+import { AssignmentAttachmentsManager } from "@/components/coursework/assignment-attachments-manager";
 import {
   getClubAssignment,
   getClubAssignmentSubmissions,
@@ -73,7 +77,11 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
 
       <div className="mb-8 grid gap-4 sm:grid-cols-3">
         <SummaryCard icon={Users} label="Assigned" value={studentMembers.length} />
-        <SummaryCard icon={FileCheck2} label="Turned in" value={submissions.length} />
+        <SummaryCard
+          icon={FileCheck2}
+          label={assignment.submission_mode === "completion" ? "Completed" : "Turned in"}
+          value={submissions.length}
+        />
         <SummaryCard icon={CheckCircle2} label="Graded" value={returnedCount} />
       </div>
 
@@ -100,6 +108,11 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
               </Button>
             )}
           </div>
+          <AssignmentAttachmentsManager
+            clubSlug={slug}
+            assignmentId={assignment.id}
+            attachments={assignment.attachments ?? []}
+          />
         </CardContent>
       </Card>
 
@@ -126,11 +139,15 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
                         {submission.student?.full_name || "Club member"}
                       </h3>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {submission.submitted_at ? `Turned in ${formatDateTime(submission.submitted_at)}` : "Draft"}
+                        {submission.submitted_at
+                          ? `${assignment.submission_mode === "completion" ? "Completed" : "Turned in"} ${formatDateTime(submission.submitted_at)}`
+                          : "Draft"}
                       </p>
                     </div>
                     <span className="w-fit rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium capitalize text-emerald-800">
-                      {submission.status === "returned" ? "Graded" : "Turned in"}
+                      {submission.status === "returned"
+                        ? "Graded"
+                        : assignment.submission_mode === "completion" ? "Completed" : "Turned in"}
                     </span>
                   </div>
                   {submission.submission_text && (
@@ -144,6 +161,38 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
                         <ExternalLink className="h-4 w-4" /> Open submitted work
                       </a>
                     </Button>
+                  )}
+                  {((submission.attachments?.length ?? 0) > 0 || (submission.student_copies?.length ?? 0) > 0) && (
+                    <div className="mt-4 rounded-xl border bg-storm-light/15 p-4">
+                      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-storm-blue">
+                        <Paperclip className="h-3.5 w-3.5" /> Private files
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {(submission.student_copies ?? []).map((copy) => (
+                          <Button key={copy.id} variant="outline" size="sm" asChild>
+                            <a href={copy.web_url} target="_blank" rel="noopener noreferrer">
+                              <Cloud className="h-4 w-4" /> {copy.file_name}
+                            </a>
+                          </Button>
+                        ))}
+                        {(submission.attachments ?? []).map((attachment) => (
+                          <Button key={attachment.id} variant="outline" size="sm" asChild>
+                            <a
+                              href={attachment.source_type === "upload"
+                                ? `/api/coursework/files/submission/${attachment.id}`
+                                : attachment.external_url ?? "#"}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {attachment.source_type === "upload"
+                                ? <Download className="h-4 w-4" />
+                                : <Cloud className="h-4 w-4" />}
+                              {attachment.file_name}
+                            </a>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
                 <GradeSubmissionForm
@@ -160,7 +209,9 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
 
       {missingMembers.length > 0 && (
         <section className="mt-8 rounded-2xl border bg-white p-5">
-          <h2 className="font-semibold text-storm-navy">Not turned in</h2>
+          <h2 className="font-semibold text-storm-navy">
+            {assignment.submission_mode === "completion" ? "Not completed" : "Not turned in"}
+          </h2>
           <div className="mt-3 flex flex-wrap gap-2">
             {missingMembers.map((member) => (
               <span key={member.user_id} className="rounded-full bg-storm-light/60 px-3 py-1.5 text-sm text-storm-blue">

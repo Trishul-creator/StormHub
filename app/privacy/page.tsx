@@ -15,7 +15,8 @@ export default function PrivacyPage() {
             <li>Grade level (optional)</li>
             <li>Club memberships and event RSVPs</li>
             <li>Saved opportunities and club participation</li>
-            <li>Club assignment submissions, sponsor feedback, and club coursework grades</li>
+            <li>Club assignment submissions, private attachments, sponsor feedback, and club coursework grades</li>
+            <li>Google Drive connection details and selected-file access, only when you connect Drive</li>
           </ul>
         </section>
 
@@ -23,7 +24,8 @@ export default function PrivacyPage() {
           <h2 className="text-lg font-semibold text-storm-navy mb-2">Service providers</h2>
           <p>
             StormHub uses Supabase for accounts and database hosting, Vercel for application hosting,
-            Resend for enabled email delivery, and hCaptcha for abuse prevention. These providers process
+            Resend for enabled email delivery, hCaptcha for abuse prevention, and Google Drive only when
+            a user chooses to connect it for coursework. These providers process
             only the information needed to operate those services under the school&apos;s approved configuration.
           </p>
         </section>
@@ -41,10 +43,15 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-lg font-semibold text-storm-navy mb-2">Club coursework privacy</h2>
           <p>
-            Assignment responses and grades are visible only to the student who submitted the work,
+            Assignment responses, private files, Google Drive selections, and grades are visible only to the student who submitted the work,
             the club&apos;s teacher sponsor, and authorized school or platform administrators. Other club
             members can see names and club roles in the People directory, but not email addresses,
             submissions, grades, or private feedback.
+          </p>
+          <p className="mt-3">
+            Uploaded coursework files are kept in private storage and opened through short-lived authorized links.
+            Google Drive access uses selected-file permission rather than access to an entire Drive. Connection tokens
+            are encrypted, are never shown to other users, and are deleted when Drive is disconnected or the account is deleted.
           </p>
         </section>
 
