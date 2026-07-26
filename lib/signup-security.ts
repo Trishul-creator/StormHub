@@ -6,6 +6,43 @@ export interface SignupBotProof {
   captchaToken?: string | null;
 }
 
+export function isMissingAllowedEmailDomainsColumn(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String(error.code) : "";
+  const message = "message" in error ? String(error.message).toLowerCase() : "";
+  return code === "42703"
+    || (message.includes("allowed_email_domains") && message.includes("does not exist"));
+}
+
+export function getAllowedSignupDomains(
+  schoolDomains: unknown,
+  environmentDomains?: string
+): string[] {
+  const configuredDomains = Array.isArray(schoolDomains)
+    ? schoolDomains.filter((domain): domain is string => typeof domain === "string")
+    : [];
+
+  return [...configuredDomains, ...(environmentDomains ?? "").split(",")]
+    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ""))
+    .filter(Boolean)
+    .filter((domain, index, domains) => domains.indexOf(domain) === index);
+}
+
+export function parseSignupDomainInput(input: string): {
+  domains: string[];
+  invalidDomains: string[];
+} {
+  const candidates = input
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ""))
+    .filter(Boolean);
+  const domains = candidates
+    .filter((domain) => domain === "*" || /^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain))
+    .filter((domain, index, values) => values.indexOf(domain) === index);
+  const invalidDomains = candidates.filter((domain) => !domains.includes(domain));
+  return { domains, invalidDomains };
+}
+
 export function validateSignupBotProof(
   proof: SignupBotProof | undefined,
   now = Date.now()

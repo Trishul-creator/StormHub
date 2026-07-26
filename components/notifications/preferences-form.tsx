@@ -31,7 +31,7 @@ export function NotificationPreferencesForm({
 
   function option(key: keyof PreferenceValues, label: string, description: string, disabled = false) {
     return (
-      <label className={`flex items-start justify-between gap-4 rounded-lg border p-3 ${disabled ? "opacity-60" : ""}`}>
+      <label className={`group flex items-start justify-between gap-4 rounded-xl border p-4 transition-[border-color,background-color,box-shadow] duration-200 has-[:focus-visible]:border-storm-electric/50 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/30 ${disabled ? "opacity-60" : "cursor-pointer hover:border-storm-electric/25 hover:bg-storm-light/20 hover:shadow-sm"}`}>
         <span>
           <span className="block text-sm font-medium text-storm-navy">{label}</span>
           <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
@@ -41,7 +41,7 @@ export function NotificationPreferencesForm({
           checked={values[key]}
           disabled={disabled}
           onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.checked }))}
-          className="mt-1 h-4 w-4"
+          className="mt-1 h-4 w-4 shrink-0 accent-storm-electric"
         />
       </label>
     );

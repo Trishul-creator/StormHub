@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   getAuthCallbackUrl,
   getEmailDeliveryMode,
+  getGoogleDriveServerConfig,
   getGroqApiKey,
   getSupabaseAnonKey,
   getSupabaseServiceRoleKey,
   getSupabaseUrl,
   isAssistantEnabled,
+  isGoogleDrivePickerConfigured,
 } from "@/lib/env";
 
 describe("environment resolver", () => {
@@ -62,6 +64,27 @@ describe("environment resolver", () => {
     expect(getAuthCallbackUrl({ NEXT_PUBLIC_APP_URL: "https://preview.stormhubapp.com/" })).toBe(
       "https://preview.stormhubapp.com/auth/callback"
     );
+  });
+
+  it("requires the complete Google Drive server and Picker configuration", () => {
+    const env = {
+      NEXT_PUBLIC_SITE_URL: "https://stormhubapp.com",
+      GOOGLE_DRIVE_CLIENT_ID: "client-id",
+      GOOGLE_DRIVE_CLIENT_SECRET: "client-secret",
+      GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY: "a".repeat(64),
+      NEXT_PUBLIC_GOOGLE_DRIVE_API_KEY: "browser-key",
+      NEXT_PUBLIC_GOOGLE_DRIVE_APP_ID: "123456789",
+    };
+
+    expect(getGoogleDriveServerConfig(env)).toEqual({
+      clientId: "client-id",
+      clientSecret: "client-secret",
+      tokenEncryptionKey: "a".repeat(64),
+      redirectUri: "https://stormhubapp.com/api/integrations/google-drive/callback",
+    });
+    expect(isGoogleDrivePickerConfigured(env)).toBe(true);
+    expect(getGoogleDriveServerConfig({})).toBeNull();
+    expect(isGoogleDrivePickerConfigured({ ...env, NEXT_PUBLIC_GOOGLE_DRIVE_API_KEY: "" })).toBe(false);
   });
 
   it("disables assistant without Groq or in explicit staging E2E", () => {

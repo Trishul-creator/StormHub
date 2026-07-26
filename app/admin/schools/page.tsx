@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { ArrowRight, Building2, Calendar, GraduationCap, Mail, UserRoundX, Users } from "lucide-react";
+import { ArrowRight, BarChart3, Building2, Calendar, GraduationCap, Mail, UserRoundX, Users } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAllSchools, getSchoolManageUrl, getSchoolPublicUrl } from "@/lib/schools";
+import { parseSignupDomainInput } from "@/lib/signup-security";
 import { slugify } from "@/lib/utils";
 import type { School } from "@/types/database";
 
@@ -26,13 +27,21 @@ async function createSchoolAction(formData: FormData) {
   const city = String(formData.get("city") ?? "").trim();
   const state = String(formData.get("state") ?? "").trim();
   const mascot = String(formData.get("mascot") ?? "").trim();
-  const allowedEmailDomains = String(formData.get("allowed_email_domains") ?? "")
-    .split(",")
-    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ""))
-    .filter((domain) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain));
+  const {
+    domains: allowedEmailDomains,
+    invalidDomains,
+  } = parseSignupDomainInput(String(formData.get("allowed_email_domains") ?? ""));
   const slug = slugify(String(formData.get("slug") ?? "").trim() || name);
 
-  if (!name || !slug || allowedEmailDomains.length === 0) redirect("/admin/schools?error=missing_school_configuration");
+  if (
+    !name
+    || !slug
+    || allowedEmailDomains.length === 0
+    || invalidDomains.length > 0
+    || (allowedEmailDomains.includes("*") && allowedEmailDomains.length > 1)
+  ) {
+    redirect("/admin/schools?error=missing_school_configuration");
+  }
 
   const { data: school, error } = await supabase
     .from("schools")
@@ -86,6 +95,9 @@ export default async function AdminSchoolsPage() {
         description="Choose a school workspace before viewing or managing school-specific content."
       >
         <Button variant="outline" asChild>
+          <Link href="/admin/statistics"><BarChart3 className="h-4 w-4" /> Statistics</Link>
+        </Button>
+        <Button variant="outline" asChild>
           <Link href="/admin/feedback"><Mail className="h-4 w-4" /> Support inbox</Link>
         </Button>
         <Button variant="outline" asChild>
@@ -120,8 +132,8 @@ export default async function AdminSchoolsPage() {
             </label>
             <label className="block text-sm">
               <span className="text-muted-foreground">Approved email domains</span>
-              <input name="allowed_email_domains" required className="mt-1 w-full rounded-md border px-3 py-2" placeholder="students.example.edu, staff.example.edu" />
-              <span className="mt-1 block text-xs text-muted-foreground">Comma-separated domains. New accounts must use one of these domains.</span>
+              <input name="allowed_email_domains" required className="mt-1 w-full rounded-md border px-3 py-2" placeholder="* or students.example.edu, staff.example.edu" />
+              <span className="mt-1 block text-xs text-muted-foreground">Use * for every verified email domain, or enter a comma-separated restriction list.</span>
             </label>
             <label className="block text-sm">
               <span className="text-muted-foreground">Workspace URL name (optional)</span>

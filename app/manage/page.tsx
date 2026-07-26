@@ -3,19 +3,21 @@ import { Shield, Zap, Users, BarChart3, CheckSquare, History, Mail } from "lucid
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { SignupDomainSettings } from "@/components/admin/signup-domain-settings";
 import { RoleChecklist } from "@/components/dashboard/role-checklist";
 import { requireManager } from "@/lib/auth";
 import { getAdminAnalytics, getManageableClubs, getPendingApprovals } from "@/lib/data";
 import { canAccessAdmin, canAccessManageAnalytics, canApproveContent } from "@/lib/permissions";
 import { getRoleOnboardingItems } from "@/lib/product";
+import { getSchoolForProfile } from "@/lib/schools";
 import { redirect } from "next/navigation";
 
 const manageLinks = [
-  { href: "/manage/clubs", icon: Users, title: "Manage Clubs", description: "Edit club profiles and view members" },
+  { href: "/manage/clubs", icon: Users, title: "Manage Clubs", description: "Manage club profiles, coursework, posts, and members" },
   { href: "/manage/clubs/drafts", icon: Users, title: "Draft Clubs", description: "Review prepared clubs before publishing them" },
   { href: "/manage/opportunities", icon: Zap, title: "Opportunities", description: "Post school-wide sign-ups and applications" },
   { href: "/manage/approvals", icon: CheckSquare, title: "Approval Queue", description: "Review pending content" },
-  { href: "/manage/analytics", icon: BarChart3, title: "Analytics", description: "View platform metrics" },
+  { href: "/admin/statistics", icon: BarChart3, title: "Statistics", description: "View school participation and activity trends" },
   { href: "/manage/digest", icon: Mail, title: "Weekly Digest", description: "Generate newsletter content" },
   { href: "/admin", icon: Shield, title: "Admin Panel", description: "School-wide administration" },
   { href: "/admin/audit", icon: History, title: "Audit Log", description: "Review administrative change history" },
@@ -24,10 +26,11 @@ const manageLinks = [
 export default async function ManagePage() {
   const { profile } = await requireManager();
   if (profile.role === "super_admin") redirect("/admin/schools");
-  const [pendingApprovals, manageableClubs, analytics] = await Promise.all([
+  const [pendingApprovals, manageableClubs, analytics, school] = await Promise.all([
     canApproveContent(profile) ? getPendingApprovals() : Promise.resolve([]),
     getManageableClubs(profile),
     canAccessManageAnalytics(profile) ? getAdminAnalytics() : Promise.resolve(null),
+    profile.role === "admin" ? getSchoolForProfile(profile) : Promise.resolve(null),
   ]);
   const checklist = getRoleOnboardingItems(profile.role, {
     manageableClubs: manageableClubs.length,
@@ -39,7 +42,7 @@ export default async function ManagePage() {
     if (link.href === "/admin") return canAccessAdmin(profile);
     if (link.href === "/admin/audit") return canAccessAdmin(profile);
     if (link.href === "/manage/opportunities") return canAccessAdmin(profile);
-    if (link.href === "/manage/analytics") return canAccessManageAnalytics(profile);
+    if (link.href === "/admin/statistics") return canAccessManageAnalytics(profile);
     if (link.href === "/manage/approvals") return canAccessAdmin(profile) || pendingApprovals.length > 0;
     return true;
   });
@@ -65,6 +68,15 @@ export default async function ManagePage() {
           <MetricCard label="Saved opportunities" value={analytics.totalBookmarks} />
         </div>
       )}
+      {profile.role === "admin" && school && (
+        <div className="mb-6">
+          <SignupDomainSettings
+            schoolId={school.id}
+            schoolName={school.name}
+            domains={school.allowed_email_domains ?? []}
+          />
+        </div>
+      )}
       {profile.role === "teacher" && manageableClubs.length > 0 && (
         <section className="mb-6">
           <div className="mb-3 flex items-center justify-between">
@@ -81,6 +93,7 @@ export default async function ManagePage() {
                 <CardContent className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" asChild><Link href={`/manage/clubs/${club.slug}/members`}>Roster</Link></Button>
                   <Button size="sm" variant="outline" asChild><Link href={`/manage/clubs/${club.slug}/announcements`}>Post</Link></Button>
+                  <Button size="sm" variant="outline" asChild><Link href={`/manage/clubs/${club.slug}/coursework`}>Coursework</Link></Button>
                   <Button size="sm" variant="outline" asChild><Link href={`/manage/clubs/${club.slug}/events`}>Events</Link></Button>
                 </CardContent>
               </Card>
