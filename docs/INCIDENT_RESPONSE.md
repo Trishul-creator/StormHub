@@ -41,7 +41,7 @@ Store current names and phone numbers in the district's private operations syste
 1. Fix forward on a branch and require all protected checks.
 2. For application-only regressions, promote the last known good Vercel deployment while the fix runs.
 3. For data corruption, stop writes, preserve a snapshot, and follow `BACKUP_AND_RECOVERY.md`.
-4. Confirm health, authentication, school isolation, admin MFA, and the affected user flow.
+4. Confirm health, email-confirmed authentication, school isolation, and the affected user flow.
 5. Monitor for at least 30 minutes after recovery.
 
 ## Afterward

@@ -51,6 +51,7 @@ import {
 } from "@/lib/signup-security";
 import { verifyCaptchaToken } from "@/lib/captcha";
 import { checkDurableRateLimit, markRateLimitAttemptSuccessful } from "@/lib/request-rate-limit";
+import { getAuthCallbackUrl } from "@/lib/env";
 
 const DEMO_USER_COOKIE = "stormhub_demo_user";
 const DEMO_EMAIL_COOKIE = "stormhub_demo_email";
@@ -58,15 +59,6 @@ const DEMO_MEMBERSHIPS_COOKIE = "stormhub_demo_memberships";
 const DEMO_BOOKMARKS_COOKIE = "stormhub_demo_bookmarks";
 const DEMO_RSVPS_COOKIE = "stormhub_demo_rsvps";
 const DEMO_READ_NOTIFICATIONS_COOKIE = "stormhub_demo_read_notifications";
-
-async function hasAdministrativeMfa(
-  supabase: NonNullable<Awaited<ReturnType<typeof createClient>>>,
-  profile: Profile
-): Promise<boolean> {
-  if (!isAdminRole(profile.role)) return false;
-  const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  return !error && data.currentLevel === "aal2";
-}
 
 function formatMembershipRole(role: MembershipRole): string {
   return role.replace(/_/g, " ");
@@ -1060,9 +1052,7 @@ export async function deleteUserAccount(targetUserId: string): Promise<{ success
   if (!supabase || !admin || !actor) {
     return { success: false, error: "Administrator configuration is incomplete. Check SUPABASE_SERVICE_ROLE_KEY." };
   }
-  if (!(await hasAdministrativeMfa(supabase, actor))) {
-    return { success: false, error: "Verify administrator MFA before deleting an account." };
-  }
+  if (!isAdminRole(actor.role)) return { success: false, error: "Administrator access required." };
 
   const { data: targetData, error: targetError } = await supabase
     .from("profiles")
@@ -1114,9 +1104,6 @@ export async function updateUserAccountStatus(
   const actor = await getCurrentProfile();
   if (!supabase || !admin || !actor) return { success: false, error: "Administrator configuration is incomplete." };
   if (!isAdminRole(actor.role)) return { success: false, error: "Administrator access required." };
-  if (!(await hasAdministrativeMfa(supabase, actor))) {
-    return { success: false, error: "Verify administrator MFA before changing an account status." };
-  }
 
   const { data: targetData, error: targetError } = await supabase
     .from("profiles")
@@ -1164,9 +1151,6 @@ export async function deactivateGraduatingStudents(
   const actor = await getCurrentProfile();
   if (!supabase || !admin || !actor || !isAdminRole(actor.role)) {
     return { success: false, error: "Administrator configuration is incomplete." };
-  }
-  if (!(await hasAdministrativeMfa(supabase, actor))) {
-    return { success: false, error: "Verify administrator MFA before running graduation cleanup." };
   }
 
   let query = supabase
@@ -1229,9 +1213,6 @@ export async function reviewAccountDeletionRequest(data: {
   const actor = await getCurrentProfile();
   if (!supabase || !admin || !actor || !isAdminRole(actor.role)) {
     return { success: false, error: "Administrator configuration is incomplete." };
-  }
-  if (!(await hasAdministrativeMfa(supabase, actor))) {
-    return { success: false, error: "Verify administrator MFA before reviewing deletion requests." };
   }
 
   const { data: request, error: requestError } = await supabase
@@ -1642,6 +1623,7 @@ export async function supabaseSignUp(
     password,
     options: {
       data: { full_name: normalizedFullName, grade_level: normalizedGrade, school_id: schoolId },
+      emailRedirectTo: getAuthCallbackUrl(),
       ...(botProof?.captchaToken ? { captchaToken: botProof.captchaToken } : {}),
     },
   });

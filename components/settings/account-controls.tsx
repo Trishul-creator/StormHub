@@ -1,43 +1,10 @@
-"use client";
-
-import { useTransition } from "react";
-import Link from "next/link";
-import { Download, KeyRound, Loader2, Trash2 } from "lucide-react";
-import { requestAccountDeletion } from "@/lib/actions";
+import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/hooks/use-toast";
-import type { UserRole } from "@/types/database";
 
-export function AccountControls({ role }: { role: UserRole }) {
-  const [pending, startTransition] = useTransition();
-
-  function requestDeletion() {
-    const reason = window.prompt("Optional: tell the administrator why you want this account deleted.") ?? undefined;
-    if (reason === undefined) return;
-    startTransition(async () => {
-      const result = await requestAccountDeletion(reason);
-      toast({
-        title: result.success ? "Deletion requested" : "Could not submit request",
-        description: result.success ? "An administrator will review the request and contact you if needed." : result.error,
-        variant: result.success ? "default" : "destructive",
-      });
-    });
-  }
-
+export function AccountControls() {
   return (
-    <div className="flex flex-wrap gap-2">
-      <Button variant="outline" asChild>
-        <a href="/api/account/export"><Download className="h-4 w-4" /> Export my data</a>
-      </Button>
-      {(role === "admin" || role === "super_admin") && (
-        <Button variant="outline" asChild>
-          <Link href="/auth/mfa"><KeyRound className="h-4 w-4" /> Authenticator settings</Link>
-        </Button>
-      )}
-      <Button variant="outline" onClick={requestDeletion} disabled={pending}>
-        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-        Request account deletion
-      </Button>
-    </div>
+    <Button variant="outline" asChild>
+      <a href="/api/account/export"><Download className="h-4 w-4" /> Export my data</a>
+    </Button>
   );
 }

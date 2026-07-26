@@ -71,7 +71,11 @@ supabase db push
 6. Add `https://stormhubapp.com/auth/callback` as a redirect URL. Add the exact staging
    callback URL as well; do not allow an unrestricted production wildcard.
 7. Enable email confirmation. Keep secure email changes enabled.
-8. Send a signup confirmation and password-reset email to an address outside the Supabase team.
+8. Leave the default confirmation template using `{{ .ConfirmationURL }}`. If the template was
+   customized, make sure its confirmation link still uses `{{ .ConfirmationURL }}` rather than
+   linking directly to `{{ .SiteURL }}`; StormHub sends users through `/auth/callback` to establish
+   their session and profile safely.
+9. Send a signup confirmation and password-reset email to an address outside the Supabase team.
 
 For application email, set these Vercel Production and Preview variables:
 
@@ -105,17 +109,21 @@ HCAPTCHA_SECRET_KEY=<hCaptcha secret>
 Supabase validates Auth CAPTCHA tokens. StormHub separately validates the contact form token before
 using the service-role database client.
 
-## 4. Enable Admin MFA
+## 4. Verify Email-Only Authentication
 
-1. In Supabase, open **Authentication > Multi-Factor Authentication**.
-2. Enable TOTP enrollment and TOTP verification.
-3. Deploy the application code before applying the hardening migration.
-4. Have every admin and super admin sign in and open `/auth/mfa`.
-5. Scan the QR code with an authenticator app, enter the six-digit code, and store recovery access
-   according to district policy.
-6. Confirm an AAL1 admin is redirected to `/auth/mfa` and an AAL2 admin can open `/admin`.
+Every student, teacher, admin, and super admin uses password sign-in plus Supabase email confirmation.
+StormHub does not require phone numbers, SMS, or authenticator applications.
 
-Do not share one administrator account. Every administrator needs an individual account and factor.
+1. In Supabase, open **Authentication > Providers > Email** and keep email signup and email
+   confirmations enabled.
+2. Keep phone signup, Phone MFA, and TOTP MFA disabled.
+3. Confirm the production URL and `/auth/callback` are present in Supabase redirect URL settings.
+4. Create one test account for every role. Confirm an unverified account is rejected and each account
+   can sign in after using the confirmation link.
+5. Confirm school admins remain limited to their school and only super admins receive cross-school
+   access. Email confirmation does not replace role, school, account-status, or audit controls.
+
+Do not share administrator accounts. Every administrator needs an individual confirmed email account.
 
 ## 5. Apply The Migration Chain
 
@@ -143,7 +151,7 @@ WHERE slug = 'your-school-slug';
 ```
 
 Replace the example values with domains controlled by the district. An empty domain list intentionally
-blocks new accounts. After the super admin has AAL2, the same list can be maintained in the school
+blocks new accounts. The same list can be maintained by the super admin in the school
 workspace under **Signup protection**.
 
 ## 6. Set Vercel Secrets
