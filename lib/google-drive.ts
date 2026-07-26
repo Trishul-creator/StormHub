@@ -3,9 +3,7 @@ import "server-only";
 import {
   createCipheriv,
   createDecipheriv,
-  createHmac,
   randomBytes,
-  timingSafeEqual,
 } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -95,19 +93,12 @@ export function createGoogleOAuthState(input: {
     returnTo: safeReturnTo(input.returnTo),
     expiresAt: Date.now() + 10 * 60 * 1000,
   };
-  const payload = Buffer.from(JSON.stringify(state)).toString("base64url");
-  const signature = createHmac("sha256", encryptionKey()).update(payload).digest("base64url");
-  return `${payload}.${signature}`;
+  return encryptGoogleToken(JSON.stringify(state));
 }
 
 export function verifyGoogleOAuthState(value: string): GoogleOAuthState | null {
-  const [payload, signature] = value.split(".");
-  if (!payload || !signature) return null;
-  const expected = createHmac("sha256", encryptionKey()).update(payload).digest();
-  const received = Buffer.from(signature, "base64url");
-  if (expected.length !== received.length || !timingSafeEqual(expected, received)) return null;
   try {
-    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as GoogleOAuthState;
+    const parsed = JSON.parse(decryptGoogleToken(value)) as GoogleOAuthState;
     if (
       !parsed.userId
       || !parsed.nonce
