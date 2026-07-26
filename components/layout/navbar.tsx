@@ -8,10 +8,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/utils";
 import { demoSignOut, supabaseSignOut } from "@/lib/actions";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { UserRole } from "@/types/database";
 import type { Notification } from "@/types/database";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { cn } from "@/lib/cn";
 
 const baseNavLinks = [
   { href: "/", label: "Home" },
@@ -44,6 +45,7 @@ export function Navbar({
 }: NavbarProps) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const primaryHref = role === "super_admin" ? "/admin/schools" : role === "admin" || role === "teacher" ? "/manage" : "/dashboard";
   const primaryLabel = role === "super_admin" ? "Platform Admin" : role === "admin" || role === "teacher" ? "Manage" : "Dashboard";
   const schoolClubHref = schoolSlug ? `/s/${schoolSlug}/clubs` : "/clubs";
@@ -67,6 +69,10 @@ export function Navbar({
             { href: schoolOpportunitiesHref, label: "Opportunities" },
           ];
   const brandHref = isLoggedIn ? primaryHref : "/";
+  const isActivePath = (href: string) => {
+    if (role === "super_admin" && href === primaryHref && pathname.startsWith("/admin")) return true;
+    return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+  };
 
   async function handleSignOut() {
     if (isDemoMode) await demoSignOut();
@@ -90,7 +96,13 @@ export function Navbar({
             <Link
               key={link.href}
               href={link.href}
-              className="relative py-2 text-sm font-medium text-storm-navy/70 transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:origin-left after:scale-x-0 after:rounded-full after:bg-storm-electric after:transition-transform after:duration-200 hover:text-storm-electric hover:after:scale-x-100"
+              aria-current={isActivePath(link.href) ? "page" : undefined}
+              className={cn(
+                "relative py-2 text-sm font-medium transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:origin-left after:rounded-full after:bg-storm-electric after:transition-transform after:duration-200 hover:text-storm-electric hover:after:scale-x-100",
+                isActivePath(link.href)
+                  ? "text-storm-electric after:scale-x-100"
+                  : "text-storm-navy/70 after:scale-x-0"
+              )}
             >
               {link.label}
             </Link>
@@ -115,7 +127,14 @@ export function Navbar({
               )}
               <NotificationBell notifications={notifications} unreadCount={unreadNotificationCount} />
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/settings"><Settings className="h-4 w-4" /></Link>
+                <Link
+                  href="/settings"
+                  aria-label="Settings"
+                  aria-current={isActivePath("/settings") ? "page" : undefined}
+                  className={isActivePath("/settings") ? "bg-storm-light/70 text-storm-electric" : undefined}
+                >
+                  <Settings className="h-4 w-4" />
+                </Link>
               </Button>
               <Button variant="outline" size="sm" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4 mr-1" />Sign out
@@ -142,7 +161,16 @@ export function Navbar({
         <div className="animate-in border-t bg-white px-4 py-4 duration-200 fade-in slide-in-from-top-2 lg:hidden">
           <nav className="flex flex-col gap-3">
             {navLinks.map((link) => (
-              <Link key={link.href} href={link.href} className="text-sm font-medium py-2" onClick={() => setOpen(false)}>
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={isActivePath(link.href) ? "page" : undefined}
+                className={cn(
+                  "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  isActivePath(link.href) ? "bg-storm-light/60 text-storm-electric" : "hover:bg-storm-light/40"
+                )}
+                onClick={() => setOpen(false)}
+              >
                 {link.label}
               </Link>
             ))}
@@ -155,7 +183,17 @@ export function Navbar({
                 <Link href="/notifications" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>
                   Notifications{unreadNotificationCount > 0 ? ` (${unreadNotificationCount})` : ""}
                 </Link>
-                <Link href="/settings" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Settings</Link>
+                <Link
+                  href="/settings"
+                  aria-current={isActivePath("/settings") ? "page" : undefined}
+                  className={cn(
+                    "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    isActivePath("/settings") ? "bg-storm-light/60 text-storm-electric" : "hover:bg-storm-light/40"
+                  )}
+                  onClick={() => setOpen(false)}
+                >
+                  Settings
+                </Link>
                 <button onClick={handleSignOut} className="text-sm font-medium py-2 text-left text-red-600">Sign out</button>
               </>
             ) : (
