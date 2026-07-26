@@ -9,7 +9,6 @@ import { getAuthContext, hasManagementAccess } from "@/lib/auth";
 import { SetupBanner } from "@/components/layout/setup-banner";
 import { getUnreadNotificationCount, getUserNotifications } from "@/lib/notifications";
 import { getSchoolForProfile } from "@/lib/schools";
-import { isAssistantEnabled } from "@/lib/env";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -41,7 +40,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           notifications={notifications}
           unreadNotificationCount={unreadNotificationCount}
           schoolSlug={school?.slug}
-          assistantEnabled={isAssistantEnabled()}
         />
         <SetupBanner />
         <main id="main-content" className="min-h-[calc(100vh-4rem)]" tabIndex={-1}>{children}</main>
