@@ -1,7 +1,7 @@
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.club_assignments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   club_id UUID NOT NULL REFERENCES public.clubs(id) ON DELETE CASCADE,
   author_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   title TEXT NOT NULL CHECK (char_length(title) BETWEEN 1 AND 200),
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.club_assignments (
 );
 
 CREATE TABLE IF NOT EXISTS public.club_assignment_submissions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   assignment_id UUID NOT NULL REFERENCES public.club_assignments(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   submission_text TEXT CHECK (char_length(submission_text) <= 20000),
