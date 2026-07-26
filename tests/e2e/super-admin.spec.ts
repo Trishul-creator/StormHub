@@ -15,8 +15,12 @@ test.describe("super admin school chooser", () => {
     await expect(page.getByText(/School 2/i).first()).toBeVisible();
     await expect(page.getByText(/Workspace URL name/i)).toBeVisible();
     await expect(page.getByText(/^Slug$/)).toHaveCount(0);
+    const adminNavigation = page.getByRole("navigation", { name: "Administration" });
+    await expect(adminNavigation).toBeVisible();
+    await expect(adminNavigation.getByRole("link", { name: "Schools" })).toHaveAttribute("aria-current", "page");
+    await expect(adminNavigation.getByRole("link", { name: "Statistics" })).toBeVisible();
 
-    await page.getByRole("link", { name: /support inbox/i }).click();
+    await adminNavigation.getByRole("link", { name: /support inbox/i }).click();
     await expect(page).toHaveURL(/\/admin\/feedback/);
     await expect(page.getByRole("heading", { name: /support inbox/i })).toBeVisible();
 

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BarChart3, Building2, Globe2, ShieldCheck } from "lucide-react";
 import { StatisticsDashboard } from "@/components/admin/statistics-dashboard";
@@ -33,13 +32,7 @@ export default async function AdminStatisticsPage({ searchParams }: AdminStatist
       <PageHeader
         title="Statistics"
         description={`Participation and activity signals for ${scopeName}.`}
-      >
-        <Button variant="outline" asChild>
-          <Link href={isSuperAdmin ? "/admin/schools" : "/admin"}>
-            Back to admin
-          </Link>
-        </Button>
-      </PageHeader>
+      />
 
       <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
