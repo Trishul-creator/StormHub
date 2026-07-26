@@ -1,4 +1,3 @@
-import { ContentForm } from "@/components/forms/content-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { getManagedClubBySlug, getClubManagedContent } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
@@ -9,8 +8,9 @@ import { Eye } from "lucide-react";
 import { StatusBadge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/utils";
 import { ArchiveContentButton } from "@/components/manage/archive-content-button";
-import { canApproveClubContent } from "@/lib/permissions";
+import { canApproveClubContent, canManageClubCoursework } from "@/lib/permissions";
 import type { ClubAnnouncement } from "@/types/database";
+import { ClubPostComposer } from "@/components/manage/club-post-composer";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -23,15 +23,20 @@ export default async function ManageAnnouncementsPage({ params }: PageProps) {
   const auth = await requireClubManager(club);
   const announcements = (await getClubManagedContent(club.id, "announcement")) as ClubAnnouncement[];
   const canDelete = canApproveClubContent(auth.profile, club, auth.membership);
+  const courseworkEnabled = canManageClubCoursework(auth.profile, club, auth.membership);
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
-      <PageHeader title="Create Announcement" description={`Post an update for ${club.name}.`}>
+      <PageHeader title="Create a club post" description={`Publish assignments, announcements, events, and materials for ${club.name}.`}>
         <Button variant="outline" size="sm" asChild>
           <Link href={`/clubs/${slug}/member`}><Eye className="h-4 w-4" /> View club dashboard</Link>
         </Button>
       </PageHeader>
-      <ContentForm type="announcement" clubSlug={slug} />
+      <ClubPostComposer
+        clubSlug={slug}
+        defaultType="announcement"
+        courseworkEnabled={courseworkEnabled}
+      />
       <section className="mt-8 rounded-xl border bg-white p-5">
         <h2 className="font-semibold text-storm-navy">Previous announcements</h2>
         <div className="mt-4 space-y-3">

@@ -111,3 +111,31 @@ export function getGroqApiKey(env: Env = process.env): string | null {
 export function getGroqModel(env: Env = process.env): string {
   return clean(env.GROQ_MODEL) ?? "openai/gpt-oss-20b";
 }
+
+export interface GoogleDriveServerConfig {
+  clientId: string;
+  clientSecret: string;
+  tokenEncryptionKey: string;
+  redirectUri: string;
+}
+
+export function getGoogleDriveServerConfig(env: Env = process.env): GoogleDriveServerConfig | null {
+  const clientId = clean(env.GOOGLE_DRIVE_CLIENT_ID);
+  const clientSecret = clean(env.GOOGLE_DRIVE_CLIENT_SECRET);
+  const tokenEncryptionKey = clean(env.GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY);
+  if (!clientId || !clientSecret || !tokenEncryptionKey) return null;
+  return {
+    clientId,
+    clientSecret,
+    tokenEncryptionKey,
+    redirectUri: new URL("/api/integrations/google-drive/callback", getPublicSiteUrl(env)).toString(),
+  };
+}
+
+export function isGoogleDrivePickerConfigured(env: Env = process.env): boolean {
+  return Boolean(
+    clean(env.NEXT_PUBLIC_GOOGLE_DRIVE_API_KEY)
+      && clean(env.NEXT_PUBLIC_GOOGLE_DRIVE_APP_ID)
+      && getGoogleDriveServerConfig(env)
+  );
+}
