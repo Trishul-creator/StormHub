@@ -7,6 +7,7 @@ import {
   demoEvents,
   demoOpportunities,
   demoAnnouncements,
+  demoAssignments,
   demoMemberResources,
   demoWorkshops,
   attachClubToItems,
@@ -15,6 +16,12 @@ import {
 import type {
   Club,
   ClubAnnouncement,
+  ClubAssignment,
+  ClubAssignmentAttachment,
+  ClubAssignmentStudentCopy,
+  ClubAssignmentSubmission,
+  ClubSubmissionAttachment,
+  ClubMemberDirectoryEntry,
   ClubMembership,
   ClubResource,
   Event,
@@ -26,6 +33,7 @@ import type {
   PendingApprovalItem,
   School,
   AdminUser,
+  AdminStatistics,
   FeedbackItem,
   ApprovalContentType,
 } from "@/types/database";
@@ -194,8 +202,19 @@ export async function getUserClubMembership(
 ): Promise<ClubMembership | null> {
   if (!userId) return null;
   if (isDemoMode()) {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const raw = cookieStore.get("stormhub_demo_memberships")?.value;
+    let joinedSlugs = demoState.memberships;
+    if (raw) {
+      try {
+        joinedSlugs = new Set(JSON.parse(raw) as string[]);
+      } catch {
+        joinedSlugs = new Set();
+      }
+    }
     const club = demoClubs.find((c) => c.id === clubId);
-    if (club && demoState.memberships.has(club.slug)) {
+    if (club && joinedSlugs.has(club.slug)) {
       return {
         id: `demo-membership-${clubId}`,
         club_id: clubId,
@@ -284,6 +303,238 @@ export async function getClubManagedContent(
     return [];
   }
   return (data as Array<ClubAnnouncement | ClubResource | Event>) ?? [];
+}
+
+function normalizeAssignment(row: ClubAssignment): ClubAssignment {
+  return {
+    ...row,
+    points_possible: Number(row.points_possible),
+    submission_mode: row.submission_mode ?? "submission",
+    submission: row.submission
+      ? {
+          ...row.submission,
+          grade_points:
+            row.submission.grade_points === null || row.submission.grade_points === undefined
+              ? null
+              : Number(row.submission.grade_points),
+        }
+      : row.submission,
+  };
+}
+
+export async function getClubAssignments(
+  clubId: string,
+  options: { userId?: string | null; includeArchived?: boolean } = {}
+): Promise<ClubAssignment[]> {
+  if (isDemoMode()) {
+    return demoAssignments
+      .filter((assignment) => assignment.club_id === clubId)
+      .filter((assignment) => options.includeArchived || assignment.status !== "archived")
+      .map(normalizeAssignment);
+  }
+
+  const supabase = await createClient();
+  if (!supabase) return [];
+
+  let query = supabase
+    .from("club_assignments")
+    .select("*")
+    .eq("club_id", clubId);
+  if (!options.includeArchived) query = query.neq("status", "archived");
+
+  const { data, error } = await query
+    .order("due_at", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("[getClubAssignments]", error.message);
+    return [];
+  }
+
+  const assignments = ((data as ClubAssignment[]) ?? []).map(normalizeAssignment);
+  if (!options.userId || assignments.length === 0) return assignments;
+
+  const { data: submissions, error: submissionError } = await supabase
+    .from("club_assignment_submissions")
+    .select("*")
+    .eq("student_id", options.userId)
+    .in("assignment_id", assignments.map((assignment) => assignment.id));
+  if (submissionError) {
+    console.error("[getClubAssignments submissions]", submissionError.message);
+    return assignments;
+  }
+
+  const submissionMap = new Map(
+    ((submissions as ClubAssignmentSubmission[]) ?? []).map((submission) => [
+      submission.assignment_id,
+      submission,
+    ])
+  );
+  return assignments.map((assignment) =>
+    normalizeAssignment({ ...assignment, submission: submissionMap.get(assignment.id) ?? null })
+  );
+}
+
+export async function getClubAssignment(
+  assignmentId: string,
+  userId?: string | null
+): Promise<ClubAssignment | null> {
+  if (isDemoMode()) {
+    const assignment = demoAssignments.find((item) => item.id === assignmentId);
+    return assignment
+      ? normalizeAssignment({
+          ...assignment,
+          attachments: assignment.attachments ?? [],
+          student_copies: assignment.student_copies ?? [],
+          submission_attachments: assignment.submission_attachments ?? [],
+        })
+      : null;
+  }
+
+  const supabase = await createClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("club_assignments")
+    .select("*")
+    .eq("id", assignmentId)
+    .maybeSingle();
+  if (error || !data) {
+    if (error) console.error("[getClubAssignment]", error.message);
+    return null;
+  }
+
+  const assignment = normalizeAssignment(data as ClubAssignment);
+  const { data: attachmentRows, error: attachmentError } = await supabase
+    .from("club_assignment_attachments")
+    .select("*")
+    .eq("assignment_id", assignmentId)
+    .order("created_at", { ascending: true });
+  if (attachmentError) {
+    console.error("[getClubAssignment attachments]", attachmentError.message);
+  }
+  const attachments = (attachmentRows as ClubAssignmentAttachment[] | null) ?? [];
+  if (!userId) return { ...assignment, attachments };
+
+  const [{ data: submission }, { data: submissionAttachmentRows }, { data: studentCopyRows }] =
+    await Promise.all([
+      supabase
+        .from("club_assignment_submissions")
+        .select("*")
+        .eq("assignment_id", assignmentId)
+        .eq("student_id", userId)
+        .maybeSingle(),
+      supabase
+        .from("club_submission_attachments")
+        .select("*")
+        .eq("assignment_id", assignmentId)
+        .eq("student_id", userId)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("club_assignment_student_copies")
+        .select("*")
+        .eq("assignment_id", assignmentId)
+        .eq("student_id", userId),
+    ]);
+  const submissionAttachments =
+    (submissionAttachmentRows as ClubSubmissionAttachment[] | null) ?? [];
+  return normalizeAssignment({
+    ...assignment,
+    attachments,
+    student_copies: (studentCopyRows as ClubAssignmentStudentCopy[] | null) ?? [],
+    submission_attachments: submissionAttachments,
+    submission: submission
+      ? {
+          ...(submission as ClubAssignmentSubmission),
+          attachments: submissionAttachments,
+        }
+      : null,
+  });
+}
+
+export async function getClubAssignmentSubmissions(
+  assignmentId: string
+): Promise<ClubAssignmentSubmission[]> {
+  if (isDemoMode()) return [];
+  const supabase = await createClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("club_assignment_submissions")
+    .select("*, student:profiles!club_assignment_submissions_student_id_fkey(id,full_name,avatar_url)")
+    .eq("assignment_id", assignmentId)
+    .order("submitted_at", { ascending: false, nullsFirst: false });
+  if (error) {
+    console.error("[getClubAssignmentSubmissions]", error.message);
+    return [];
+  }
+  const submissions = (data as ClubAssignmentSubmission[]) ?? [];
+  if (submissions.length === 0) return [];
+  const [
+    { data: attachmentRows, error: attachmentError },
+    { data: studentCopyRows, error: studentCopyError },
+  ] = await Promise.all([
+    supabase
+      .from("club_submission_attachments")
+      .select("*")
+      .eq("assignment_id", assignmentId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("club_assignment_student_copies")
+      .select("*")
+      .eq("assignment_id", assignmentId),
+  ]);
+  if (attachmentError) {
+    console.error("[getClubAssignmentSubmissions attachments]", attachmentError.message);
+  }
+  if (studentCopyError) {
+    console.error("[getClubAssignmentSubmissions copies]", studentCopyError.message);
+  }
+  const attachmentsBySubmission = new Map<string, ClubSubmissionAttachment[]>();
+  for (const attachment of (attachmentRows as ClubSubmissionAttachment[] | null) ?? []) {
+    if (!attachment.submission_id) continue;
+    const current = attachmentsBySubmission.get(attachment.submission_id) ?? [];
+    current.push(attachment);
+    attachmentsBySubmission.set(attachment.submission_id, current);
+  }
+  return submissions.map((submission) => ({
+    ...submission,
+    attachments: attachmentsBySubmission.get(submission.id) ?? [],
+    student_copies: ((studentCopyRows as ClubAssignmentStudentCopy[] | null) ?? [])
+      .filter((copy) => copy.student_id === submission.student_id),
+    grade_points:
+      submission.grade_points === null || submission.grade_points === undefined
+        ? null
+        : Number(submission.grade_points),
+  }));
+}
+
+export async function getClubMemberDirectory(clubId: string): Promise<ClubMemberDirectoryEntry[]> {
+  if (isDemoMode()) {
+    return [
+      {
+        user_id: "demo-teacher",
+        full_name: "Club Sponsor",
+        avatar_url: null,
+        membership_role: "sponsor",
+        joined_at: new Date().toISOString(),
+      },
+      {
+        user_id: "demo-student",
+        full_name: "Demo Student",
+        avatar_url: null,
+        membership_role: "member",
+        joined_at: new Date().toISOString(),
+      },
+    ];
+  }
+  const supabase = await createClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("get_club_member_directory", {
+    club_uuid: clubId,
+  });
+  if (error) {
+    console.error("[getClubMemberDirectory]", error.message);
+    return [];
+  }
+  return (data as ClubMemberDirectoryEntry[]) ?? [];
 }
 
 export async function getRecentAnnouncements(
@@ -695,11 +946,104 @@ export async function getAdminAnalytics(): Promise<AnalyticsSummary> {
   };
 }
 
+function demoAdminStatistics(schoolId: string | null): AdminStatistics {
+  const activeMemberships = demoClubs.reduce((sum, club) => sum + (club.member_count ?? 0), 0);
+  const totalPeople = Math.max(activeMemberships + 14, 48);
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  const monthlyActivity = Array.from({ length: 6 }, (_, index) => {
+    const month = new Date(Date.UTC(
+      monthStart.getUTCFullYear(),
+      monthStart.getUTCMonth() - (5 - index),
+      1,
+    )).toISOString().slice(0, 7);
+    return {
+      month,
+      newPeople: [7, 10, 8, 14, 11, 16][index],
+      newMemberships: [12, 18, 15, 24, 21, 29][index],
+      engagementEvents: [28, 42, 39, 64, 58, 81][index],
+    };
+  });
+  const clubStatusDistribution = (["active", "interest_open", "draft", "paused", "archived"] as const)
+    .map((status) => ({
+      status,
+      count: demoClubs.filter((club) => club.status === status).length,
+    }));
+  const topClubs = demoClubs
+    .filter((club) => ["active", "interest_open"].includes(club.status))
+    .map((club) => {
+      const recentEvents = demoEvents.filter((event) => event.club_id === club.id).length;
+      const members = club.member_count ?? 0;
+      const recentActivity = Math.max(2, Math.round(members / 3));
+      return {
+        id: club.id,
+        name: club.name,
+        slug: club.slug,
+        status: club.status,
+        members,
+        recentEvents,
+        recentActivity,
+        score: members + (recentEvents * 3) + recentActivity,
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8);
+
+  return {
+    scopeSchoolId: schoolId,
+    totalPeople,
+    activePeople: totalPeople - 2,
+    engagedPeople30d: Math.min(totalPeople - 2, Math.max(activeMemberships, 32)),
+    newPeople30d: monthlyActivity.at(-1)?.newPeople ?? 0,
+    totalClubs: demoClubs.length,
+    activeClubs: demoClubs.filter((club) => club.status === "active" && club.is_active !== false).length,
+    activeMemberships,
+    upcomingEvents: demoEvents.length,
+    engagementEvents30d: monthlyActivity.at(-1)?.engagementEvents ?? 0,
+    roleDistribution: [
+      { role: "student", count: totalPeople - 10 },
+      { role: "teacher", count: 7 },
+      { role: "admin", count: 3 },
+      { role: "super_admin", count: 0 },
+    ],
+    clubStatusDistribution,
+    monthlyActivity,
+    topClubs,
+  };
+}
+
+export async function getScopedAdminStatistics(
+  profile: Profile,
+  requestedSchoolId?: string | null,
+): Promise<AdminStatistics | null> {
+  if (!isAdminRole(profile.role)) return null;
+
+  const schoolId = profile.role === "super_admin"
+    ? requestedSchoolId ?? null
+    : profile.school_id ?? null;
+  if (profile.role === "admin" && !schoolId) return null;
+
+  if (isDemoMode()) return demoAdminStatistics(schoolId);
+
+  const supabase = await createClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc("get_admin_statistics", {
+    requested_school_id: schoolId,
+  });
+  if (error) {
+    console.error("[getScopedAdminStatistics]", error.message);
+    return null;
+  }
+
+  return data as AdminStatistics;
+}
+
 export async function getStudentDashboard(userId: string | null): Promise<StudentDashboard> {
   if (!userId) {
     return {
       memberships: [],
       upcomingEvents: [],
+      upcomingAssignments: [],
       savedOpportunities: [],
       recommendedOpportunities: [],
       recentAnnouncements: [],
@@ -765,10 +1109,18 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
         club: demoClubs.find((c) => c.id === a.club_id),
       }))
       .slice(0, 5);
+    const upcomingAssignments = demoAssignments
+      .filter((assignment) => clubIds.includes(assignment.club_id))
+      .map((assignment) => ({
+        ...assignment,
+        club: demoClubs.find((club) => club.id === assignment.club_id),
+      }))
+      .slice(0, 5);
 
     return {
       memberships,
       upcomingEvents,
+      upcomingAssignments,
       savedOpportunities,
       recommendedOpportunities,
       recentAnnouncements,
@@ -780,6 +1132,7 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
     return {
       memberships: [],
       upcomingEvents: [],
+      upcomingAssignments: [],
       savedOpportunities: [],
       recommendedOpportunities: [],
       recentAnnouncements: [],
@@ -873,9 +1226,40 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
     recentAnnouncements = (announcements as (ClubAnnouncement & { club?: Club })[]) ?? [];
   }
 
+  let upcomingAssignments: (ClubAssignment & { club?: Club })[] = [];
+  if (clubIds.length > 0) {
+    const { data: assignmentRows } = await supabase
+      .from("club_assignments")
+      .select("*, club:clubs(*)")
+      .in("club_id", clubIds)
+      .eq("status", "published")
+      .order("due_at", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(10);
+    const assignments = ((assignmentRows as (ClubAssignment & { club?: Club })[]) ?? [])
+      .map((assignment) => normalizeAssignment(assignment));
+    if (assignments.length > 0) {
+      const { data: submissionRows } = await supabase
+        .from("club_assignment_submissions")
+        .select("*")
+        .eq("student_id", userId)
+        .in("assignment_id", assignments.map((assignment) => assignment.id));
+      const submissionMap = new Map(
+        ((submissionRows as ClubAssignmentSubmission[]) ?? []).map((submission) => [
+          submission.assignment_id,
+          submission,
+        ])
+      );
+      upcomingAssignments = assignments.map((assignment) =>
+        normalizeAssignment({ ...assignment, submission: submissionMap.get(assignment.id) ?? null })
+      );
+    }
+  }
+
   return {
     memberships: schoolMemberships,
     upcomingEvents,
+    upcomingAssignments,
     savedOpportunities,
     recommendedOpportunities,
     recentAnnouncements,
@@ -944,10 +1328,14 @@ export async function getMemberClubData(slug: string, userId: string | null, clu
   const club = clubOverride ?? await getClubBySlug(slug);
   if (!club) return null;
   const membership = await getUserClubMembership(userId, club.id);
-  const announcements = await getClubAnnouncements(club.id, "members");
-  const resources = await getClubResourcesByClubId(club.id);
-  const events = await getClubEvents(club.id, true);
-  return { club, membership, announcements, resources, events };
+  const [announcements, resources, events, assignments, directory] = await Promise.all([
+    getClubAnnouncements(club.id, "members"),
+    getClubResourcesByClubId(club.id),
+    getClubEvents(club.id, true),
+    getClubAssignments(club.id, { userId }),
+    getClubMemberDirectory(club.id),
+  ]);
+  return { club, membership, announcements, resources, events, assignments, directory };
 }
 
 export async function trackAnalytics(

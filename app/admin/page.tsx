@@ -8,9 +8,9 @@ import { redirect } from "next/navigation";
 
 const adminLinks = [
   { href: "/admin/users", icon: Users, title: "Users & Roles", description: "Manage student and staff accounts" },
-  { href: "/admin/schools", icon: School, title: "Schools", description: "School configuration (single-school for now)" },
-  { href: "/admin/content", icon: FileText, title: "Content Moderation", description: "Global approval queue" },
-  { href: "/manage/analytics", icon: BarChart3, title: "Analytics", description: "Platform-wide metrics" },
+  { href: "/admin/schools", icon: School, title: "Schools", description: "Manage school workspaces and settings" },
+  { href: "/admin/content", icon: FileText, title: "Content Moderation", description: "Review the school-scoped approval queue" },
+  { href: "/admin/statistics", icon: BarChart3, title: "Statistics", description: "People, participation, and active-club trends" },
   { href: "/admin/audit", icon: History, title: "Audit Log", description: "Review immutable administrative history" },
   { href: "/admin/deletion-requests", icon: UserRoundX, title: "Deletion Requests", description: "Review account lifecycle requests" },
 ];

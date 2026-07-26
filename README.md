@@ -108,10 +108,16 @@ Optional production env vars:
 - `SIGNUP_ACCESS_CODE`
 - `ALLOWED_SIGNUP_EMAIL_DOMAINS`
 - `GROQ_API_KEY`, only after district approval
+- `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET`, and
+  `GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY` for server-side Google Drive authorization
+- `NEXT_PUBLIC_GOOGLE_DRIVE_API_KEY` and `NEXT_PUBLIC_GOOGLE_DRIVE_APP_ID`
+  for the Google Picker
 - `EMAIL_DELIVERY_MODE=outbox_only` for queue-only testing.
 - `EMAIL_DELIVERY_MODE=send` for real Resend delivery.
 
 After changing Vercel env vars, redeploy.
+See `docs/GOOGLE_DRIVE_SETUP.md` for the Google Cloud consent screen, redirect URI,
+API-key restrictions, and pilot test steps.
 
 ## Current product boundaries
 

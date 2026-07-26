@@ -118,6 +118,46 @@ describe("supabaseSignUp", () => {
     expect(signOut).toHaveBeenCalled();
     expect(deleteUser).toHaveBeenCalledWith("user-1");
   });
+
+  it("explains an opaque Auth mailer failure instead of returning a generic signup error", async () => {
+    setupClients({
+      signup: {
+        data: { user: null, session: null },
+        error: {
+          name: "AuthRetryableFetchError",
+          message: "{}",
+          status: 500,
+        },
+      },
+    });
+
+    const result = await submitSignup();
+
+    expect(result).toEqual({
+      success: false,
+      error: "We couldn't send the verification email. Please try again later or contact your school administrator.",
+    });
+  });
+
+  it("asks users to wait when Supabase rate-limits verification email", async () => {
+    setupClients({
+      signup: {
+        data: { user: null, session: null },
+        error: {
+          name: "AuthApiError",
+          message: "email rate limit exceeded",
+          status: 429,
+        },
+      },
+    });
+
+    const result = await submitSignup();
+
+    expect(result).toEqual({
+      success: false,
+      error: "Too many verification emails have been requested. Wait a few minutes before trying again.",
+    });
+  });
 });
 
 type QueryResult = {
@@ -133,7 +173,11 @@ function setupClients(input: {
       user: { id: string } | null;
       session: Record<string, unknown> | null;
     };
-    error: { message: string } | null;
+    error: {
+      name?: string;
+      message: string;
+      status?: number;
+    } | null;
   };
 } = {}) {
   const school = input.school ?? {

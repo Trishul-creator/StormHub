@@ -94,7 +94,7 @@ export function getRoleOnboardingItems(role: UserRole, signals: OnboardingSignal
       id: "inspect-activity",
       label: "Inspect school activity",
       description: "Review active clubs, upcoming events, signups, and recent platform usage.",
-      href: "/manage/analytics",
+      href: "/admin/statistics",
       status: (signals.activeClubs ?? 0) > 0 || (signals.recentActivity ?? 0) > 0 ? "active" : "locked",
     },
   ];

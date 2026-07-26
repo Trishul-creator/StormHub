@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
@@ -8,13 +9,14 @@ import { isDemoMode } from "@/lib/supabase/mode";
 import { createProfileIfMissing, defaultPathForProfile, getAuthUserId, getCurrentProfile } from "@/lib/auth";
 import { demoState } from "@/lib/data/demo-data";
 import { getClubBySlug, getManagedClubBySlug } from "@/lib/data";
-import { friendlyError } from "@/lib/errors";
+import { friendlyAuthEmailError, friendlyError } from "@/lib/errors";
 import {
   canApproveContent,
   canApproveClubContent,
   canDeleteUser,
   canEditRole,
   canManageClub,
+  canManageClubCoursework,
   canManageClubRoster,
   isAdminRole,
 } from "@/lib/permissions";
@@ -26,6 +28,9 @@ import type {
   Profile,
   UserRole,
   AccountStatus,
+  AssignmentStatus,
+  ClubAssignment,
+  ClubAssignmentSubmission,
   FeedbackStatus,
 } from "@/types/database";
 import { slugify } from "@/lib/utils";
@@ -55,6 +60,16 @@ import {
 import { verifyCaptchaToken } from "@/lib/captcha";
 import { checkDurableRateLimit, markRateLimitAttemptSuccessful } from "@/lib/request-rate-limit";
 import { getAuthCallbackUrl } from "@/lib/env";
+import {
+  copyGoogleDriveFileForStudent,
+  disconnectGoogleDrive,
+  ensureGoogleDrivePermission,
+  getGoogleDriveConnectionStatus,
+  getGoogleDriveFile,
+  isCopyableGoogleWorkspaceFile,
+  isGoogleDriveReconnectError,
+  isGoogleWorkspaceFile,
+} from "@/lib/google-drive";
 
 const DEMO_USER_COOKIE = "stormhub_demo_user";
 const DEMO_EMAIL_COOKIE = "stormhub_demo_email";
@@ -1014,6 +1029,819 @@ export async function submitContent(data: {
   return { success: true, approved: trustedPost };
 }
 
+function normalizeHttpUrl(value?: string | null): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+const COURSEWORK_BUCKET = "coursework-private";
+const MAX_COURSEWORK_FILE_SIZE = 20 * 1024 * 1024;
+const BLOCKED_COURSEWORK_EXTENSIONS = new Set([
+  "app",
+  "bat",
+  "cmd",
+  "com",
+  "dll",
+  "dmg",
+  "exe",
+  "html",
+  "htm",
+  "jar",
+  "js",
+  "msi",
+  "ps1",
+  "scr",
+  "sh",
+  "svg",
+]);
+
+function safeCourseworkFileName(value: string): string {
+  const normalized = value
+    .normalize("NFKC")
+    .replace(/[/\\\u0000-\u001f\u007f]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 180);
+  return normalized || "attachment";
+}
+
+function validateCourseworkFile(input: {
+  fileName: string;
+  fileSize: number;
+  mimeType?: string | null;
+}): string | null {
+  if (!Number.isFinite(input.fileSize) || input.fileSize <= 0) {
+    return "Choose a non-empty file.";
+  }
+  if (input.fileSize > MAX_COURSEWORK_FILE_SIZE) {
+    return "Files must be 20 MB or smaller.";
+  }
+  const extension = input.fileName.split(".").pop()?.toLowerCase() ?? "";
+  const mimeType = input.mimeType?.toLowerCase() ?? "";
+  if (
+    BLOCKED_COURSEWORK_EXTENSIONS.has(extension)
+    || mimeType.includes("javascript")
+    || mimeType === "text/html"
+    || mimeType === "image/svg+xml"
+    || mimeType.startsWith("application/x-")
+  ) {
+    return "That file type is not allowed. Upload a document, image, spreadsheet, presentation, text file, or archive.";
+  }
+  return null;
+}
+
+async function getStudentAssignmentContext(clubSlug: string, assignmentId: string) {
+  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  if (!supabase || !profile) return { error: "Please sign in." } as const;
+  if (profile.role !== "student") {
+    return { error: "Only student members can submit assignment work." } as const;
+  }
+  const club = await getManagedClubBySlug(clubSlug);
+  if (!club) return { error: "Club not found." } as const;
+  const [{ data: assignment }, { data: membership }] = await Promise.all([
+    supabase
+      .from("club_assignments")
+      .select("*")
+      .eq("id", assignmentId)
+      .eq("club_id", club.id)
+      .maybeSingle(),
+    supabase
+      .from("club_memberships")
+      .select("club_id,status,role")
+      .eq("club_id", club.id)
+      .eq("user_id", profile.id)
+      .eq("status", "active")
+      .maybeSingle(),
+  ]);
+  if (!assignment || !membership) return { error: "Assignment not found." } as const;
+  if (assignment.status !== "published") {
+    return { error: "This assignment is not accepting work." } as const;
+  }
+  return {
+    supabase,
+    profile,
+    club,
+    assignment: assignment as ClubAssignment,
+    membership: membership as ClubMembership,
+  } as const;
+}
+
+async function getCourseworkManagerContext(clubSlug: string) {
+  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  if (!supabase || !profile) return { error: "Please sign in." } as const;
+  const club = await getManagedClubBySlug(clubSlug);
+  if (!club) return { error: "Club not found." } as const;
+  const { data: membership } = await supabase
+    .from("club_memberships")
+    .select("club_id,status,role")
+    .eq("club_id", club.id)
+    .eq("user_id", profile.id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!canManageClubCoursework(profile, club, membership as ClubMembership | null)) {
+    return { error: "Only the teacher sponsor or a school administrator can manage assignments." } as const;
+  }
+  return { supabase, profile, club, membership } as const;
+}
+
+export async function createClubAssignment(data: {
+  clubSlug: string;
+  title: string;
+  instructions: string;
+  dueAt?: string | null;
+  pointsPossible: number;
+  attachmentUrl?: string | null;
+  submissionMode?: "submission" | "completion";
+  publishNow?: boolean;
+}): Promise<{ success: boolean; error?: string; assignmentId?: string }> {
+  if (isDemoMode()) return { success: true, assignmentId: "demo-assignment" };
+  const context = await getCourseworkManagerContext(data.clubSlug);
+  if ("error" in context) return { success: false, error: context.error };
+
+  const title = data.title.trim();
+  const instructions = data.instructions.trim();
+  if (!title || title.length > 200) {
+    return { success: false, error: "Assignment title must be between 1 and 200 characters." };
+  }
+  if (instructions.length > 20000) {
+    return { success: false, error: "Assignment instructions are too long." };
+  }
+  const pointsPossible = Number(data.pointsPossible);
+  if (!Number.isFinite(pointsPossible) || pointsPossible < 0 || pointsPossible > 10000) {
+    return { success: false, error: "Points possible must be between 0 and 10,000." };
+  }
+
+  let dueAt: string | null = null;
+  if (data.dueAt) {
+    const parsedDueAt = new Date(data.dueAt);
+    if (Number.isNaN(parsedDueAt.getTime())) {
+      return { success: false, error: "Choose a valid due date and time." };
+    }
+    dueAt = parsedDueAt.toISOString();
+  }
+
+  const attachmentUrl = normalizeHttpUrl(data.attachmentUrl);
+  if (data.attachmentUrl?.trim() && !attachmentUrl) {
+    return { success: false, error: "The assignment link must be a valid http or https URL." };
+  }
+  const publishNow = data.publishNow !== false;
+  const submissionMode = data.submissionMode === "completion" ? "completion" : "submission";
+  const { data: assignment, error } = await context.supabase
+    .from("club_assignments")
+    .insert({
+      club_id: context.club.id,
+      author_id: context.profile.id,
+      title,
+      instructions,
+      due_at: dueAt,
+      points_possible: pointsPossible,
+      attachment_url: attachmentUrl,
+      submission_mode: submissionMode,
+      status: publishNow ? "published" : "draft",
+      published_at: publishNow ? new Date().toISOString() : null,
+    })
+    .select("id")
+    .single();
+  if (error) return { success: false, error: friendlyError(error, "Could not create the assignment.") };
+
+  if (publishNow) {
+    await createNotificationsForClubMembers({
+      clubId: context.club.id,
+      type: "club_assignment_created",
+      importance: "normal",
+      title,
+      message: `${context.club.name} posted a new assignment${dueAt ? ` due ${new Date(dueAt).toLocaleDateString()}` : ""}.`,
+      link: `/clubs/${context.club.slug}/member/assignments/${assignment.id}`,
+      sendEmail: false,
+    });
+  }
+
+  revalidatePath(`/manage/clubs/${context.club.slug}`);
+  revalidatePath(`/manage/clubs/${context.club.slug}/coursework`);
+  revalidatePath(`/clubs/${context.club.slug}/member`);
+  return { success: true, assignmentId: assignment.id };
+}
+
+export async function updateClubAssignmentStatus(data: {
+  clubSlug: string;
+  assignmentId: string;
+  status: Extract<AssignmentStatus, "published" | "closed" | "archived">;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: true };
+  const context = await getCourseworkManagerContext(data.clubSlug);
+  if ("error" in context) return { success: false, error: context.error };
+
+  const { data: existing } = await context.supabase
+    .from("club_assignments")
+    .select("id,status,title")
+    .eq("id", data.assignmentId)
+    .eq("club_id", context.club.id)
+    .maybeSingle();
+  if (!existing) return { success: false, error: "Assignment not found." };
+
+  const update: Record<string, unknown> = { status: data.status };
+  if (data.status === "published" && existing.status === "draft") {
+    update.published_at = new Date().toISOString();
+  }
+  const { error } = await context.supabase
+    .from("club_assignments")
+    .update(update)
+    .eq("id", data.assignmentId)
+    .eq("club_id", context.club.id);
+  if (error) return { success: false, error: friendlyError(error, "Could not update the assignment.") };
+
+  if (data.status === "published" && existing.status === "draft") {
+    await createNotificationsForClubMembers({
+      clubId: context.club.id,
+      type: "club_assignment_created",
+      importance: "normal",
+      title: existing.title,
+      message: `${context.club.name} posted a new assignment.`,
+      link: `/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`,
+      sendEmail: false,
+    });
+  }
+
+  revalidatePath(`/manage/clubs/${context.club.slug}`);
+  revalidatePath(`/manage/clubs/${context.club.slug}/coursework`);
+  revalidatePath(`/manage/clubs/${context.club.slug}/coursework/${data.assignmentId}`);
+  revalidatePath(`/clubs/${context.club.slug}/member`);
+  revalidatePath(`/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`);
+  return { success: true };
+}
+
+export async function prepareCourseworkFileUpload(data: {
+  clubSlug: string;
+  assignmentId: string;
+  target: "assignment" | "submission";
+  fileName: string;
+  fileSize: number;
+  mimeType?: string | null;
+}): Promise<{ success: boolean; error?: string; path?: string; token?: string }> {
+  if (isDemoMode()) {
+    return { success: false, error: "File uploads are unavailable in demo mode." };
+  }
+  const validationError = validateCourseworkFile(data);
+  if (validationError) return { success: false, error: validationError };
+
+  const context = data.target === "assignment"
+    ? await getCourseworkManagerContext(data.clubSlug)
+    : await getStudentAssignmentContext(data.clubSlug, data.assignmentId);
+  if ("error" in context) return { success: false, error: context.error };
+
+  if (data.target === "assignment") {
+    const { data: assignment } = await context.supabase
+      .from("club_assignments")
+      .select("id")
+      .eq("id", data.assignmentId)
+      .eq("club_id", context.club.id)
+      .maybeSingle();
+    if (!assignment) return { success: false, error: "Assignment not found." };
+  }
+
+  const admin = createAdminClient();
+  if (!admin) return { success: false, error: "Private file storage is not configured." };
+  const fileName = safeCourseworkFileName(data.fileName);
+  const section = data.target === "assignment" ? "materials" : "submissions";
+  const path = `${data.assignmentId}/${section}/${context.profile.id}/${randomUUID()}-${fileName}`;
+  const { data: signedUpload, error } = await admin.storage
+    .from(COURSEWORK_BUCKET)
+    .createSignedUploadUrl(path);
+  if (error || !signedUpload?.token) {
+    return { success: false, error: friendlyError(error, "Could not prepare the private upload.") };
+  }
+  return { success: true, path, token: signedUpload.token };
+}
+
+async function getStoredCourseworkObject(path: string): Promise<{
+  size?: number | null;
+  mimetype?: string | null;
+} | null> {
+  const admin = createAdminClient();
+  if (!admin) return null;
+  const separator = path.lastIndexOf("/");
+  if (separator < 1) return null;
+  const folder = path.slice(0, separator);
+  const fileName = path.slice(separator + 1);
+  const { data, error } = await admin.storage
+    .from(COURSEWORK_BUCKET)
+    .list(folder, { search: fileName, limit: 10 });
+  if (error) return null;
+  const object = data?.find((item) => item.name === fileName);
+  if (!object) return null;
+  const metadata = object.metadata as { size?: number; mimetype?: string } | null;
+  return {
+    size: metadata?.size ?? null,
+    mimetype: metadata?.mimetype ?? null,
+  };
+}
+
+export async function registerCourseworkFileUpload(data: {
+  clubSlug: string;
+  assignmentId: string;
+  target: "assignment" | "submission";
+  storagePath: string;
+  fileName: string;
+  fileSize: number;
+  mimeType?: string | null;
+}): Promise<{ success: boolean; error?: string; attachmentId?: string }> {
+  if (isDemoMode()) {
+    return { success: false, error: "File uploads are unavailable in demo mode." };
+  }
+  const validationError = validateCourseworkFile(data);
+  if (validationError) return { success: false, error: validationError };
+
+  const context = data.target === "assignment"
+    ? await getCourseworkManagerContext(data.clubSlug)
+    : await getStudentAssignmentContext(data.clubSlug, data.assignmentId);
+  if ("error" in context) return { success: false, error: context.error };
+
+  if (data.target === "assignment") {
+    const { data: assignment } = await context.supabase
+      .from("club_assignments")
+      .select("id")
+      .eq("id", data.assignmentId)
+      .eq("club_id", context.club.id)
+      .maybeSingle();
+    if (!assignment) return { success: false, error: "Assignment not found." };
+  }
+
+  const section = data.target === "assignment" ? "materials" : "submissions";
+  const requiredPrefix = `${data.assignmentId}/${section}/${context.profile.id}/`;
+  if (!data.storagePath.startsWith(requiredPrefix) || data.storagePath.includes("..")) {
+    return { success: false, error: "The uploaded file path is invalid." };
+  }
+  const storedObject = await getStoredCourseworkObject(data.storagePath);
+  if (!storedObject) {
+    return { success: false, error: "The private upload did not finish. Please try again." };
+  }
+  const storedSize = Number(storedObject.size ?? data.fileSize);
+  const storedValidationError = validateCourseworkFile({
+    fileName: data.fileName,
+    fileSize: storedSize,
+    mimeType: storedObject.mimetype ?? data.mimeType,
+  });
+  if (storedValidationError) return { success: false, error: storedValidationError };
+
+  const admin = createAdminClient();
+  if (!admin) return { success: false, error: "Private file storage is not configured." };
+  const insertResult = data.target === "assignment"
+    ? await admin
+      .from("club_assignment_attachments")
+      .insert({
+        assignment_id: data.assignmentId,
+        uploaded_by: context.profile.id,
+        source_type: "upload",
+        copy_mode: "reference",
+        file_name: safeCourseworkFileName(data.fileName),
+        mime_type: storedObject.mimetype ?? data.mimeType?.slice(0, 255) ?? null,
+        file_size: storedSize,
+        storage_path: data.storagePath,
+      })
+      .select("id")
+      .single()
+    : await admin
+      .from("club_submission_attachments")
+      .insert({
+        assignment_id: data.assignmentId,
+        submission_id: null,
+        student_id: context.profile.id,
+        source_type: "upload",
+        file_name: safeCourseworkFileName(data.fileName),
+        mime_type: storedObject.mimetype ?? data.mimeType?.slice(0, 255) ?? null,
+        file_size: storedSize,
+        storage_path: data.storagePath,
+      })
+      .select("id")
+      .single();
+  const { data: attachment, error } = insertResult;
+  if (error || !attachment) {
+    await admin.storage.from(COURSEWORK_BUCKET).remove([data.storagePath]);
+    return { success: false, error: friendlyError(error, "Could not attach the uploaded file.") };
+  }
+
+  revalidatePath(`/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`);
+  revalidatePath(`/manage/clubs/${context.club.slug}/coursework/${data.assignmentId}`);
+  return { success: true, attachmentId: attachment.id };
+}
+
+export async function registerAssignmentGoogleDriveAttachment(data: {
+  clubSlug: string;
+  assignmentId: string;
+  fileId: string;
+  copyMode: "reference" | "student_copy";
+}): Promise<{ success: boolean; error?: string; attachmentId?: string }> {
+  if (isDemoMode()) {
+    return { success: false, error: "Google Drive is unavailable in demo mode." };
+  }
+  const context = await getCourseworkManagerContext(data.clubSlug);
+  if ("error" in context) return { success: false, error: context.error };
+  const { data: assignment } = await context.supabase
+    .from("club_assignments")
+    .select("id")
+    .eq("id", data.assignmentId)
+    .eq("club_id", context.club.id)
+    .maybeSingle();
+  if (!assignment) return { success: false, error: "Assignment not found." };
+
+  try {
+    const file = await getGoogleDriveFile(context.profile.id, data.fileId);
+    if (data.copyMode === "student_copy" && !isCopyableGoogleWorkspaceFile(file.mimeType)) {
+      return {
+        success: false,
+        error: "Individual student copies are supported for Google Docs, Sheets, and Slides.",
+      };
+    }
+    if (data.copyMode === "student_copy" && file.capabilities?.canCopy === false) {
+      return { success: false, error: "Google Drive does not allow this file to be copied." };
+    }
+    const admin = createAdminClient();
+    if (!admin) return { success: false, error: "Google Drive storage is not configured." };
+    const { data: attachment, error } = await admin
+      .from("club_assignment_attachments")
+      .insert({
+        assignment_id: data.assignmentId,
+        uploaded_by: context.profile.id,
+        source_type: "google_drive",
+        copy_mode: data.copyMode,
+        file_name: safeCourseworkFileName(file.name),
+        mime_type: file.mimeType ?? null,
+        file_size: file.size ? Number(file.size) : null,
+        storage_path: null,
+        external_url: file.webViewLink ?? `https://drive.google.com/open?id=${encodeURIComponent(file.id)}`,
+        google_file_id: file.id,
+      })
+      .select("id")
+      .single();
+    if (error || !attachment) {
+      return { success: false, error: friendlyError(error, "Could not attach the Google Drive file.") };
+    }
+    revalidatePath(`/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`);
+    revalidatePath(`/manage/clubs/${context.club.slug}/coursework/${data.assignmentId}`);
+    return { success: true, attachmentId: attachment.id };
+  } catch (error) {
+    return {
+      success: false,
+      error: isGoogleDriveReconnectError(error)
+        ? "Reconnect Google Drive and try again."
+        : error instanceof Error ? error.message : "Could not access that Google Drive file.",
+    };
+  }
+}
+
+async function getCourseworkManagerEmails(input: {
+  clubId: string;
+  schoolId: string;
+  assignmentAuthorId?: string | null;
+}): Promise<string[]> {
+  const admin = createAdminClient();
+  if (!admin) return [];
+  const { data: sponsorRows } = await admin
+    .from("club_memberships")
+    .select("user_id")
+    .eq("club_id", input.clubId)
+    .eq("status", "active")
+    .eq("role", "sponsor");
+  const ids = new Set<string>(
+    (sponsorRows ?? []).map((row) => row.user_id as string)
+  );
+  if (input.assignmentAuthorId) ids.add(input.assignmentAuthorId);
+  const [clubManagers, schoolAdmins] = await Promise.all([
+    ids.size
+      ? admin.from("profiles").select("email").in("id", [...ids]).eq("account_status", "active")
+      : Promise.resolve({ data: [] as Array<{ email?: string | null }> }),
+    admin
+      .from("profiles")
+      .select("email")
+      .eq("school_id", input.schoolId)
+      .in("role", ["admin"])
+      .eq("account_status", "active"),
+  ]);
+  return [...new Set(
+    [...(clubManagers.data ?? []), ...(schoolAdmins.data ?? [])]
+      .map((row) => row.email?.trim().toLowerCase())
+      .filter((email): email is string => Boolean(email))
+  )];
+}
+
+export async function registerSubmissionGoogleDriveAttachment(data: {
+  clubSlug: string;
+  assignmentId: string;
+  fileId: string;
+}): Promise<{ success: boolean; error?: string; warning?: string; attachmentId?: string }> {
+  if (isDemoMode()) {
+    return { success: false, error: "Google Drive is unavailable in demo mode." };
+  }
+  const context = await getStudentAssignmentContext(data.clubSlug, data.assignmentId);
+  if ("error" in context) return { success: false, error: context.error };
+  try {
+    const file = await getGoogleDriveFile(context.profile.id, data.fileId);
+    const managerEmails = await getCourseworkManagerEmails({
+      clubId: context.club.id,
+      schoolId: context.club.school_id,
+      assignmentAuthorId: context.assignment.author_id,
+    });
+    const shareResults = await Promise.allSettled(
+      managerEmails
+        .filter((email) => email !== context.profile.email?.toLowerCase())
+        .map((recipientEmail) =>
+          ensureGoogleDrivePermission({
+            ownerUserId: context.profile.id,
+            fileId: file.id,
+            recipientEmail,
+            role: isGoogleWorkspaceFile(file.mimeType) ? "commenter" : "reader",
+          })
+        )
+    );
+    const shareFailures = shareResults.filter((result) => result.status === "rejected").length;
+
+    const admin = createAdminClient();
+    if (!admin) return { success: false, error: "Google Drive storage is not configured." };
+    const { data: attachment, error } = await admin
+      .from("club_submission_attachments")
+      .insert({
+        assignment_id: data.assignmentId,
+        submission_id: null,
+        student_id: context.profile.id,
+        source_type: "google_drive",
+        file_name: safeCourseworkFileName(file.name),
+        mime_type: file.mimeType ?? null,
+        file_size: file.size ? Number(file.size) : null,
+        storage_path: null,
+        external_url: file.webViewLink ?? `https://drive.google.com/open?id=${encodeURIComponent(file.id)}`,
+        google_file_id: file.id,
+      })
+      .select("id")
+      .single();
+    if (error || !attachment) {
+      return { success: false, error: friendlyError(error, "Could not attach the Google Drive file.") };
+    }
+    revalidatePath(`/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`);
+    revalidatePath(`/manage/clubs/${context.club.slug}/coursework/${data.assignmentId}`);
+    return {
+      success: true,
+      attachmentId: attachment.id,
+      warning: shareFailures
+        ? "The file was attached, but Google could not automatically share it with every coursework manager. Check its Drive sharing settings."
+        : undefined,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: isGoogleDriveReconnectError(error)
+        ? "Reconnect Google Drive and try again."
+        : error instanceof Error ? error.message : "Could not access that Google Drive file.",
+    };
+  }
+}
+
+export async function removeCourseworkAttachment(data: {
+  clubSlug: string;
+  assignmentId: string;
+  target: "assignment" | "submission";
+  attachmentId: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: true };
+  const context = data.target === "assignment"
+    ? await getCourseworkManagerContext(data.clubSlug)
+    : await getStudentAssignmentContext(data.clubSlug, data.assignmentId);
+  if ("error" in context) return { success: false, error: context.error };
+  if (data.target === "assignment") {
+    const { data: assignment } = await context.supabase
+      .from("club_assignments")
+      .select("id")
+      .eq("id", data.assignmentId)
+      .eq("club_id", context.club.id)
+      .maybeSingle();
+    if (!assignment) return { success: false, error: "Assignment not found." };
+  }
+  const admin = createAdminClient();
+  if (!admin) return { success: false, error: "Private file storage is not configured." };
+  const table = data.target === "assignment"
+    ? "club_assignment_attachments"
+    : "club_submission_attachments";
+  let query = admin
+    .from(table)
+    .select("id,storage_path,source_type")
+    .eq("id", data.attachmentId)
+    .eq("assignment_id", data.assignmentId);
+  if (data.target === "submission") query = query.eq("student_id", context.profile.id);
+  const { data: attachment } = await query.maybeSingle();
+  if (!attachment) return { success: false, error: "Attachment not found." };
+  const { error } = await admin.from(table).delete().eq("id", data.attachmentId);
+  if (error) return { success: false, error: friendlyError(error, "Could not remove the attachment.") };
+  if (attachment.source_type === "upload" && attachment.storage_path) {
+    await admin.storage.from(COURSEWORK_BUCKET).remove([attachment.storage_path]);
+  }
+  revalidatePath(`/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`);
+  revalidatePath(`/manage/clubs/${context.club.slug}/coursework/${data.assignmentId}`);
+  return { success: true };
+}
+
+export async function createStudentGoogleDriveCopy(data: {
+  clubSlug: string;
+  assignmentId: string;
+  attachmentId: string;
+}): Promise<{ success: boolean; error?: string; webUrl?: string }> {
+  if (isDemoMode()) {
+    return { success: true, webUrl: "https://docs.google.com/document/" };
+  }
+  const context = await getStudentAssignmentContext(data.clubSlug, data.assignmentId);
+  if ("error" in context) return { success: false, error: context.error };
+  const studentDriveStatus = await getGoogleDriveConnectionStatus(context.profile.id).catch(() => null);
+  const studentDriveEmail = studentDriveStatus?.google_email || context.profile.email;
+  if (!studentDriveEmail) {
+    return { success: false, error: "Your account needs an email address before a private copy can be shared." };
+  }
+  const admin = createAdminClient();
+  if (!admin) return { success: false, error: "Google Drive storage is not configured." };
+  const { data: existing } = await admin
+    .from("club_assignment_student_copies")
+    .select("web_url")
+    .eq("assignment_attachment_id", data.attachmentId)
+    .eq("student_id", context.profile.id)
+    .maybeSingle();
+  if (existing?.web_url) return { success: true, webUrl: existing.web_url };
+
+  const { data: attachment } = await admin
+    .from("club_assignment_attachments")
+    .select("*")
+    .eq("id", data.attachmentId)
+    .eq("assignment_id", data.assignmentId)
+    .eq("source_type", "google_drive")
+    .eq("copy_mode", "student_copy")
+    .maybeSingle();
+  if (!attachment?.google_file_id || !attachment.uploaded_by) {
+    return { success: false, error: "The assignment template is unavailable." };
+  }
+
+  try {
+    const studentName = context.profile.full_name?.trim() || studentDriveEmail.split("@")[0];
+    const copy = await copyGoogleDriveFileForStudent({
+      teacherUserId: attachment.uploaded_by,
+      templateFileId: attachment.google_file_id,
+      copyName: `${context.assignment.title} - ${studentName}`,
+      studentEmail: studentDriveEmail,
+    });
+    const webUrl = copy.webViewLink ?? `https://drive.google.com/open?id=${encodeURIComponent(copy.id)}`;
+    const { error } = await admin.from("club_assignment_student_copies").insert({
+      assignment_id: data.assignmentId,
+      assignment_attachment_id: data.attachmentId,
+      student_id: context.profile.id,
+      google_file_id: copy.id,
+      file_name: safeCourseworkFileName(copy.name),
+      web_url: webUrl,
+    });
+    if (error?.code === "23505") {
+      const { data: racedCopy } = await admin
+        .from("club_assignment_student_copies")
+        .select("web_url")
+        .eq("assignment_attachment_id", data.attachmentId)
+        .eq("student_id", context.profile.id)
+        .single();
+      return racedCopy?.web_url
+        ? { success: true, webUrl: racedCopy.web_url }
+        : { success: false, error: "Could not finish preparing your copy." };
+    }
+    if (error) return { success: false, error: friendlyError(error, "Could not save your private copy.") };
+    revalidatePath(`/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`);
+    revalidatePath(`/manage/clubs/${context.club.slug}/coursework/${data.assignmentId}`);
+    return { success: true, webUrl };
+  } catch (error) {
+    return {
+      success: false,
+      error: isGoogleDriveReconnectError(error)
+        ? "The teacher needs to reconnect Google Drive before copies can be created."
+        : error instanceof Error ? error.message : "Could not create your private Google Drive copy.",
+    };
+  }
+}
+
+export async function disconnectGoogleDriveAction(): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: true };
+  const profile = await getCurrentProfile();
+  if (!profile) return { success: false, error: "Please sign in." };
+  try {
+    await disconnectGoogleDrive(profile.id);
+    revalidatePath("/settings");
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Could not disconnect Google Drive.",
+    };
+  }
+}
+
+export async function submitClubAssignment(data: {
+  clubSlug: string;
+  assignmentId: string;
+  submissionText?: string | null;
+  attachmentUrl?: string | null;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: true };
+  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  if (!supabase || !profile) return { success: false, error: "Please sign in." };
+  if (profile.role !== "student") {
+    return { success: false, error: "Only student members can submit club assignments." };
+  }
+
+  const attachmentUrl = normalizeHttpUrl(data.attachmentUrl);
+  if (data.attachmentUrl?.trim() && !attachmentUrl) {
+    return { success: false, error: "The submission link must be a valid http or https URL." };
+  }
+  const submissionText = data.submissionText?.trim() || null;
+  const { data: assignment } = await supabase
+    .from("club_assignments")
+    .select("id,club_id,submission_mode")
+    .eq("id", data.assignmentId)
+    .maybeSingle();
+  const club = await getManagedClubBySlug(data.clubSlug);
+  if (!assignment || !club || assignment.club_id !== club.id) {
+    return { success: false, error: "Assignment not found." };
+  }
+  if (assignment.submission_mode !== "completion" && !submissionText && !attachmentUrl) {
+    const { count } = await supabase
+      .from("club_submission_attachments")
+      .select("id", { count: "exact", head: true })
+      .eq("assignment_id", data.assignmentId)
+      .eq("student_id", profile.id);
+    if (!count) return { success: false, error: "Add a written response, link, or file." };
+  }
+
+  const { error } = await supabase.rpc("submit_club_assignment", {
+    assignment_uuid: data.assignmentId,
+    submitted_text: submissionText,
+    submitted_url: attachmentUrl,
+  });
+  if (error) return { success: false, error: friendlyError(error, "Could not submit the assignment.") };
+
+  revalidatePath(`/clubs/${club.slug}/member`);
+  revalidatePath(`/clubs/${club.slug}/member/assignments/${data.assignmentId}`);
+  revalidatePath(`/manage/clubs/${club.slug}/coursework`);
+  revalidatePath(`/manage/clubs/${club.slug}/coursework/${data.assignmentId}`);
+  return { success: true };
+}
+
+export async function gradeClubAssignmentSubmission(data: {
+  clubSlug: string;
+  assignmentId: string;
+  submissionId: string;
+  gradePoints: number;
+  feedback?: string | null;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: true };
+  const context = await getCourseworkManagerContext(data.clubSlug);
+  if ("error" in context) return { success: false, error: context.error };
+  const { data: submission } = await context.supabase
+    .from("club_assignment_submissions")
+    .select("id,student_id,assignment_id")
+    .eq("id", data.submissionId)
+    .eq("assignment_id", data.assignmentId)
+    .maybeSingle();
+  const { data: assignment } = await context.supabase
+    .from("club_assignments")
+    .select("*")
+    .eq("id", data.assignmentId)
+    .eq("club_id", context.club.id)
+    .maybeSingle();
+  if (!submission || !assignment) return { success: false, error: "Submission not found." };
+
+  const { error } = await context.supabase.rpc("grade_club_assignment_submission", {
+    submission_uuid: data.submissionId,
+    awarded_points: data.gradePoints,
+    grader_feedback: data.feedback?.trim() || null,
+  });
+  if (error) return { success: false, error: friendlyError(error, "Could not return this grade.") };
+
+  const typedAssignment = assignment as ClubAssignment;
+  const typedSubmission = submission as Pick<ClubAssignmentSubmission, "student_id">;
+  await createNotification({
+    recipientUserId: typedSubmission.student_id,
+    type: "club_assignment_graded",
+    importance: "normal",
+    title: `${typedAssignment.title} was graded`,
+    message: `Your work in ${context.club.name} has been returned with a grade and feedback.`,
+    link: `/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`,
+    clubId: context.club.id,
+  });
+
+  revalidatePath(`/manage/clubs/${context.club.slug}/coursework`);
+  revalidatePath(`/manage/clubs/${context.club.slug}/coursework/${data.assignmentId}`);
+  revalidatePath(`/clubs/${context.club.slug}/member`);
+  revalidatePath(`/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`);
+  return { success: true };
+}
+
 export async function updateUserRoleAndClubs(data: {
   targetUserId: string;
   role: UserRole;
@@ -1068,6 +1896,31 @@ export async function deleteUserAccount(targetUserId: string): Promise<{ success
   if (!canDeleteUser(actor, target)) {
     return { success: false, error: "You do not have permission to delete this account." };
   }
+
+  const [{ data: authoredFiles }, { data: submittedFiles }] = await Promise.all([
+    admin
+      .from("club_assignment_attachments")
+      .select("storage_path")
+      .eq("uploaded_by", targetUserId)
+      .eq("source_type", "upload"),
+    admin
+      .from("club_submission_attachments")
+      .select("storage_path")
+      .eq("student_id", targetUserId)
+      .eq("source_type", "upload"),
+  ]);
+  const storagePaths = [...(authoredFiles ?? []), ...(submittedFiles ?? [])]
+    .map((row) => row.storage_path)
+    .filter((path): path is string => Boolean(path));
+  if (storagePaths.length) {
+    const { error: storageError } = await admin.storage
+      .from(COURSEWORK_BUCKET)
+      .remove(storagePaths);
+    if (storageError) {
+      return { success: false, error: "Could not remove the account's private coursework files." };
+    }
+  }
+  await disconnectGoogleDrive(targetUserId).catch(() => undefined);
 
   const cleanupSteps = [
     admin.from("opportunities").update({ author_id: null }).eq("author_id", targetUserId),
@@ -1647,7 +2500,15 @@ export async function supabaseSignUp(
       ...(botProof?.captchaToken ? { captchaToken: botProof.captchaToken } : {}),
     },
   });
-  if (error) return { success: false, error: friendlyError(error, "Sign up failed.") };
+  if (error) {
+    console.error("[supabaseSignUp] Supabase Auth signup failed:", {
+      name: error.name,
+      code: error.code,
+      status: error.status,
+      message: error.message,
+    });
+    return { success: false, error: friendlyAuthEmailError(error) };
+  }
   if (data.session) {
     await supabase.auth.signOut();
     if (admin && data.user) {
@@ -1683,7 +2544,18 @@ export async function supabaseResendConfirmation(email: string, captchaToken?: s
       ...(captchaToken ? { captchaToken } : {}),
     },
   });
-  if (error) return { success: false, error: friendlyError(error, "Could not resend the confirmation email.") };
+  if (error) {
+    console.error("[supabaseResendConfirmation] Supabase Auth email failed:", {
+      name: error.name,
+      code: error.code,
+      status: error.status,
+      message: error.message,
+    });
+    return {
+      success: false,
+      error: friendlyAuthEmailError(error, "We couldn't resend the verification email. Please try again later."),
+    };
+  }
   return { success: true };
 }
 
