@@ -57,7 +57,7 @@ export function AccountControls({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 rounded-xl border bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-xl border bg-muted/30 p-4 transition-[border-color,box-shadow] duration-200 hover:border-storm-electric/20 hover:shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-medium text-storm-navy">Download your information</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -69,7 +69,7 @@ export function AccountControls({
         </Button>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-red-200 bg-red-50/40">
+      <div className="overflow-hidden rounded-xl border border-red-200 bg-red-50/40 transition-shadow duration-200 hover:shadow-sm">
         <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex gap-3">
             <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-700">
