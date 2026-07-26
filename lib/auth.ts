@@ -7,7 +7,6 @@ import { DEFAULT_SCHOOL_ID, DEFAULT_SCHOOL_SLUG } from "@/lib/schools";
 import {
   canAccessAdmin,
   canAccessManage,
-  canAccessManageAnalytics,
   canApproveContent,
   canManageClub,
 } from "@/lib/permissions";
@@ -203,12 +202,6 @@ export async function hasManagementAccess(profile: Profile | null): Promise<bool
     .in("role", ["officer", "president"])
     .limit(1);
   return !!data?.length;
-}
-
-export async function requireAnalyticsAccess(): Promise<AuthContext & { userId: string; profile: Profile }> {
-  const auth = await requireAuth("/manage/analytics");
-  if (!canAccessManageAnalytics(auth.profile)) redirect("/manage?error=admin_required");
-  return auth;
 }
 
 export async function requireApprover(): Promise<AuthContext & { userId: string; profile: Profile }> {

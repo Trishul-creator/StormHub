@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { ArrowRight, Building2, Calendar, GraduationCap, Mail, UserRoundX, Users } from "lucide-react";
+import { ArrowRight, BarChart3, Building2, Calendar, GraduationCap, Mail, UserRoundX, Users } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -94,6 +94,9 @@ export default async function AdminSchoolsPage() {
         title="Platform Admin"
         description="Choose a school workspace before viewing or managing school-specific content."
       >
+        <Button variant="outline" asChild>
+          <Link href="/admin/statistics"><BarChart3 className="h-4 w-4" /> Statistics</Link>
+        </Button>
         <Button variant="outline" asChild>
           <Link href="/admin/feedback"><Mail className="h-4 w-4" /> Support inbox</Link>
         </Button>

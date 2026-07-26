@@ -20,12 +20,12 @@ const supabaseOrigin = publicSupabaseUrl ? new URL(publicSupabaseUrl).origin : "
 const supabaseWebsocketOrigin = supabaseOrigin.replace(/^http/, "ws");
 const contentSecurityPolicy = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isProduction ? "" : " 'unsafe-eval'"} https://js.hcaptcha.com https://*.hcaptcha.com`,
+  `script-src 'self' 'unsafe-inline'${isProduction ? "" : " 'unsafe-eval'"} https://js.hcaptcha.com https://*.hcaptcha.com https://apis.google.com`,
   "style-src 'self' 'unsafe-inline' https://*.hcaptcha.com",
   "img-src 'self' data: blob: https://*.supabase.co https://*.hcaptcha.com",
   "font-src 'self' data:",
   `connect-src 'self' ${supabaseOrigin} ${supabaseWebsocketOrigin} https://*.hcaptcha.com`.replace(/\s+/g, " ").trim(),
-  "frame-src https://*.hcaptcha.com",
+  "frame-src https://*.hcaptcha.com https://docs.google.com https://drive.google.com https://accounts.google.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

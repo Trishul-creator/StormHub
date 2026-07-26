@@ -10,13 +10,15 @@ import { toast } from "@/hooks/use-toast";
 import { submitContent } from "@/lib/actions";
 import { humanizeLabel } from "@/lib/utils";
 import type { NotificationImportance } from "@/types/database";
+import { cn } from "@/lib/cn";
 
 interface ContentFormProps {
   type: "announcement" | "event" | "resource" | "opportunity";
   clubSlug?: string;
+  className?: string;
 }
 
-export function ContentForm({ type, clubSlug }: ContentFormProps) {
+export function ContentForm({ type, clubSlug, className }: ContentFormProps) {
   const [loading, setLoading] = useState(false);
   const [importance, setImportance] = useState<NotificationImportance>("normal");
   const [sendEmail, setSendEmail] = useState(false);
@@ -61,7 +63,7 @@ export function ContentForm({ type, clubSlug }: ContentFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-xl border bg-white p-6 space-y-4">
+    <form onSubmit={handleSubmit} className={cn("space-y-4 rounded-xl border bg-white p-6", className)}>
       <div>
         <Label htmlFor="title">Title</Label>
         <Input id="title" name="title" required className="mt-1" />

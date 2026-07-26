@@ -6,6 +6,7 @@ import {
   canEditRole,
   canJoinClub,
   canManageClub,
+  canManageClubCoursework,
   canManageClubRoster,
   canManageSchool,
   canUseStudentFeatures,
@@ -174,6 +175,15 @@ describe("club permissions", () => {
     expect(canManageClubRoster(profile("super_admin"), club({ school_id: schoolB }))).toBe(true);
     expect(canManageClubRoster(profile("teacher"), club(), membership("sponsor"))).toBe(true);
     expect(canManageClubRoster(profile("student"), club(), membership("president"))).toBe(false);
+  });
+
+  it("limits coursework and grading to admins or teacher sponsors", () => {
+    expect(canManageClubCoursework(profile("admin", { school_id: schoolA }), club({ school_id: schoolA }))).toBe(true);
+    expect(canManageClubCoursework(profile("admin", { school_id: schoolA }), club({ school_id: schoolB }))).toBe(false);
+    expect(canManageClubCoursework(profile("super_admin"), club({ school_id: schoolB }))).toBe(true);
+    expect(canManageClubCoursework(profile("teacher"), club(), membership("sponsor"))).toBe(true);
+    expect(canManageClubCoursework(profile("teacher"), club(), membership("member"))).toBe(false);
+    expect(canManageClubCoursework(profile("student"), club(), membership("president"))).toBe(false);
   });
 
   it("allows admins and super admins to preview/manage but not join through student flow", () => {
