@@ -58,9 +58,9 @@ export function Navbar({
       : role === "admin" || role === "teacher"
         ? [
             { href: primaryHref, label: primaryLabel },
-            { href: schoolClubHref, label: "Clubs" },
+            { href: "/manage/clubs", label: "Clubs" },
             { href: schoolCalendarHref, label: "Calendar" },
-            ...(role === "admin" ? [{ href: schoolOpportunitiesHref, label: "Opportunities" }] : []),
+            ...(role === "admin" ? [{ href: "/manage/opportunities", label: "Opportunities" }] : []),
           ]
         : [
             { href: primaryHref, label: primaryLabel },
@@ -70,6 +70,9 @@ export function Navbar({
           ];
   const isActivePath = (href: string) => {
     if (role === "super_admin" && href === primaryHref && pathname.startsWith("/admin")) return true;
+    if (href === "/manage" && (pathname.startsWith("/manage/clubs") || pathname.startsWith("/manage/opportunities"))) {
+      return false;
+    }
     return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
   };
 

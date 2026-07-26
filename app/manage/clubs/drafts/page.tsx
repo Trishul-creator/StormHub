@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { FilePenLine, Rocket, Settings } from "lucide-react";
+import { ArrowLeft, FilePenLine, Rocket } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -20,6 +20,9 @@ export default async function DraftClubsPage() {
         title="Draft Clubs"
         description="Prepare clubs before publishing them. Draft clubs are hidden from students until they are listed and opened."
       >
+        <Button variant="outline" asChild>
+          <Link href="/manage/clubs"><ArrowLeft className="h-4 w-4" /> Published clubs</Link>
+        </Button>
         <Button asChild>
           <Link href="/manage/clubs/new">Propose club</Link>
         </Button>
@@ -27,7 +30,7 @@ export default async function DraftClubsPage() {
 
       <div className="space-y-3">
         {clubs.map((club) => (
-          <div key={club.id} className="flex items-center justify-between rounded-xl border bg-white p-4">
+          <div key={club.id} className="flex items-center justify-between rounded-xl border bg-card p-4">
             <div>
               <div className="flex items-center gap-2">
                 <FilePenLine className="h-4 w-4 text-storm-electric" />
@@ -46,8 +49,7 @@ export default async function DraftClubsPage() {
             <div className="flex flex-wrap justify-end gap-2">
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/manage/clubs/${club.slug}`}>
-                  <Settings className="mr-1 h-4 w-4" />
-                  Dashboard
+                  Open workspace
                 </Link>
               </Button>
               <Button size="sm" asChild>

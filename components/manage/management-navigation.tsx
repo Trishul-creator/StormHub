@@ -3,13 +3,10 @@
 import {
   Building2,
   CheckSquare2,
-  FilePenLine,
-  LayoutDashboard,
   Mail,
   ShieldCheck,
-  Sparkles,
-  Users,
 } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { WorkspaceNavigation, type WorkspaceNavigationLink } from "@/components/layout/workspace-navigation";
 import type { UserRole } from "@/types/database";
 
@@ -24,15 +21,12 @@ export function ManagementNavigation({
   canApprove,
   canAdminister,
 }: ManagementNavigationProps) {
+  const pathname = usePathname();
+  if (pathname.startsWith("/manage/clubs") || pathname.startsWith("/manage/opportunities")) {
+    return null;
+  }
+
   const links: WorkspaceNavigationLink[] = [
-    { href: "/manage", label: "Overview", icon: LayoutDashboard },
-    { href: "/manage/clubs", label: "Clubs", icon: Users },
-    ...(["teacher", "admin", "super_admin"].includes(role)
-      ? [{ href: "/manage/clubs/drafts", label: "Drafts", icon: FilePenLine }]
-      : []),
-    ...(canAdminister
-      ? [{ href: "/manage/opportunities", label: "Opportunities", icon: Sparkles }]
-      : []),
     ...(canApprove
       ? [{ href: "/manage/approvals", label: "Approvals", icon: CheckSquare2 }]
       : []),
@@ -43,12 +37,13 @@ export function ManagementNavigation({
       ? [{ href: "/admin", label: "Administration", icon: ShieldCheck }]
       : []),
   ];
+  if (links.length === 0) return null;
 
   return (
     <WorkspaceNavigation
       ariaLabel="Management"
       eyebrow={role === "admin" ? "School" : role === "teacher" ? "Sponsor" : "Club"}
-      title="Management"
+      title="Management tools"
       icon={Building2}
       links={links}
     />

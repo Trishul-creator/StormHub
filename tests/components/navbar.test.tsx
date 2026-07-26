@@ -36,4 +36,11 @@ describe("Navbar", () => {
     expect(screen.getByRole("link", { name: "Calendar" })).toHaveAttribute("href", "/calendar");
     expect(screen.getByRole("link", { name: "Opportunities" })).toHaveAttribute("href", "/opportunities");
   });
+
+  it("routes administrator product sections directly to their management workspaces", () => {
+    render(<Navbar isLoggedIn role="admin" />);
+
+    expect(screen.getByRole("link", { name: "Clubs" })).toHaveAttribute("href", "/manage/clubs");
+    expect(screen.getByRole("link", { name: "Opportunities" })).toHaveAttribute("href", "/manage/opportunities");
+  });
 });

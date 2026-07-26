@@ -9,7 +9,7 @@ export function Footer({ role }: { role?: UserRole }) {
       <div className="container mx-auto px-4 py-12">
         <div className="grid gap-8 md:grid-cols-4">
           <div className="md:col-span-2">
-            <h3 className="text-lg font-bold text-white">{APP_NAME}</h3>
+            <p className="text-lg font-bold text-white">{APP_NAME}</p>
             <p className="mt-2 text-sm max-w-md">
               Student-built opportunity hub for school communities. Discover clubs, opportunities, and everything happening on the school calendar.
             </p>
@@ -21,7 +21,7 @@ export function Footer({ role }: { role?: UserRole }) {
             </p>
           </div>
           <div>
-            <h4 className="font-semibold text-white mb-3">Explore</h4>
+            <p className="mb-3 font-semibold text-white">Explore</p>
             <ul className="space-y-2 text-sm">
               <li><Link href="/clubs" className="hover:text-white transition-colors">Clubs</Link></li>
               {role !== "teacher" && (
@@ -31,7 +31,7 @@ export function Footer({ role }: { role?: UserRole }) {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-white mb-3">Info</h4>
+            <p className="mb-3 font-semibold text-white">Info</p>
             <ul className="space-y-2 text-sm">
               <li><Link href="/about" className="hover:text-white transition-colors">About</Link></li>
               <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link></li>
