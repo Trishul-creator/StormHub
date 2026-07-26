@@ -5,6 +5,36 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
+interface ExportQueryResult<T> {
+  data: T | null;
+  error: unknown;
+}
+
+interface ExportSection<T> {
+  data: T;
+  warning?: string;
+}
+
+async function readExportSection<T>(
+  section: string,
+  query: () => PromiseLike<ExportQueryResult<T>>,
+  fallback: T,
+): Promise<ExportSection<T>> {
+  try {
+    const result = await query();
+    if (!result.error) {
+      return { data: result.data ?? fallback };
+    }
+  } catch {
+    // A rejected database request should not prevent the remaining account data from exporting.
+  }
+
+  return {
+    data: fallback,
+    warning: `${section} could not be included in this export. Please try again after the latest database migrations are applied.`,
+  };
+}
+
 function exportResponse(profile: NonNullable<Awaited<ReturnType<typeof getAuthContext>>["profile"]>, data?: {
   clubMemberships?: unknown[] | null;
   eventRsvps?: unknown[] | null;
@@ -16,10 +46,12 @@ function exportResponse(profile: NonNullable<Awaited<ReturnType<typeof getAuthCo
   assignmentAttachments?: unknown[] | null;
   studentDriveCopies?: unknown[] | null;
   googleDriveConnection?: unknown | null;
+  warnings?: string[];
 }) {
   const exportedAt = new Date().toISOString();
   const payload = {
     exported_at: exportedAt,
+    export_warnings: data?.warnings ?? [],
     profile,
     club_memberships: data?.clubMemberships ?? [],
     event_rsvps: data?.eventRsvps ?? [],
@@ -68,25 +100,65 @@ export async function GET() {
     studentDriveCopies,
     googleDriveConnection,
   ] = await Promise.all([
-    supabase.from("club_memberships").select("*").eq("user_id", auth.userId),
-    supabase.from("event_rsvps").select("*").eq("user_id", auth.userId),
-    supabase.from("bookmarks").select("*").eq("user_id", auth.userId),
-    supabase.from("notifications").select("*").eq("recipient_user_id", auth.userId),
-    supabase.from("club_assignment_submissions").select("*").eq("student_id", auth.userId),
-    supabase.from("club_assignments").select("*").eq("author_id", auth.userId),
-    supabase.from("club_submission_attachments").select("*").eq("student_id", auth.userId),
-    supabase.from("club_assignment_attachments").select("*").eq("uploaded_by", auth.userId),
-    supabase.from("club_assignment_student_copies").select("*").eq("student_id", auth.userId),
-    admin
-      ? admin
-          .from("google_drive_connections")
-          .select("google_email,granted_scopes,created_at,updated_at")
-          .eq("user_id", auth.userId)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
+    readExportSection(
+      "Club memberships",
+      () => supabase.from("club_memberships").select("*").eq("user_id", auth.userId),
+      [],
+    ),
+    readExportSection(
+      "Event RSVPs",
+      () => supabase.from("event_rsvps").select("*").eq("user_id", auth.userId),
+      [],
+    ),
+    readExportSection(
+      "Bookmarks",
+      () => supabase.from("bookmarks").select("*").eq("user_id", auth.userId),
+      [],
+    ),
+    readExportSection(
+      "Notifications",
+      () => supabase.from("notifications").select("*").eq("recipient_user_id", auth.userId),
+      [],
+    ),
+    readExportSection(
+      "Assignment submissions",
+      () => supabase.from("club_assignment_submissions").select("*").eq("student_id", auth.userId),
+      [],
+    ),
+    readExportSection(
+      "Authored assignments",
+      () => supabase.from("club_assignments").select("*").eq("author_id", auth.userId),
+      [],
+    ),
+    readExportSection(
+      "Submission attachments",
+      () => supabase.from("club_submission_attachments").select("*").eq("student_id", auth.userId),
+      [],
+    ),
+    readExportSection(
+      "Assignment attachments",
+      () => supabase.from("club_assignment_attachments").select("*").eq("uploaded_by", auth.userId),
+      [],
+    ),
+    readExportSection(
+      "Student Drive copies",
+      () => supabase.from("club_assignment_student_copies").select("*").eq("student_id", auth.userId),
+      [],
+    ),
+    readExportSection(
+      "Google Drive connection",
+      () => admin
+        ? admin
+            .from("google_drive_connections")
+            .select("google_email,granted_scopes,created_at,updated_at")
+            .eq("user_id", auth.userId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      null,
+    ),
   ]);
 
-  const failed = [
+  const warnings = [
     memberships,
     rsvps,
     bookmarks,
@@ -97,10 +169,7 @@ export async function GET() {
     assignmentAttachments,
     studentDriveCopies,
     googleDriveConnection,
-  ].find((result) => result.error);
-  if (failed?.error) {
-    return NextResponse.json({ error: "Could not prepare the export." }, { status: 500 });
-  }
+  ].flatMap((result) => result.warning ? [result.warning] : []);
 
   return exportResponse(auth.profile, {
     clubMemberships: memberships.data,
@@ -113,5 +182,6 @@ export async function GET() {
     assignmentAttachments: assignmentAttachments.data,
     studentDriveCopies: studentDriveCopies.data,
     googleDriveConnection: googleDriveConnection.data,
+    warnings,
   });
 }
