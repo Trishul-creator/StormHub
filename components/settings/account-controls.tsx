@@ -61,7 +61,7 @@ export function AccountControls({
         <div>
           <p className="font-medium text-storm-navy">Download your information</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Export a copy of your profile, memberships, activity, and settings.
+            Export a copy of your profile, memberships, activity, coursework, and settings.
           </p>
         </div>
         <Button variant="outline" asChild className="shrink-0">

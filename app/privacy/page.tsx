@@ -15,6 +15,7 @@ export default function PrivacyPage() {
             <li>Grade level (optional)</li>
             <li>Club memberships and event RSVPs</li>
             <li>Saved opportunities and club participation</li>
+            <li>Club assignment submissions, sponsor feedback, and club coursework grades</li>
           </ul>
         </section>
 
@@ -38,9 +39,19 @@ export default function PrivacyPage() {
         </section>
 
         <section>
+          <h2 className="text-lg font-semibold text-storm-navy mb-2">Club coursework privacy</h2>
+          <p>
+            Assignment responses and grades are visible only to the student who submitted the work,
+            the club&apos;s teacher sponsor, and authorized school or platform administrators. Other club
+            members can see names and club roles in the People directory, but not email addresses,
+            submissions, grades, or private feedback.
+          </p>
+        </section>
+
+        <section>
           <h2 className="text-lg font-semibold text-storm-navy mb-2">What we do NOT collect</h2>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Grades or academic records</li>
+            <li>Official transcripts or report-card grades</li>
             <li>Disciplinary records</li>
             <li>Private messages between students</li>
             <li>Public student profiles by default</li>
@@ -52,7 +63,8 @@ export default function PrivacyPage() {
           <h2 className="text-lg font-semibold text-storm-navy mb-2">How we use data</h2>
           <p>
             Your data is used solely to provide club enrollment, event RSVPs, opportunity bookmarks,
-            and basic analytics (club join counts, event attendance). We do not sell student data.
+            club coursework and feedback, and basic analytics (club join counts, event attendance).
+            We do not sell student data.
           </p>
         </section>
 
@@ -69,7 +81,8 @@ export default function PrivacyPage() {
         <section className="rounded-xl border p-5">
           <p className="text-sm">
             StormHub is designed to collect only what is needed for club participation and opportunity discovery.
-            It does not store grades, disciplinary records, private messages, or sensitive student information.
+            Club coursework grades are private to the student and authorized club or school staff. StormHub does
+            not store official report-card grades, disciplinary records, private student messages, or advertising profiles.
           </p>
         </section>
       </div>

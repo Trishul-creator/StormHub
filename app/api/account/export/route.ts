@@ -9,6 +9,8 @@ function exportResponse(profile: NonNullable<Awaited<ReturnType<typeof getAuthCo
   eventRsvps?: unknown[] | null;
   bookmarks?: unknown[] | null;
   notifications?: unknown[] | null;
+  assignmentSubmissions?: unknown[] | null;
+  authoredAssignments?: unknown[] | null;
 }) {
   const exportedAt = new Date().toISOString();
   const payload = {
@@ -18,6 +20,8 @@ function exportResponse(profile: NonNullable<Awaited<ReturnType<typeof getAuthCo
     event_rsvps: data?.eventRsvps ?? [],
     bookmarks: data?.bookmarks ?? [],
     notifications: data?.notifications ?? [],
+    assignment_submissions: data?.assignmentSubmissions ?? [],
+    authored_assignments: data?.authoredAssignments ?? [],
   };
 
   return new NextResponse(JSON.stringify(payload, null, 2), {
@@ -42,14 +46,23 @@ export async function GET() {
     return NextResponse.json({ error: "Could not prepare the export." }, { status: 503 });
   }
 
-  const [memberships, rsvps, bookmarks, notifications] = await Promise.all([
+  const [memberships, rsvps, bookmarks, notifications, assignmentSubmissions, authoredAssignments] = await Promise.all([
     supabase.from("club_memberships").select("*").eq("user_id", auth.userId),
     supabase.from("event_rsvps").select("*").eq("user_id", auth.userId),
     supabase.from("bookmarks").select("*").eq("user_id", auth.userId),
     supabase.from("notifications").select("*").eq("recipient_user_id", auth.userId),
+    supabase.from("club_assignment_submissions").select("*").eq("student_id", auth.userId),
+    supabase.from("club_assignments").select("*").eq("author_id", auth.userId),
   ]);
 
-  const failed = [memberships, rsvps, bookmarks, notifications].find((result) => result.error);
+  const failed = [
+    memberships,
+    rsvps,
+    bookmarks,
+    notifications,
+    assignmentSubmissions,
+    authoredAssignments,
+  ].find((result) => result.error);
   if (failed?.error) {
     return NextResponse.json({ error: "Could not prepare the export." }, { status: 500 });
   }
@@ -59,5 +72,7 @@ export async function GET() {
     eventRsvps: rsvps.data,
     bookmarks: bookmarks.data,
     notifications: notifications.data,
+    assignmentSubmissions: assignmentSubmissions.data,
+    authoredAssignments: authoredAssignments.data,
   });
 }

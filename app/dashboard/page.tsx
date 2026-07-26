@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Bookmark, Bot, Calendar, CheckSquare, Settings, Users } from "lucide-react";
+import { ArrowRight, Bookmark, Bot, Calendar, CheckSquare, ClipboardList, Settings, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RoleChecklist } from "@/components/dashboard/role-checklist";
 import { DashboardCard } from "@/components/layout/stat-cards";
@@ -32,7 +32,7 @@ export default async function DashboardPage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-storm-navy">Teacher Dashboard</h1>
-        <p className="mt-1 text-muted-foreground">Manage your assigned clubs, rosters, events, and announcements.</p>
+        <p className="mt-1 text-muted-foreground">Manage your assigned clubs, coursework, rosters, events, and announcements.</p>
         <div className="mt-6">
           <RoleChecklist
             title="Teacher launch checklist"
@@ -60,7 +60,7 @@ export default async function DashboardPage() {
               key={club.id}
               href={`/manage/clubs/${club.slug}`}
               title={club.name}
-              description="Manage content, events, resources, and the club roster."
+              description="Manage assignments, grades, posts, events, resources, and the club roster."
             />
           ))}
         </div>
@@ -167,6 +167,32 @@ export default async function DashboardPage() {
                     <p className="text-xs text-muted-foreground">{m.club.category}</p>
                   </div>
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </DashboardCard>
+
+        <DashboardCard title="Upcoming classwork">
+          {dashboard.upcomingAssignments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No current assignments from your clubs.</p>
+          ) : (
+            <div className="space-y-3">
+              {dashboard.upcomingAssignments.slice(0, 4).map((assignment) => (
+                <Link
+                  key={assignment.id}
+                  href={assignment.club
+                    ? `/clubs/${assignment.club.slug}/member/assignments/${assignment.id}`
+                    : "/dashboard"}
+                  className="flex items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-storm-light/30"
+                >
+                  <ClipboardList className="mt-0.5 h-4 w-4 shrink-0 text-storm-electric" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{assignment.title}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {assignment.club?.name ?? "Club"} · {assignment.submission ? "Turned in" : assignment.due_at ? `Due ${formatDate(assignment.due_at)}` : "No due date"}
+                    </p>
+                  </div>
                 </Link>
               ))}
             </div>

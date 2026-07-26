@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(40);
+SELECT plan(55);
 
 UPDATE public.schools
 SET allowed_email_domains = ARRAY['school-a.edu']
@@ -174,6 +174,26 @@ SELECT lives_ok(
   $$SELECT public.manage_club_roster_member('a1000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', 'officer', FALSE)$$,
   'teacher sponsors can manage students in their club'
 );
+SELECT lives_ok(
+  $$INSERT INTO public.club_assignments (
+      id, club_id, author_id, title, instructions, points_possible, status, published_at
+    ) VALUES (
+      'a3000000-0000-4000-8000-000000000001',
+      'a1000000-0000-4000-8000-000000000001',
+      '20000000-0000-4000-8000-000000000001',
+      'Practice reflection',
+      'Submit a short reflection.',
+      20,
+      'published',
+      NOW()
+    )$$,
+  'teacher sponsors can create assignments for their club'
+);
+SELECT is(
+  (SELECT count(*) FROM public.get_club_member_directory('a1000000-0000-4000-8000-000000000001')),
+  2::BIGINT,
+  'teacher sponsors can view the limited club directory'
+);
 SELECT throws_ok(
   $$SELECT public.manage_club_roster_member('b1000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001', 'member', FALSE)$$,
   'P0001',
@@ -187,6 +207,126 @@ SELECT lives_ok(
 RESET ROLE;
 DELETE FROM public.account_deletion_requests
 WHERE user_id = '20000000-0000-4000-8000-000000000001';
+
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}',
+  TRUE
+);
+SET LOCAL ROLE authenticated;
+SELECT is(
+  (SELECT count(*) FROM public.club_assignments),
+  1::BIGINT,
+  'active club members can read published assignments for their club'
+);
+SELECT lives_ok(
+  $$SELECT public.submit_club_assignment(
+      'a3000000-0000-4000-8000-000000000001',
+      'My reflection',
+      'https://example.com/student-work'
+    )$$,
+  'student members can submit their own assignment work'
+);
+SELECT is(
+  (SELECT count(*) FROM public.club_assignment_submissions),
+  1::BIGINT,
+  'students can read their own submission'
+);
+SELECT is(
+  (SELECT count(*) FROM public.get_club_member_directory('a1000000-0000-4000-8000-000000000001')),
+  2::BIGINT,
+  'student members can view names and roles in their own club directory'
+);
+SELECT throws_ok(
+  $$UPDATE public.club_assignment_submissions SET grade_points = 20$$,
+  '42501',
+  NULL,
+  'students cannot directly modify assignment grades'
+);
+SELECT throws_ok(
+  $$INSERT INTO public.club_assignments (
+      club_id, author_id, title, instructions, points_possible, status
+    ) VALUES (
+      'a1000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+      'Unauthorized assignment',
+      'Bypass',
+      100,
+      'published'
+    )$$,
+  '42501',
+  NULL,
+  'student officers cannot create or grade coursework'
+);
+RESET ROLE;
+
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal1"}',
+  TRUE
+);
+SET LOCAL ROLE authenticated;
+SELECT is(
+  (SELECT count(*) FROM public.club_assignments),
+  0::BIGINT,
+  'students cannot read assignments for clubs they did not join'
+);
+SELECT throws_ok(
+  $$SELECT * FROM public.get_club_member_directory('a1000000-0000-4000-8000-000000000001')$$,
+  'P0001',
+  'Club membership required',
+  'students cannot view another club directory'
+);
+SELECT throws_ok(
+  $$SELECT public.submit_club_assignment(
+      'a3000000-0000-4000-8000-000000000001',
+      'Cross-school attempt',
+      NULL
+    )$$,
+  'P0001',
+  'An active student club membership is required',
+  'students cannot submit work to another club'
+);
+RESET ROLE;
+
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"20000000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}',
+  TRUE
+);
+SET LOCAL ROLE authenticated;
+SELECT is(
+  (SELECT count(*) FROM public.club_assignment_submissions),
+  1::BIGINT,
+  'teacher sponsors can review submissions for their club'
+);
+SELECT lives_ok(
+  $$SELECT public.grade_club_assignment_submission(
+      (SELECT id FROM public.club_assignment_submissions LIMIT 1),
+      18,
+      'Clear reasoning and a strong reflection.'
+    )$$,
+  'teacher sponsors can return a grade and private feedback'
+);
+RESET ROLE;
+
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}',
+  TRUE
+);
+SET LOCAL ROLE authenticated;
+SELECT is(
+  (SELECT grade_points FROM public.club_assignment_submissions LIMIT 1),
+  18::NUMERIC,
+  'students can see their returned grade'
+);
+SELECT is(
+  (SELECT status FROM public.club_assignment_submissions LIMIT 1),
+  'returned',
+  'graded work is returned only to its student'
+);
+RESET ROLE;
 
 SELECT set_config(
   'request.jwt.claims',

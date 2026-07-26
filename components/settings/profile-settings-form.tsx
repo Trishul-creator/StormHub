@@ -66,7 +66,7 @@ export function ProfileSettingsForm({ profile }: { profile: Profile }) {
 
       <div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
         <p className="max-w-md text-xs leading-relaxed text-muted-foreground">
-          StormHub collects only what is needed for club participation. No academic records or sensitive school data is stored.
+          StormHub stores only what is needed for participation, including private club coursework when your club uses assignments.
         </p>
         <Button className="shrink-0" onClick={save} disabled={pending}>
           {pending ? "Saving..." : "Save profile"}

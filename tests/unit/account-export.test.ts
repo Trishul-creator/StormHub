@@ -37,6 +37,8 @@ describe("account export", () => {
     expect(response.headers.get("content-disposition")).toMatch(/^attachment; filename="stormhub-data-/);
     expect(payload.profile.id).toBe("user-1");
     expect(payload.club_memberships).toEqual([]);
+    expect(payload.assignment_submissions).toEqual([]);
+    expect(payload.authored_assignments).toEqual([]);
     expect(payload).not.toHaveProperty("account_deletion_requests");
     expect(createClientMock).not.toHaveBeenCalled();
   });
