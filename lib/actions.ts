@@ -44,8 +44,11 @@ import { processEmailOutbox } from "@/lib/email";
 import type { NotificationImportance, NotificationPreferences } from "@/types/database";
 import {
   getClientAddress,
+  getAllowedSignupDomains,
   getSignupRateLimitConfig,
   hashSignupIdentifier,
+  isMissingAllowedEmailDomainsColumn,
+  parseSignupDomainInput,
   type SignupBotProof,
   validateSignupBotProof,
 } from "@/lib/signup-security";
@@ -1542,11 +1545,11 @@ export async function supabaseSignUp(
 
   let signupAttemptId: string | null = null;
   if (admin) {
-    const requestHeaders = await headers();
-    const clientAddress = getClientAddress(requestHeaders);
     const fingerprintSecret =
       process.env.SIGNUP_RATE_LIMIT_SECRET?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
     if (fingerprintSecret) {
+      const requestHeaders = await headers();
+      const clientAddress = getClientAddress(requestHeaders);
       const config = getSignupRateLimitConfig();
       const since = new Date(Date.now() - config.windowMinutes * 60 * 1000).toISOString();
       const emailHash = hashSignupIdentifier(normalizedEmail, fingerprintSecret);
@@ -1581,33 +1584,50 @@ export async function supabaseSignUp(
   }
   const { data: school, error: schoolError } = await db
     .from("schools")
-    .select("id, is_active, allowed_email_domains")
+    .select("id, is_active, is_public")
     .eq("id", schoolId)
     .maybeSingle();
-  if (schoolError || !school || school.is_active === false) {
+  if (schoolError) {
+    console.error("[supabaseSignUp] Could not verify school:", schoolError.message);
+    return { success: false, error: "We couldn't verify your school right now. Please try again." };
+  }
+  if (!school || school.is_active === false || school.is_public === false) {
     return { success: false, error: "Choose an active school." };
   }
+
+  const { data: schoolSignupConfig, error: signupConfigError } = await db
+    .from("schools")
+    .select("allowed_email_domains")
+    .eq("id", schoolId)
+    .maybeSingle();
+  const usesLegacySchoolSchema = isMissingAllowedEmailDomainsColumn(signupConfigError);
+  if (signupConfigError && !usesLegacySchoolSchema) {
+    console.error("[supabaseSignUp] Could not read school signup settings:", signupConfigError.message);
+    return { success: false, error: "We couldn't verify your school's signup settings right now. Please try again." };
+  }
+  if (usesLegacySchoolSchema) {
+    console.warn(
+      "[supabaseSignUp] schools.allowed_email_domains is not deployed; using legacy signup rules until the migration is applied."
+    );
+  }
+
   const normalizedGrade = typeof gradeLevel === "number" && gradeLevel >= 6 && gradeLevel <= 12
     ? gradeLevel
     : null;
-  const configuredDomains: string[] = Array.isArray(school.allowed_email_domains)
-    ? school.allowed_email_domains.filter((domain: unknown): domain is string => typeof domain === "string")
-    : [];
-  const allowedDomains = [
-    ...configuredDomains,
-    ...(process.env.ALLOWED_SIGNUP_EMAIL_DOMAINS ?? "").split(","),
-  ]
-    .map((domain) => domain.trim().toLowerCase())
-    .filter(Boolean);
+  const allowedDomains = getAllowedSignupDomains(
+    schoolSignupConfig?.allowed_email_domains,
+    process.env.ALLOWED_SIGNUP_EMAIL_DOMAINS
+  );
   const blockedDomains = (process.env.BLOCKED_SIGNUP_EMAIL_DOMAINS ?? "")
     .split(",")
-    .map((domain) => domain.trim().toLowerCase())
+    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ""))
     .filter(Boolean);
   const emailDomain = normalizedEmail.split("@")[1]?.toLowerCase();
-  if (allowedDomains.length === 0) {
+  if (allowedDomains.length === 0 && !usesLegacySchoolSchema) {
     return { success: false, error: "Signups are not configured for this school yet. Contact the school administrator." };
   }
-  if (allowedDomains.length > 0 && (!emailDomain || !allowedDomains.includes(emailDomain))) {
+  const allowsEveryDomain = allowedDomains.includes("*");
+  if (!allowsEveryDomain && allowedDomains.length > 0 && (!emailDomain || !allowedDomains.includes(emailDomain))) {
     return {
       success: false,
       error: `Please use an approved school email address (${allowedDomains.join(", ")}).`,
@@ -1628,17 +1648,85 @@ export async function supabaseSignUp(
     },
   });
   if (error) return { success: false, error: friendlyError(error, "Sign up failed.") };
-  if (data.user) {
-    await createProfileIfMissing(data.user.id, normalizedEmail, normalizedFullName);
-    await supabase
-      .from("profiles")
-      .update({ full_name: normalizedFullName, grade_level: normalizedGrade, school_id: schoolId })
-      .eq("id", data.user.id);
+  if (data.session) {
+    await supabase.auth.signOut();
+    if (admin && data.user) {
+      const { error: rollbackError } = await admin.auth.admin.deleteUser(data.user.id);
+      if (rollbackError) {
+        console.error("[supabaseSignUp] Could not roll back an auto-confirmed signup:", rollbackError.message);
+      }
+    }
+    return {
+      success: false,
+      error: "Email verification is temporarily unavailable. Please contact support before trying again.",
+    };
   }
   if (admin && signupAttemptId) {
     await admin.from("signup_attempts").update({ was_successful: true }).eq("id", signupAttemptId);
   }
-  return { success: true, needsConfirmation: !data.session };
+  return { success: true, needsConfirmation: true };
+}
+
+export async function supabaseResendConfirmation(email: string, captchaToken?: string | null) {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return { success: false, error: "Enter a valid email address." };
+  }
+
+  const supabase = await createClient();
+  if (!supabase) return { success: false, error: "Database not configured." };
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: normalizedEmail,
+    options: {
+      emailRedirectTo: getAuthCallbackUrl(),
+      ...(captchaToken ? { captchaToken } : {}),
+    },
+  });
+  if (error) return { success: false, error: friendlyError(error, "Could not resend the confirmation email.") };
+  return { success: true };
+}
+
+export async function updateSchoolSignupDomains(input: {
+  schoolId: string;
+  domains: string;
+}): Promise<{ success: boolean; domains?: string[]; error?: string }> {
+  const actor = await getCurrentProfile();
+  if (!actor || !["admin", "super_admin"].includes(actor.role)) {
+    return { success: false, error: "Administrator access required." };
+  }
+  if (actor.role !== "super_admin" && actor.school_id !== input.schoolId) {
+    return { success: false, error: "You can only change signup settings for your own school." };
+  }
+
+  const { domains, invalidDomains } = parseSignupDomainInput(input.domains);
+  if (invalidDomains.length > 0) {
+    return { success: false, error: `Remove invalid domains: ${invalidDomains.join(", ")}.` };
+  }
+  if (domains.length === 0) {
+    return { success: false, error: "Enter at least one email domain, or * to allow every domain." };
+  }
+  if (domains.includes("*") && domains.length > 1) {
+    return { success: false, error: "Use * by itself to allow every email domain." };
+  }
+
+  const supabase = await createClient();
+  if (!supabase) return { success: false, error: "Database not configured." };
+  const { data, error } = await supabase.rpc("set_school_signup_domains", {
+    target_school_id: input.schoolId,
+    requested_domains: domains,
+  });
+  if (error) {
+    console.error("[updateSchoolSignupDomains]", error.message);
+    if (error.code === "42883" || error.message.includes("does not exist")) {
+      return { success: false, error: "Apply the latest database migrations before changing signup domains." };
+    }
+    return { success: false, error: friendlyError(error, "Could not update accepted email domains.") };
+  }
+
+  revalidatePath("/manage");
+  revalidatePath("/admin/schools");
+  return { success: true, domains: Array.isArray(data) ? data : domains };
 }
 
 export async function updateProfileSettings(data: {

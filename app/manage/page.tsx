@@ -3,11 +3,13 @@ import { Shield, Zap, Users, BarChart3, CheckSquare, History, Mail } from "lucid
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { SignupDomainSettings } from "@/components/admin/signup-domain-settings";
 import { RoleChecklist } from "@/components/dashboard/role-checklist";
 import { requireManager } from "@/lib/auth";
 import { getAdminAnalytics, getManageableClubs, getPendingApprovals } from "@/lib/data";
 import { canAccessAdmin, canAccessManageAnalytics, canApproveContent } from "@/lib/permissions";
 import { getRoleOnboardingItems } from "@/lib/product";
+import { getSchoolForProfile } from "@/lib/schools";
 import { redirect } from "next/navigation";
 
 const manageLinks = [
@@ -24,10 +26,11 @@ const manageLinks = [
 export default async function ManagePage() {
   const { profile } = await requireManager();
   if (profile.role === "super_admin") redirect("/admin/schools");
-  const [pendingApprovals, manageableClubs, analytics] = await Promise.all([
+  const [pendingApprovals, manageableClubs, analytics, school] = await Promise.all([
     canApproveContent(profile) ? getPendingApprovals() : Promise.resolve([]),
     getManageableClubs(profile),
     canAccessManageAnalytics(profile) ? getAdminAnalytics() : Promise.resolve(null),
+    profile.role === "admin" ? getSchoolForProfile(profile) : Promise.resolve(null),
   ]);
   const checklist = getRoleOnboardingItems(profile.role, {
     manageableClubs: manageableClubs.length,
@@ -63,6 +66,15 @@ export default async function ManagePage() {
           <MetricCard label="Active clubs" value={analytics.activeClubs} />
           <MetricCard label="Upcoming events" value={analytics.upcomingEvents} />
           <MetricCard label="Saved opportunities" value={analytics.totalBookmarks} />
+        </div>
+      )}
+      {profile.role === "admin" && school && (
+        <div className="mb-6">
+          <SignupDomainSettings
+            schoolId={school.id}
+            schoolName={school.name}
+            domains={school.allowed_email_domains ?? []}
+          />
         </div>
       )}
       {profile.role === "teacher" && manageableClubs.length > 0 && (

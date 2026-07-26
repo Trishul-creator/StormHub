@@ -16,6 +16,9 @@ export function friendlyError(error: unknown, fallback = "Something went wrong. 
   if (msg.includes("permission denied") || code === "42501") {
     return "You do not have permission to do that.";
   }
+  if (msg.toLowerCase().includes("email not confirmed")) {
+    return "Confirm your email address before signing in.";
+  }
   if (process.env.NODE_ENV === "development") {
     console.error("[StormHub]", error);
   }

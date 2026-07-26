@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(33);
+SELECT plan(37);
 
 UPDATE public.schools
 SET allowed_email_domains = ARRAY['school-a.edu']
@@ -18,7 +18,7 @@ INSERT INTO public.schools (
   'school-b',
   TRUE,
   TRUE,
-  ARRAY['school-b.edu']
+  ARRAY['*']
 );
 
 INSERT INTO auth.users (
@@ -200,6 +200,16 @@ SELECT lives_ok(
   $$SELECT public.admin_set_account_status('10000000-0000-4000-8000-000000000001', 'suspended')$$,
   'confirmed-email school admins can use authorized account RPCs'
 );
+SELECT lives_ok(
+  $$SELECT public.set_school_signup_domains('a0000000-0000-4000-8000-000000000001', ARRAY['school-a.edu'])$$,
+  'school admins can update accepted email domains for their own school'
+);
+SELECT throws_ok(
+  $$SELECT public.set_school_signup_domains('b0000000-0000-4000-8000-000000000002', ARRAY['example.com'])$$,
+  'P0001',
+  'School administrators can only update their own school',
+  'school admins cannot update another school signup domains'
+);
 RESET ROLE;
 
 SELECT set_config(
@@ -273,6 +283,10 @@ SELECT lives_ok(
   $$SELECT public.admin_set_account_status('10000000-0000-4000-8000-000000000002', 'suspended')$$,
   'super admins can manage users across schools'
 );
+SELECT lives_ok(
+  $$SELECT public.set_school_signup_domains('b0000000-0000-4000-8000-000000000002', ARRAY['*'])$$,
+  'super admins can update accepted email domains for any school'
+);
 RESET ROLE;
 
 SELECT throws_ok(
@@ -292,6 +306,23 @@ SELECT throws_ok(
   'P0001',
   'Use an approved school email address',
   'the auth trigger rejects direct signups from unapproved domains'
+);
+
+SELECT lives_ok(
+  $$
+    INSERT INTO auth.users (
+      id, instance_id, aud, role, email, encrypted_password,
+      raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+    ) VALUES (
+      '50000000-0000-4000-8000-000000000002',
+      '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+      'outside-domain@example.com', crypt('Password123!', gen_salt('bf')),
+      '{"provider":"email","providers":["email"]}',
+      '{"full_name":"Wildcard Student","school_id":"b0000000-0000-4000-8000-000000000002"}',
+      NOW(), NOW()
+    )
+  $$,
+  'a school configured with * accepts any verified email domain'
 );
 
 SELECT * FROM finish();
