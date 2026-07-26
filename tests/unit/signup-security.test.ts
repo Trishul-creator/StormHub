@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  getAllowedSignupDomains,
   getClientAddress,
   getSignupRateLimitConfig,
   hashSignupIdentifier,
+  isMissingAllowedEmailDomainsColumn,
+  parseSignupDomainInput,
   validateSignupBotProof,
 } from "@/lib/signup-security";
 
@@ -34,5 +37,35 @@ describe("signup security", () => {
       SIGNUP_MAX_ATTEMPTS_PER_EMAIL: "3",
       SIGNUP_MAX_ATTEMPTS_PER_IP: "20",
     })).toEqual({ windowMinutes: 30, maxEmailAttempts: 3, maxIpAttempts: 20 });
+  });
+
+  it("normalizes and deduplicates school and environment signup domains", () => {
+    expect(getAllowedSignupDomains(
+      [" Students.Example.edu ", "@staff.example.edu"],
+      "staff.example.edu, district.example.org"
+    )).toEqual(["students.example.edu", "staff.example.edu", "district.example.org"]);
+  });
+
+  it("recognizes the legacy schema's missing signup-domain column", () => {
+    expect(isMissingAllowedEmailDomainsColumn({
+      code: "42703",
+      message: "column schools.allowed_email_domains does not exist",
+    })).toBe(true);
+    expect(isMissingAllowedEmailDomainsColumn({
+      code: "42501",
+      message: "permission denied",
+    })).toBe(false);
+  });
+
+  it("parses either a wildcard or a normalized domain restriction list", () => {
+    expect(parseSignupDomainInput("*")).toEqual({ domains: ["*"], invalidDomains: [] });
+    expect(parseSignupDomainInput("@Students.Example.edu, staff.example.edu")).toEqual({
+      domains: ["students.example.edu", "staff.example.edu"],
+      invalidDomains: [],
+    });
+    expect(parseSignupDomainInput("valid.example.edu, not a domain")).toEqual({
+      domains: ["valid.example.edu"],
+      invalidDomains: ["not a domain"],
+    });
   });
 });

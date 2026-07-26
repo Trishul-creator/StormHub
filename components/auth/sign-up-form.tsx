@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabaseSignUp } from "@/lib/actions";
+import { supabaseResendConfirmation, supabaseSignUp } from "@/lib/actions";
 import { toast } from "@/hooks/use-toast";
-import { Zap } from "lucide-react";
+import { MailCheck, Zap } from "lucide-react";
 import { Captcha } from "@/components/auth/captcha";
 
 interface SignUpSchool {
@@ -32,6 +32,7 @@ export function SignUpForm({
   const [loading, setLoading] = useState(false);
   const [loadedAt] = useState(() => Date.now());
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -74,7 +75,7 @@ export function SignUpForm({
     if (result.success) {
       if (result.needsConfirmation) {
         toast({ title: "Check your email", description: "Confirm your email address to complete signup." });
-        router.push("/auth/sign-in");
+        setPendingEmail(email.trim().toLowerCase());
       } else {
         toast({ title: "Welcome to StormHub!", description: "Your account has been created." });
         router.push("/dashboard");
@@ -83,6 +84,10 @@ export function SignUpForm({
     } else {
       toast({ title: "Sign up failed", description: result.error, variant: "destructive" });
     }
+  }
+
+  if (pendingEmail) {
+    return <EmailVerificationNotice email={pendingEmail} />;
   }
 
   return (
@@ -162,6 +167,55 @@ export function SignUpForm({
         <p className="mt-3 text-center text-xs text-muted-foreground">
           Confirm your email after signup. New accounts are tied to one school workspace, and staff roles are assigned by authorized administrators.
         </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function EmailVerificationNotice({ email }: { email: string }) {
+  const [resending, setResending] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRequired = Boolean(process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim());
+
+  async function resendConfirmation() {
+    setResending(true);
+    const result = await supabaseResendConfirmation(email, captchaToken);
+    setResending(false);
+    toast(
+      result.success
+        ? { title: "Confirmation sent", description: "Check your inbox for a new verification link." }
+        : { title: "Could not resend email", description: result.error, variant: "destructive" }
+    );
+  }
+
+  return (
+    <Card className="w-full max-w-md">
+      <CardHeader className="text-center">
+        <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-storm-gradient">
+          <MailCheck className="h-5 w-5 text-white" />
+        </div>
+        <CardTitle>Check your email</CardTitle>
+        <CardDescription>
+          We sent a confirmation link to <span className="font-medium text-foreground">{email}</span>.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 text-center">
+        <p className="text-sm text-muted-foreground">
+          Open the link to verify your email and finish creating your account. Check your spam folder if it does not arrive.
+        </p>
+        <Captcha onToken={setCaptchaToken} />
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          disabled={resending || (captchaRequired && !captchaToken)}
+          onClick={resendConfirmation}
+        >
+          {resending ? "Sending..." : "Resend confirmation email"}
+        </Button>
+        <Link href="/auth/sign-in" className="inline-block text-sm text-storm-electric underline">
+          Return to sign in
+        </Link>
       </CardContent>
     </Card>
   );

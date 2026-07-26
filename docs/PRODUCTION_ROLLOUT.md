@@ -151,8 +151,10 @@ WHERE slug = 'your-school-slug';
 ```
 
 Replace the example values with domains controlled by the district. An empty domain list intentionally
-blocks new accounts. The same list can be maintained by the super admin in the school
-workspace under **Signup protection**.
+blocks new accounts. Use `ARRAY['*']` to accept every verified email domain. Super admins can maintain
+the list for any school from the school workspace, and school admins can maintain it for their own
+school from `/manage`. The `20260725120000_configurable_school_signup_domains.sql` migration initially
+sets Elkhorn South, Elkhorn North, and Lexington East to `ARRAY['*']`.
 
 ## 6. Set Vercel Secrets
 
