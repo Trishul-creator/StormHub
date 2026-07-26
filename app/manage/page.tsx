@@ -17,7 +17,7 @@ const manageLinks = [
   { href: "/manage/clubs/drafts", icon: Users, title: "Draft Clubs", description: "Review prepared clubs before publishing them" },
   { href: "/manage/opportunities", icon: Zap, title: "Opportunities", description: "Post school-wide sign-ups and applications" },
   { href: "/manage/approvals", icon: CheckSquare, title: "Approval Queue", description: "Review pending content" },
-  { href: "/manage/analytics", icon: BarChart3, title: "Analytics", description: "View platform metrics" },
+  { href: "/admin/statistics", icon: BarChart3, title: "Statistics", description: "View school participation and activity trends" },
   { href: "/manage/digest", icon: Mail, title: "Weekly Digest", description: "Generate newsletter content" },
   { href: "/admin", icon: Shield, title: "Admin Panel", description: "School-wide administration" },
   { href: "/admin/audit", icon: History, title: "Audit Log", description: "Review administrative change history" },
@@ -42,7 +42,7 @@ export default async function ManagePage() {
     if (link.href === "/admin") return canAccessAdmin(profile);
     if (link.href === "/admin/audit") return canAccessAdmin(profile);
     if (link.href === "/manage/opportunities") return canAccessAdmin(profile);
-    if (link.href === "/manage/analytics") return canAccessManageAnalytics(profile);
+    if (link.href === "/admin/statistics") return canAccessManageAnalytics(profile);
     if (link.href === "/manage/approvals") return canAccessAdmin(profile) || pendingApprovals.length > 0;
     return true;
   });

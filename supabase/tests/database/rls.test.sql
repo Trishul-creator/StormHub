@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(67);
+SELECT plan(73);
 
 SELECT is(
   (SELECT public FROM storage.buckets WHERE id = 'coursework-private'),
@@ -161,6 +161,12 @@ SELECT throws_ok(
   '42501',
   NULL,
   'authenticated users cannot directly insert public interest forms'
+);
+SELECT throws_ok(
+  $$SELECT public.get_admin_statistics(NULL)$$,
+  'P0001',
+  'Administrator access required',
+  'students cannot access administrative statistics'
 );
 RESET ROLE;
 
@@ -499,6 +505,22 @@ SELECT is(
   0::BIGINT,
   'confirmed-email school admins still cannot read another school profiles'
 );
+SELECT is(
+  (public.get_admin_statistics(NULL)->>'scopeSchoolId'),
+  'a0000000-0000-4000-8000-000000000001',
+  'school admin statistics are automatically locked to their own school'
+);
+SELECT is(
+  (public.get_admin_statistics(NULL)->>'totalClubs')::INTEGER,
+  1,
+  'school admin statistics exclude clubs from other schools'
+);
+SELECT throws_ok(
+  $$SELECT public.get_admin_statistics('b0000000-0000-4000-8000-000000000002')$$,
+  'P0001',
+  'School administrators can only view statistics for their own school',
+  'school admins cannot request statistics for another school'
+);
 SELECT is((SELECT count(*) FROM public.account_deletion_requests), 1::BIGINT, 'confirmed-email school admins can read same-school deletion requests');
 SELECT lives_ok(
   $$SELECT public.admin_set_account_status('10000000-0000-4000-8000-000000000001', 'suspended')$$,
@@ -580,6 +602,16 @@ SELECT set_config(
 );
 SET LOCAL ROLE authenticated;
 SELECT is((SELECT count(*) FROM public.profiles), 5::BIGINT, 'confirmed-email super admins can read profiles across schools');
+SELECT is(
+  (public.get_admin_statistics(NULL)->>'totalClubs')::INTEGER,
+  2,
+  'super admin platform statistics include clubs across schools'
+);
+SELECT is(
+  (public.get_admin_statistics('b0000000-0000-4000-8000-000000000002')->>'totalClubs')::INTEGER,
+  1,
+  'super admins can explicitly scope statistics to one school'
+);
 SELECT lives_ok(
   $$INSERT INTO public.account_deletion_requests (user_id, school_id, reason) VALUES ('40000000-0000-4000-8000-000000000001', NULL, 'Super admin self-service request')$$,
   'super admins can request deletion for their own account'
