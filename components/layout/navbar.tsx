@@ -76,13 +76,13 @@ export function Navbar({
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+    <header className="sticky top-0 z-50 border-b bg-white/95 shadow-sm transition-shadow duration-300 backdrop-blur supports-[backdrop-filter]:bg-white/80">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link href={brandHref} className="flex items-center gap-2 font-bold text-storm-navy">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-storm-gradient">
+        <Link href={brandHref} className="group flex items-center gap-2 font-bold text-storm-navy">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-storm-gradient shadow-sm transition-[transform,box-shadow] duration-300 group-hover:rotate-3 group-hover:scale-105 group-hover:shadow-md motion-reduce:transform-none">
             <Zap className="h-4 w-4 text-white" />
           </div>
-          <span>{APP_NAME}</span>
+          <span className="transition-colors group-hover:text-storm-electric">{APP_NAME}</span>
         </Link>
 
         <nav className="hidden items-center gap-6 lg:flex">
@@ -90,7 +90,7 @@ export function Navbar({
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm font-medium text-storm-navy/70 hover:text-storm-electric transition-colors"
+              className="relative py-2 text-sm font-medium text-storm-navy/70 transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:origin-left after:scale-x-0 after:rounded-full after:bg-storm-electric after:transition-transform after:duration-200 hover:text-storm-electric hover:after:scale-x-100"
             >
               {link.label}
             </Link>
@@ -133,13 +133,13 @@ export function Navbar({
           )}
         </div>
 
-        <button className="lg:hidden p-2" onClick={() => setOpen(!open)} aria-label="Toggle menu">
+        <button className="rounded-lg p-2 transition-colors hover:bg-storm-light/60 lg:hidden" onClick={() => setOpen(!open)} aria-label="Toggle menu" aria-expanded={open}>
           {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
       </div>
 
       {open && (
-        <div className="border-t bg-white px-4 py-4 lg:hidden">
+        <div className="animate-in border-t bg-white px-4 py-4 duration-200 fade-in slide-in-from-top-2 lg:hidden">
           <nav className="flex flex-col gap-3">
             {navLinks.map((link) => (
               <Link key={link.href} href={link.href} className="text-sm font-medium py-2" onClick={() => setOpen(false)}>

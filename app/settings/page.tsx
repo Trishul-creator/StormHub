@@ -8,13 +8,26 @@ import { getNotificationPreferences } from "@/lib/notifications";
 import { ProfileSettingsForm } from "@/components/settings/profile-settings-form";
 import { AccountControls } from "@/components/settings/account-controls";
 import { Shield } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function SettingsPage() {
   const { profile } = await requireAuth("/settings");
-  const preferences = await getNotificationPreferences(profile.id);
+  const supabase = await createClient();
+  const [preferences, deletionRequestResult] = await Promise.all([
+    getNotificationPreferences(profile.id),
+    supabase
+      ? supabase
+          .from("account_deletion_requests")
+          .select("status,requested_at,reviewer_notes")
+          .eq("user_id", profile.id)
+          .order("requested_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
+    <div className="motion-stagger container mx-auto max-w-2xl px-4 py-8">
       <PageHeader title="Settings" description="Manage your StormHub profile." />
       <Card>
         <CardHeader>
@@ -40,7 +53,7 @@ export default async function SettingsPage() {
           <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5" /> Account and privacy</CardTitle>
         </CardHeader>
         <CardContent>
-          <AccountControls />
+          <AccountControls deletionRequest={deletionRequestResult.data ?? null} />
         </CardContent>
       </Card>
     </div>
