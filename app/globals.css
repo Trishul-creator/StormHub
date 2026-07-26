@@ -84,6 +84,9 @@
       radial-gradient(circle at 88% 8%, hsl(214 100% 70% / 0.08), transparent 24rem);
     background-attachment: fixed;
   }
+  .dark {
+    color-scheme: dark;
+  }
   ::selection {
     @apply bg-storm-electric/20 text-storm-navy;
   }
@@ -98,26 +101,68 @@
   .dark .bg-blue-50,
   .dark .bg-emerald-50,
   .dark .bg-amber-50,
-  .dark .bg-violet-50 {
+  .dark .bg-violet-50,
+  .dark .bg-cyan-50,
+  .dark .bg-pink-50,
+  .dark .bg-red-50,
+  .dark .bg-green-50,
+  .dark .bg-slate-50,
+  .dark .bg-gray-50,
+  .dark .bg-zinc-50 {
     background-color: hsl(var(--muted));
   }
+  .dark .bg-slate-50\/70,
+  .dark .bg-blue-50\/70,
+  .dark .bg-green-50\/70,
+  .dark .bg-red-50\/40,
+  .dark .bg-blue-50\/60 {
+    background-color: hsl(var(--muted) / 0.72);
+  }
+  .dark .bg-slate-100,
+  .dark .bg-gray-100,
+  .dark .bg-zinc-100 { background-color: hsl(var(--secondary)); }
   .dark .bg-emerald-50\/50 { background-color: hsl(160 35% 14% / 0.7); }
   .dark .bg-emerald-100 { background-color: hsl(160 45% 20%); }
   .dark .bg-amber-100 { background-color: hsl(42 55% 20%); }
   .dark .bg-blue-100 { background-color: hsl(217 45% 21%); }
   .dark .bg-violet-100 { background-color: hsl(250 40% 22%); }
+  .dark .bg-red-100 { background-color: hsl(0 45% 22%); }
+  .dark .bg-green-100 { background-color: hsl(145 45% 20%); }
   .dark .text-storm-navy { color: hsl(var(--foreground)); }
   .dark .text-storm-navy\/70 { color: hsl(var(--foreground) / 0.72); }
   .dark .text-storm-navy\/85 { color: hsl(var(--foreground) / 0.86); }
   .dark .text-storm-blue { color: hsl(214 32% 82%); }
   .dark .text-storm-electric { color: hsl(213 94% 72%); }
   .dark .text-amber-800,
-  .dark .text-amber-700 { color: hsl(45 93% 68%); }
+  .dark .text-amber-700,
+  .dark .text-amber-900,
+  .dark .text-amber-950 { color: hsl(45 93% 72%); }
   .dark .text-emerald-900,
   .dark .text-emerald-800,
   .dark .text-emerald-700 { color: hsl(155 70% 72%); }
   .dark .text-blue-900 { color: hsl(213 94% 82%); }
+  .dark .text-blue-800,
+  .dark .text-blue-700 { color: hsl(213 94% 76%); }
   .dark .text-violet-700 { color: hsl(250 95% 80%); }
+  .dark .text-red-950,
+  .dark .text-red-900,
+  .dark .text-red-800,
+  .dark .text-red-700,
+  .dark .text-red-600 { color: hsl(0 90% 76%); }
+  .dark .text-green-900,
+  .dark .text-green-800,
+  .dark .text-green-700 { color: hsl(145 70% 72%); }
+  .dark .text-slate-800,
+  .dark .text-slate-700,
+  .dark .text-gray-800,
+  .dark .text-gray-700,
+  .dark .text-zinc-800,
+  .dark .text-zinc-700 { color: hsl(var(--foreground)); }
+  .dark .border-slate-200,
+  .dark .border-gray-200,
+  .dark .border-zinc-200 { border-color: hsl(var(--border)); }
+  .dark .border-amber-200 { border-color: hsl(42 45% 32%); }
+  .dark .border-red-200 { border-color: hsl(0 40% 34%); }
 }
 
 @layer utilities {

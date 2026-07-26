@@ -2,9 +2,6 @@ import { PageHeader } from "@/components/layout/page-header";
 import { getManagedClubBySlug, getClubManagedContent } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Eye } from "lucide-react";
 import { StatusBadge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/utils";
 import { ArchiveContentButton } from "@/components/manage/archive-content-button";
@@ -27,17 +24,13 @@ export default async function ManageAnnouncementsPage({ params }: PageProps) {
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
-      <PageHeader title="Create a club post" description={`Publish assignments, announcements, events, and materials for ${club.name}.`}>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/clubs/${slug}/member`}><Eye className="h-4 w-4" /> View club dashboard</Link>
-        </Button>
-      </PageHeader>
+      <PageHeader title="Create a club post" description={`Publish assignments, announcements, events, and materials for ${club.name}.`} />
       <ClubPostComposer
         clubSlug={slug}
         defaultType="announcement"
         courseworkEnabled={courseworkEnabled}
       />
-      <section className="mt-8 rounded-xl border bg-white p-5">
+      <section className="mt-8 rounded-xl border bg-card p-5 shadow-sm">
         <h2 className="font-semibold text-storm-navy">Previous announcements</h2>
         <div className="mt-4 space-y-3">
           {announcements.map((announcement) => (

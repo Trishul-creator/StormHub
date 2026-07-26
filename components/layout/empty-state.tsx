@@ -22,7 +22,7 @@ export function EmptyState({ title, description, actionLabel, actionHref, action
         : [];
 
   return (
-    <div className="motion-block flex flex-col items-center justify-center rounded-xl border border-dashed bg-gradient-to-b from-white to-storm-light/25 px-6 py-12 text-center shadow-sm">
+    <div className="motion-block flex flex-col items-center justify-center rounded-xl border border-dashed bg-gradient-to-b from-card to-storm-light/25 px-6 py-12 text-center shadow-sm">
       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-storm-light/60 text-storm-blue shadow-inner">
         <Inbox className="h-7 w-7" />
       </div>

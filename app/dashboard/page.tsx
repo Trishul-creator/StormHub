@@ -3,7 +3,6 @@ import { ArrowRight, Bookmark, Calendar, CheckSquare, ClipboardList, Settings, U
 import { Button } from "@/components/ui/button";
 import { RoleChecklist } from "@/components/dashboard/role-checklist";
 import { DashboardCard } from "@/components/layout/stat-cards";
-import { EmptyState } from "@/components/layout/empty-state";
 import {
   getAdminAnalytics,
   getManageableClubs,
@@ -152,10 +151,18 @@ export default async function DashboardPage() {
       <div className="grid gap-8 lg:grid-cols-2">
         <DashboardCard
           title="Your clubs"
-          action={<Button variant="ghost" size="sm" asChild><Link href="/my-clubs">View all</Link></Button>}
+          action={dashboard.memberships.length > 0
+            ? <Button variant="ghost" size="sm" asChild><Link href="/my-clubs">View all</Link></Button>
+            : undefined}
         >
           {dashboard.memberships.length === 0 ? (
-            <EmptyState title="No clubs yet" description="Explore clubs and join to get started." actionLabel="Browse clubs" actionHref="/clubs" />
+            <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed bg-storm-light/20 p-5">
+              <div>
+                <p className="font-medium text-storm-navy">No clubs yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">Browse the club directory and join one to build your dashboard.</p>
+              </div>
+              <Button size="sm" asChild><Link href="/clubs">Browse clubs</Link></Button>
+            </div>
           ) : (
             <div className="space-y-3">
               {dashboard.memberships.slice(0, 3).map((m) => m.club && (
@@ -263,11 +270,6 @@ export default async function DashboardPage() {
         </DashboardCard>
       </div>
 
-      <div className="mt-8 text-center">
-        <Button asChild>
-          <Link href="/clubs">Explore more clubs <ArrowRight className="h-4 w-4" /></Link>
-        </Button>
-      </div>
     </div>
   );
 }
@@ -282,7 +284,7 @@ function DashboardMetric({
   icon: typeof Users;
 }) {
   return (
-    <div className="rounded-xl border bg-white p-4 flex items-center gap-3">
+    <div className="rounded-xl border bg-card p-4 shadow-sm flex items-center gap-3">
       <Icon className="h-8 w-8 text-storm-electric" />
       <div><p className="text-2xl font-bold">{value}</p><p className="text-sm text-muted-foreground">{label}</p></div>
     </div>
@@ -291,7 +293,7 @@ function DashboardMetric({
 
 function DashboardLink({ href, title, description }: { href: string; title: string; description: string }) {
   return (
-    <Link href={href} className="rounded-xl border bg-white p-5 hover:shadow-md transition-shadow">
+    <Link href={href} className="rounded-xl border bg-card p-5 shadow-sm transition-shadow hover:border-storm-electric/30 hover:shadow-md">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-storm-navy">{title}</h2>
         <ArrowRight className="h-4 w-4 text-muted-foreground" />

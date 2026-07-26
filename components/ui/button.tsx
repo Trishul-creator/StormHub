@@ -10,7 +10,7 @@ const buttonVariants = cva(
       variant: {
         default: "bg-storm-electric text-white hover:bg-blue-800 shadow-sm hover:shadow-md",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm hover:shadow-md",
-        outline: "border border-storm-light bg-white hover:border-storm-electric/30 hover:bg-storm-light/50 text-storm-navy hover:shadow-sm",
+        outline: "border border-storm-light bg-card hover:border-storm-electric/30 hover:bg-storm-light/50 text-storm-navy hover:shadow-sm",
         secondary: "bg-storm-light text-storm-navy hover:bg-storm-silver/30",
         ghost: "hover:bg-storm-light/50 text-storm-navy",
         link: "text-storm-electric underline-offset-4 hover:underline",

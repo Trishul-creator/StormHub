@@ -23,24 +23,26 @@ export default async function HomePage() {
               StormHub helps students discover clubs, track school opportunities, follow events, and stay connected through one organized school workspace.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button size="lg" variant="secondary" asChild>
-                <Link href="/auth/sign-in">Sign in <ArrowRight className="h-4 w-4" /></Link>
-              </Button>
-              <Button size="lg" variant="outline" className="border-white/30 bg-transparent text-white hover:bg-white/10" asChild>
-                <Link href="/contact">Contact / Learn more</Link>
-              </Button>
               {pilotSchool && (
-                <Button size="lg" variant="outline" className="border-white/30 bg-transparent text-white hover:bg-white/10" asChild>
-                  <Link href={getSchoolPublicUrl(pilotSchool)}>Explore pilot school</Link>
+                <Button size="lg" variant="secondary" asChild>
+                  <Link href={getSchoolPublicUrl(pilotSchool)}>
+                    Explore {pilotSchool.name} <ArrowRight className="h-4 w-4" />
+                  </Link>
                 </Button>
               )}
+              <Button
+                size="lg"
+                variant={pilotSchool ? "outline" : "secondary"}
+                className={pilotSchool ? "border-white/30 bg-transparent text-white hover:bg-white/10" : undefined}
+                asChild
+              >
+                <Link href="/auth/sign-in">Sign in</Link>
+              </Button>
             </div>
             {pilotSchool && (
               <p className="mt-4 text-sm text-storm-silver">
-                Current pilot workspace:{" "}
-                <Link href={getSchoolPublicUrl(pilotSchool)} className="underline underline-offset-4">
-                  {pilotSchool.name}
-                </Link>
+                Current pilot workspace · Need help?{" "}
+                <Link href="/contact" className="underline underline-offset-4">Contact us</Link>
               </p>
             )}
           </div>
@@ -64,7 +66,7 @@ export default async function HomePage() {
 
       <section className="bg-storm-subtle py-16">
         <div className="container mx-auto px-4">
-          <div className="rounded-2xl border bg-white p-8 md:p-12">
+          <div className="rounded-2xl border bg-card p-8 shadow-sm md:p-12">
             <div className="flex flex-col gap-6 md:flex-row md:items-start">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-green-100">
                 <Shield className="h-6 w-6 text-green-700" />
