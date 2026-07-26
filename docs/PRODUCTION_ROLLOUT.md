@@ -55,7 +55,7 @@ supabase db push
 
 1. In Resend, add and verify the sending domain. Complete every DNS record Resend provides.
 2. Create a Resend API key restricted to sending email.
-3. In Supabase, open **Authentication > Settings > SMTP Settings** and enable custom SMTP.
+3. In Supabase, open **Authentication > Email > SMTP Settings** and enable custom SMTP.
 4. Enter these values:
 
 | Supabase field | Value |
@@ -76,6 +76,12 @@ supabase db push
    linking directly to `{{ .SiteURL }}`; StormHub sends users through `/auth/callback` to establish
    their session and profile safely.
 9. Send a signup confirmation and password-reset email to an address outside the Supabase team.
+
+The `RESEND_API_KEY` stored in Vercel is only used by StormHub's application-email worker. Supabase
+Auth cannot read Vercel environment variables, so enabling email confirmation before configuring
+Supabase SMTP causes registration to fail while Auth tries to send the confirmation message. In
+Supabase Auth logs this appears as `Error sending confirmation email`; finish the SMTP integration
+and repeat the outside-team signup test before inviting users.
 
 For application email, set these Vercel Production and Preview variables:
 

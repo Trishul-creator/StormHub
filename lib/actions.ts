@@ -8,7 +8,7 @@ import { isDemoMode } from "@/lib/supabase/mode";
 import { createProfileIfMissing, defaultPathForProfile, getAuthUserId, getCurrentProfile } from "@/lib/auth";
 import { demoState } from "@/lib/data/demo-data";
 import { getClubBySlug, getManagedClubBySlug } from "@/lib/data";
-import { friendlyError } from "@/lib/errors";
+import { friendlyAuthEmailError, friendlyError } from "@/lib/errors";
 import {
   canApproveContent,
   canApproveClubContent,
@@ -1647,7 +1647,15 @@ export async function supabaseSignUp(
       ...(botProof?.captchaToken ? { captchaToken: botProof.captchaToken } : {}),
     },
   });
-  if (error) return { success: false, error: friendlyError(error, "Sign up failed.") };
+  if (error) {
+    console.error("[supabaseSignUp] Supabase Auth signup failed:", {
+      name: error.name,
+      code: error.code,
+      status: error.status,
+      message: error.message,
+    });
+    return { success: false, error: friendlyAuthEmailError(error) };
+  }
   if (data.session) {
     await supabase.auth.signOut();
     if (admin && data.user) {
@@ -1683,7 +1691,18 @@ export async function supabaseResendConfirmation(email: string, captchaToken?: s
       ...(captchaToken ? { captchaToken } : {}),
     },
   });
-  if (error) return { success: false, error: friendlyError(error, "Could not resend the confirmation email.") };
+  if (error) {
+    console.error("[supabaseResendConfirmation] Supabase Auth email failed:", {
+      name: error.name,
+      code: error.code,
+      status: error.status,
+      message: error.message,
+    });
+    return {
+      success: false,
+      error: friendlyAuthEmailError(error, "We couldn't resend the verification email. Please try again later."),
+    };
+  }
   return { success: true };
 }
 
