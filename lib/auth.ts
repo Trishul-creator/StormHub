@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isDemoMode } from "@/lib/supabase/mode";
 import type { Profile, UserRole } from "@/types/database";
-import { DEFAULT_SCHOOL_ID, DEFAULT_SCHOOL_SLUG } from "@/lib/schools";
+import { DEFAULT_SCHOOL_ID } from "@/lib/schools";
 import {
   canAccessAdmin,
   canAccessManage,
@@ -70,19 +70,13 @@ export async function createProfileIfMissing(
 
   if (existing) return existing as Profile;
 
-  const { data: school } = await supabase
-    .from("schools")
-    .select("id")
-    .eq("slug", DEFAULT_SCHOOL_SLUG)
-    .maybeSingle();
-
   const { data: created, error } = await supabase
     .from("profiles")
     .insert({
       id: userId,
       email,
       full_name: fullName || email.split("@")[0],
-      school_id: school?.id ?? null,
+      school_id: null,
       role: "student",
     })
     .select("*")
@@ -168,6 +162,14 @@ export async function requireAuth(redirectTo?: string): Promise<AuthContext & { 
   if (!auth.isLoggedIn || !auth.userId || !auth.profile) {
     const path = redirectTo ? `/auth/sign-in?redirect=${encodeURIComponent(redirectTo)}` : "/auth/sign-in";
     redirect(path);
+  }
+  if (
+    auth.profile.role !== "super_admin"
+    && !auth.profile.school_id
+    && redirectTo !== "/auth/complete-profile"
+  ) {
+    const next = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/dashboard";
+    redirect(`/auth/complete-profile?next=${encodeURIComponent(next)}`);
   }
   if (auth.profile.account_status && auth.profile.account_status !== "active" && redirectTo !== "/account-status") {
     redirect("/account-status");

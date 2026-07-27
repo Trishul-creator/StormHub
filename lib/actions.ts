@@ -55,12 +55,14 @@ import {
   hashSignupIdentifier,
   isMissingAllowedEmailDomainsColumn,
   parseSignupDomainInput,
+  validateSignupEmailDomain,
   type SignupBotProof,
   validateSignupBotProof,
 } from "@/lib/signup-security";
 import { verifyCaptchaToken } from "@/lib/captcha";
 import { checkDurableRateLimit, markRateLimitAttemptSuccessful } from "@/lib/request-rate-limit";
 import { getAuthCallbackUrl } from "@/lib/env";
+import { safeAuthRedirectPath } from "@/lib/auth-redirect";
 import {
   copyGoogleDriveFileForStudent,
   disconnectGoogleDrive,
@@ -2577,6 +2579,120 @@ export async function supabaseSignIn(email: string, password: string, captchaTok
   return { success: true };
 }
 
+export async function completeGoogleOnboarding(input: {
+  schoolId: string;
+  fullName: string;
+  gradeLevel?: string;
+  accessCode?: string;
+  next?: string;
+}): Promise<{ success: true; redirectTo: string } | { success: false; error: string }> {
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  if (!supabase || !admin) {
+    return { success: false, error: "Account setup is not configured for this deployment." };
+  }
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user?.email) {
+    return { success: false, error: "Your Google session expired. Sign in again." };
+  }
+
+  const providers = Array.isArray(user.app_metadata?.providers)
+    ? user.app_metadata.providers
+    : [];
+  if (user.app_metadata?.provider !== "google" && !providers.includes("google")) {
+    return { success: false, error: "Finish this account using Google sign-in." };
+  }
+
+  const requiredAccessCode = process.env.SIGNUP_ACCESS_CODE?.trim();
+  if (requiredAccessCode && input.accessCode?.trim() !== requiredAccessCode) {
+    return { success: false, error: "Enter the correct school signup code." };
+  }
+
+  const normalizedFullName = input.fullName.trim().replace(/\s+/g, " ");
+  if (normalizedFullName.length < 3 || normalizedFullName.length > 120) {
+    return { success: false, error: "Enter your full name." };
+  }
+  if (!input.schoolId) {
+    return { success: false, error: "Choose your school." };
+  }
+
+  const { data: existingProfile, error: profileError } = await admin
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profileError) {
+    return { success: false, error: "We couldn't load your account. Please try again." };
+  }
+  if (existingProfile?.school_id || existingProfile?.role === "super_admin") {
+    return {
+      success: true,
+      redirectTo: safeAuthRedirectPath(input.next, defaultPathForProfile(existingProfile as Profile)),
+    };
+  }
+
+  const { data: school, error: schoolError } = await admin
+    .from("schools")
+    .select("id,is_active,is_public,allowed_email_domains")
+    .eq("id", input.schoolId)
+    .maybeSingle();
+  if (schoolError) {
+    return { success: false, error: "We couldn't verify your school right now. Please try again." };
+  }
+  if (!school || school.is_active === false || school.is_public === false) {
+    return { success: false, error: "Choose an active school." };
+  }
+
+  const allowedDomains = getAllowedSignupDomains(
+    school.allowed_email_domains,
+    process.env.ALLOWED_SIGNUP_EMAIL_DOMAINS
+  );
+  const domainError = validateSignupEmailDomain(
+    user.email,
+    allowedDomains,
+    process.env.BLOCKED_SIGNUP_EMAIL_DOMAINS
+  );
+  if (domainError) return { success: false, error: domainError };
+
+  const parsedGrade = Number(input.gradeLevel);
+  const gradeLevel = Number.isInteger(parsedGrade) && parsedGrade >= 9 && parsedGrade <= 12
+    ? parsedGrade
+    : null;
+  const profileValues = {
+    email: user.email.trim().toLowerCase(),
+    full_name: normalizedFullName,
+    grade_level: gradeLevel,
+    school_id: school.id,
+    role: "student" as const,
+    account_status: "active" as const,
+  };
+
+  const profileMutation = existingProfile
+    ? admin
+        .from("profiles")
+        .update(profileValues)
+        .eq("id", user.id)
+        .is("school_id", null)
+        .select("*")
+        .maybeSingle()
+    : admin
+        .from("profiles")
+        .insert({ id: user.id, ...profileValues })
+        .select("*")
+        .maybeSingle();
+  const { data: completedProfile, error: updateError } = await profileMutation;
+  if (updateError || !completedProfile) {
+    return { success: false, error: "We couldn't finish setting up your account. Please try again." };
+  }
+
+  revalidatePath("/", "layout");
+  return {
+    success: true,
+    redirectTo: safeAuthRedirectPath(input.next, defaultPathForProfile(completedProfile as Profile)),
+  };
+}
+
 export async function supabaseSignUp(
   email: string,
   password: string,
@@ -2682,23 +2798,13 @@ export async function supabaseSignUp(
     schoolSignupConfig?.allowed_email_domains,
     process.env.ALLOWED_SIGNUP_EMAIL_DOMAINS
   );
-  const blockedDomains = (process.env.BLOCKED_SIGNUP_EMAIL_DOMAINS ?? "")
-    .split(",")
-    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ""))
-    .filter(Boolean);
-  const emailDomain = normalizedEmail.split("@")[1]?.toLowerCase();
-  if (allowedDomains.length === 0 && !usesLegacySchoolSchema) {
-    return { success: false, error: "Signups are not configured for this school yet. Contact the school administrator." };
-  }
-  const allowsEveryDomain = allowedDomains.includes("*");
-  if (!allowsEveryDomain && allowedDomains.length > 0 && (!emailDomain || !allowedDomains.includes(emailDomain))) {
-    return {
-      success: false,
-      error: `Please use an approved school email address (${allowedDomains.join(", ")}).`,
-    };
-  }
-  if (emailDomain && blockedDomains.includes(emailDomain)) {
-    return { success: false, error: "Please use a school email address." };
+  if (!usesLegacySchoolSchema || allowedDomains.length > 0) {
+    const domainError = validateSignupEmailDomain(
+      normalizedEmail,
+      allowedDomains,
+      process.env.BLOCKED_SIGNUP_EMAIL_DOMAINS
+    );
+    if (domainError) return { success: false, error: domainError };
   }
   const supabase = await createClient();
   if (!supabase) return { success: false, error: "Database not configured." };

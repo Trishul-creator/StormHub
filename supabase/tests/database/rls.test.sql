@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(80);
+SELECT plan(83);
 
 SELECT is(
   (SELECT public FROM storage.buckets WHERE id = 'coursework-private'),
@@ -71,6 +71,49 @@ INSERT INTO auth.users (
     '{"full_name":"Super Admin","school_id":"a0000000-0000-4000-8000-000000000001"}',
     NOW(), NOW()
   );
+
+INSERT INTO auth.users (
+  id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+) VALUES (
+  '50000000-0000-4000-8000-000000000001',
+  '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+  'google-user@gmail.com', '', NOW(),
+  '{"provider":"google","providers":["google"]}',
+  '{"full_name":"Google Student"}',
+  NOW(), NOW()
+);
+
+SELECT is(
+  (SELECT school_id FROM public.profiles WHERE id = '50000000-0000-4000-8000-000000000001'),
+  NULL::UUID,
+  'new Google users enter onboarding without a school assignment'
+);
+SELECT is(
+  (SELECT role FROM public.profiles WHERE id = '50000000-0000-4000-8000-000000000001'),
+  'student',
+  'new Google users cannot receive an elevated role during onboarding'
+);
+SELECT throws_ok(
+  $$
+    INSERT INTO auth.users (
+      id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+    ) VALUES (
+      '50000000-0000-4000-8000-000000000002',
+      '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+      'missing-school@school-a.edu', crypt('Password123!', gen_salt('bf')), NOW(),
+      '{"provider":"email","providers":["email"]}',
+      '{}',
+      NOW(), NOW()
+    )
+  $$,
+  'P0001',
+  'Choose a valid school workspace',
+  'email/password users cannot bypass school selection'
+);
+
+DELETE FROM auth.users WHERE id = '50000000-0000-4000-8000-000000000001';
 
 UPDATE public.profiles SET role = 'teacher'
 WHERE id = '20000000-0000-4000-8000-000000000001';

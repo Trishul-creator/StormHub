@@ -173,6 +173,17 @@ StormHub does not require phone numbers, SMS, or authenticator applications.
 
 Do not share administrator accounts. Every administrator needs an individual confirmed email account.
 
+## 4A. Enable Google Authentication
+
+Google authentication uses a separate OAuth client from Google Drive. Apply
+`20260727043000_google_oauth_onboarding.sql` before enabling the provider, then
+follow `docs/GOOGLE_AUTH_SETUP.md`. The Sign-In client secret belongs only in
+Supabase Auth. It is not a Vercel environment variable.
+
+Retain password authentication and email confirmation as a fallback. A new
+Google identity must finish school onboarding and pass the selected school's
+accepted-email-domain rules before accessing school-scoped features.
+
 ## 5. Apply The Migration Chain
 
 The production database predates the baseline migration. Mark the baseline as already represented

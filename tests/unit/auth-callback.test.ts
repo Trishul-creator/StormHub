@@ -28,8 +28,55 @@ describe("email verification callback", () => {
       id: "user-1",
       role: "student",
       email: "student@example.edu",
+      school_id: "school-1",
     });
     mocks.defaultPathForProfile.mockReturnValue("/dashboard");
+  });
+
+  it("sends a new Google user to school onboarding before opening the app", async () => {
+    exchangeCodeForSession.mockResolvedValue({
+      data: {
+        user: {
+          id: "google-user",
+          email: "student@gmail.com",
+          user_metadata: { full_name: "Google Student" },
+        },
+      },
+      error: null,
+    });
+    mocks.createProfileIfMissing.mockResolvedValue({
+      id: "google-user",
+      role: "student",
+      email: "student@gmail.com",
+      school_id: null,
+    });
+
+    const response = await GET(new Request(
+      "https://stormhubapp.com/auth/callback?code=google-code&next=%2Fopportunities"
+    ));
+
+    expect(response.headers.get("location")).toBe(
+      "https://stormhubapp.com/auth/complete-profile?next=%2Fopportunities"
+    );
+  });
+
+  it("rejects an external redirect supplied through OAuth state", async () => {
+    exchangeCodeForSession.mockResolvedValue({
+      data: {
+        user: {
+          id: "user-1",
+          email: "student@example.edu",
+          user_metadata: { full_name: "Test Student" },
+        },
+      },
+      error: null,
+    });
+
+    const response = await GET(new Request(
+      "https://stormhubapp.com/auth/callback?code=confirmation-code&next=https%3A%2F%2Fevil.example"
+    ));
+
+    expect(response.headers.get("location")).toBe("https://stormhubapp.com/dashboard");
   });
 
   it("exchanges the confirmation code, loads the profile, and starts the session", async () => {

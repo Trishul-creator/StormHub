@@ -1,11 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { createProfileIfMissing, defaultPathForProfile } from "@/lib/auth";
+import { safeAuthRedirectPath } from "@/lib/auth-redirect";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/dashboard";
+  const next = safeAuthRedirectPath(searchParams.get("next"));
 
   if (code) {
     const supabase = await createClient();
@@ -17,11 +18,20 @@ export async function GET(request: Request) {
           data.user.email ?? "",
           data.user.user_metadata?.full_name as string | undefined
         );
+        if (!profile || (profile.role !== "super_admin" && !profile.school_id)) {
+          const onboarding = new URL("/auth/complete-profile", origin);
+          onboarding.searchParams.set("next", next);
+          return NextResponse.redirect(onboarding);
+        }
         const destination = next === "/dashboard" ? defaultPathForProfile(profile) : next;
         return NextResponse.redirect(`${origin}${destination}`);
       }
     }
   }
 
-  return NextResponse.redirect(`${origin}/auth/sign-in`);
+  const signIn = new URL("/auth/sign-in", origin);
+  if (searchParams.get("error")) {
+    signIn.searchParams.set("error", "google_sign_in_failed");
+  }
+  return NextResponse.redirect(signIn);
 }
