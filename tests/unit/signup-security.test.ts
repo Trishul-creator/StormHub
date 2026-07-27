@@ -6,6 +6,7 @@ import {
   hashSignupIdentifier,
   isMissingAllowedEmailDomainsColumn,
   parseSignupDomainInput,
+  validateSignupEmailDomain,
   validateSignupBotProof,
 } from "@/lib/signup-security";
 
@@ -44,6 +45,20 @@ describe("signup security", () => {
       [" Students.Example.edu ", "@staff.example.edu"],
       "staff.example.edu, district.example.org"
     )).toEqual(["students.example.edu", "staff.example.edu", "district.example.org"]);
+  });
+
+  it("enforces school domains for both password and Google signup", () => {
+    expect(validateSignupEmailDomain("student@school.edu", ["school.edu"])).toBeNull();
+    expect(validateSignupEmailDomain("student@gmail.com", ["*"])).toBeNull();
+    expect(validateSignupEmailDomain("student@gmail.com", ["school.edu"])).toMatch(
+      /approved school email address/i
+    );
+    expect(validateSignupEmailDomain("student@gmail.com", ["*"], "gmail.com")).toBe(
+      "Please use a school email address."
+    );
+    expect(validateSignupEmailDomain("student@school.edu", [])).toMatch(
+      /not configured for this school/i
+    );
   });
 
   it("recognizes the legacy schema's missing signup-domain column", () => {

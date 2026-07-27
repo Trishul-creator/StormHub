@@ -45,10 +45,11 @@ describe("Navbar", () => {
     expect(screen.getByRole("link", { name: "Administration" })).toHaveAttribute("href", "/admin");
   });
 
-  it("does not expose school administration to teachers", () => {
+  it("gives teachers read-only discovery navigation without school administration", () => {
     render(<Navbar isLoggedIn role="teacher" schoolSlug="elkhorn-south" />);
 
     expect(screen.getByRole("link", { name: "Clubs" })).toHaveAttribute("href", "/s/elkhorn-south/clubs");
+    expect(screen.getByRole("link", { name: "Opportunities" })).toHaveAttribute("href", "/s/elkhorn-south/opportunities");
     expect(screen.queryByRole("link", { name: "Administration" })).not.toBeInTheDocument();
   });
 });

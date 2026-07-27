@@ -6,6 +6,7 @@ import {
   canEditRole,
   canJoinClub,
   canManageClub,
+  canManageClubPublication,
   canManageClubCoursework,
   canManageClubRoster,
   canManageSchool,
@@ -184,6 +185,14 @@ describe("club permissions", () => {
     expect(canManageClubCoursework(profile("teacher"), club(), membership("sponsor"))).toBe(true);
     expect(canManageClubCoursework(profile("teacher"), club(), membership("member"))).toBe(false);
     expect(canManageClubCoursework(profile("student"), club(), membership("president"))).toBe(false);
+  });
+
+  it("allows only scoped admins to publish or feature clubs", () => {
+    expect(canManageClubPublication(profile("teacher"), club())).toBe(false);
+    expect(canManageClubPublication(profile("student"), club())).toBe(false);
+    expect(canManageClubPublication(profile("admin", { school_id: schoolA }), club({ school_id: schoolA }))).toBe(true);
+    expect(canManageClubPublication(profile("admin", { school_id: schoolA }), club({ school_id: schoolB }))).toBe(false);
+    expect(canManageClubPublication(profile("super_admin"), club({ school_id: schoolB }))).toBe(true);
   });
 
   it("allows admins and super admins to preview/manage but not join through student flow", () => {

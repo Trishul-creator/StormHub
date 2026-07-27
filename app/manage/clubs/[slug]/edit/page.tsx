@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { getManagedClubBySlug, getSchoolTeachers } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
 import { ClubSettingsForm } from "@/components/manage/club-settings-form";
+import { canManageClubPublication } from "@/lib/permissions";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -14,8 +15,9 @@ export default async function EditClubPage({ params, searchParams }: PageProps) 
   const query = searchParams ? await searchParams : {};
   const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
-  await requireClubManager(club);
-  const publishMode = query.publish === "1" && club.status === "draft";
+  const auth = await requireClubManager(club);
+  const canManagePublication = canManageClubPublication(auth.profile, club);
+  const publishMode = canManagePublication && query.publish === "1" && club.status === "draft";
   const teachers = await getSchoolTeachers(club.school_id);
 
   return (
@@ -24,7 +26,12 @@ export default async function EditClubPage({ params, searchParams }: PageProps) 
         title={publishMode ? "Publish Draft Club" : "Edit Club Profile"}
         description={publishMode ? "Confirm the starting details students will see before this club goes live." : club.name}
       />
-      <ClubSettingsForm club={club} publishMode={publishMode} teachers={teachers} />
+      <ClubSettingsForm
+        club={club}
+        publishMode={publishMode}
+        canManagePublication={canManagePublication}
+        teachers={teachers}
+      />
     </div>
   );
 }

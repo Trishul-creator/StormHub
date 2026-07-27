@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Calendar, CheckCircle2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,6 @@ interface OpportunityPageProps {
 export default async function OpportunityPage({ params }: OpportunityPageProps) {
   const { slug } = await params;
   const { userId, isLoggedIn, profile } = await getAuthContext();
-  if (profile?.role === "teacher") redirect("/calendar");
   const opportunity = await getOpportunityBySlug(slug);
   if (!opportunity) notFound();
 
@@ -56,11 +55,11 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           {isSignedUp && (
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/35 dark:text-emerald-200">
               <CheckCircle2 className="h-5 w-5 shrink-0" />
               <div>
                 <p className="font-medium">{actionLabel.toLowerCase() === "rsvp" ? "Your RSVP is confirmed" : "You’re signed up"}</p>
-                <p className="text-sm text-emerald-800">StormHub will keep this opportunity highlighted for you.</p>
+                <p className="text-sm text-emerald-800 dark:text-emerald-300">StormHub will keep this opportunity highlighted for you.</p>
               </div>
             </div>
           )}
@@ -78,7 +77,7 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
 
         </div>
 
-        <div className="rounded-xl border bg-white p-6 h-fit sticky top-20 space-y-4">
+        <div className="sticky top-20 h-fit space-y-4 rounded-xl border bg-card p-6">
           {opportunity.deadline && (
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Deadline</p>
@@ -121,8 +120,8 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
             />
           )}
           {!canParticipate && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-              Administrator preview. Student sign-up actions are disabled for administrator accounts.
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-900/70 dark:bg-blue-950/40 dark:text-blue-200">
+              Read-only preview. Participation actions are available only to student accounts.
             </div>
           )}
         </div>

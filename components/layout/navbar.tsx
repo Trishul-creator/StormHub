@@ -60,9 +60,9 @@ export function Navbar({
             { href: primaryHref, label: primaryLabel },
             { href: schoolClubHref, label: "Clubs" },
             { href: schoolCalendarHref, label: "Calendar" },
+            { href: schoolOpportunitiesHref, label: "Opportunities" },
             ...(role === "admin"
               ? [
-                  { href: schoolOpportunitiesHref, label: "Opportunities" },
                   { href: "/admin", label: "Administration" },
                 ]
               : []),

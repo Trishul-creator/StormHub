@@ -102,6 +102,16 @@ describe("SignUpForm", () => {
     expect(screen.getByLabelText("School signup code")).toBeRequired();
   });
 
+  it("keeps Google signup hidden until production configuration is complete", () => {
+    const schools = [{ id: "school-1", name: "Storm High", slug: "storm-high" }];
+    const { rerender } = render(<SignUpForm schools={schools} />);
+
+    expect(screen.queryByRole("button", { name: "Continue with Google" })).not.toBeInTheDocument();
+
+    rerender(<SignUpForm schools={schools} googleAuthEnabled />);
+    expect(screen.getByRole("button", { name: "Continue with Google" })).toBeVisible();
+  });
+
   it("can resend the confirmation email from the pending-verification state", async () => {
     render(<SignUpForm schools={[{ id: "school-1", name: "Storm High", slug: "storm-high" }]} />);
 

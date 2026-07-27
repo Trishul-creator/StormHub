@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -11,11 +11,23 @@ import { demoSignIn } from "@/lib/actions";
 import { toast } from "@/hooks/use-toast";
 import { Zap } from "lucide-react";
 import { Captcha } from "@/components/auth/captcha";
+import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 
 export default function SignInPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const googleAuthEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("error") === "google_sign_in_failed") {
+      toast({
+        title: "Google sign-in failed",
+        description: "Google could not finish signing you in. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -49,6 +61,16 @@ export default function SignInPage() {
           <CardDescription>Use your school email to sign in</CardDescription>
         </CardHeader>
         <CardContent>
+          {googleAuthEnabled && (
+            <>
+              <GoogleAuthButton />
+              <div className="my-4 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                <span>or use your password</span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
+            </>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="email">Email</Label>

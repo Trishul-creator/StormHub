@@ -30,7 +30,9 @@ test.describe("public platform surfaces", () => {
   });
 
   test("scheduled jobs reject unauthenticated requests", async ({ request }) => {
-    const response = await request.get("/api/cron/weekly-digest");
-    expect(response.status()).toBe(401);
+    for (const path of ["/api/cron/weekly-digest", "/api/cron/publish-scheduled"]) {
+      const response = await request.get(path);
+      expect(response.status()).toBe(401);
+    }
   });
 });

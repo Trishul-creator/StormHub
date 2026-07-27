@@ -2,10 +2,15 @@ import Link from "next/link";
 import { ArrowRight, Bell, Calendar, GraduationCap, Shield, Users, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { defaultPathForProfile, getAuthContext } from "@/lib/auth";
 import { getSchoolBySlug, getSchoolPublicUrl, getDefaultSchoolSlug } from "@/lib/schools";
 
 export default async function HomePage() {
-  const pilotSchool = await getSchoolBySlug(getDefaultSchoolSlug());
+  const [pilotSchool, auth] = await Promise.all([
+    getSchoolBySlug(getDefaultSchoolSlug()),
+    getAuthContext(),
+  ]);
+  const accountPath = defaultPathForProfile(auth.profile);
 
   return (
     <>
@@ -36,7 +41,9 @@ export default async function HomePage() {
                 className={pilotSchool ? "border-white/30 bg-transparent text-white hover:bg-white/10" : undefined}
                 asChild
               >
-                <Link href="/auth/sign-in">Sign in</Link>
+                <Link href={auth.isLoggedIn ? accountPath : "/auth/sign-in"}>
+                  {auth.isLoggedIn ? "Open dashboard" : "Sign in"}
+                </Link>
               </Button>
             </div>
             {pilotSchool && (

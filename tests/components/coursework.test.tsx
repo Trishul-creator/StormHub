@@ -4,9 +4,11 @@ import { AssignmentForm } from "@/components/coursework/assignment-form";
 import { ClubPostComposer } from "@/components/manage/club-post-composer";
 import { SubmissionForm } from "@/components/coursework/submission-form";
 import { GradeSubmissionForm } from "@/components/coursework/grade-submission-form";
+import { ContentForm } from "@/components/forms/content-form";
 import {
   createClubAssignment,
   gradeClubAssignmentSubmission,
+  submitContent,
   submitClubAssignment,
 } from "@/lib/actions";
 import type { ClubAssignmentSubmission } from "@/types/database";
@@ -55,6 +57,7 @@ describe("club coursework controls", () => {
     vi.mocked(createClubAssignment).mockResolvedValue({ success: true, assignmentId: "assignment-1" });
     vi.mocked(submitClubAssignment).mockResolvedValue({ success: true });
     vi.mocked(gradeClubAssignmentSubmission).mockResolvedValue({ success: true });
+    vi.mocked(submitContent).mockResolvedValue({ success: true, approved: true });
   });
 
   it("creates and publishes a points-based club assignment", async () => {
@@ -98,6 +101,52 @@ describe("club coursework controls", () => {
 
     expect(screen.getByText("Collect work, return feedback, and grade.")).toBeVisible();
     expect(screen.getByLabelText("Assignment title")).toBeVisible();
+  });
+
+  it("saves an assignment as a scheduled private draft", async () => {
+    render(<AssignmentForm clubSlug="science-bowl" />);
+
+    fireEvent.change(screen.getByLabelText("Assignment title"), {
+      target: { value: "Scheduled practice" },
+    });
+    fireEvent.click(screen.getByRole("radio", { name: /^schedule/i }));
+    fireEvent.change(screen.getByLabelText(/release date and time/i), {
+      target: { value: "2099-01-02T09:30" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Schedule assignment" }));
+
+    await waitFor(() => {
+      expect(createClubAssignment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clubSlug: "science-bowl",
+          title: "Scheduled practice",
+          publishNow: false,
+          scheduledFor: "2099-01-02T09:30",
+        })
+      );
+    });
+  });
+
+  it("schedules an announcement instead of notifying members immediately", async () => {
+    vi.mocked(submitContent).mockResolvedValue({ success: true, approved: true, scheduled: true });
+    render(<ContentForm type="announcement" clubSlug="science-bowl" />);
+
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Tomorrow's update" } });
+    fireEvent.change(screen.getByLabelText("Content"), { target: { value: "Bring safety glasses." } });
+    fireEvent.click(screen.getByRole("radio", { name: /schedule for later/i }));
+    fireEvent.change(screen.getByLabelText("Release date and time"), {
+      target: { value: "2099-01-02T09:30" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Schedule Announcement" }));
+
+    await waitFor(() => {
+      expect(submitContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "announcement",
+          release_at: "2099-01-02T09:30",
+        })
+      );
+    });
   });
 
   it("submits or resubmits only the student's own response", async () => {

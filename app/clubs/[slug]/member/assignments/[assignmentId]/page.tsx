@@ -128,7 +128,7 @@ export default async function ClubAssignmentPage({ params }: AssignmentPageProps
                           : `/api/coursework/google/assignment-attachments/${attachment.id}/open`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex min-w-0 items-center gap-3 rounded-xl border bg-storm-light/15 p-3 text-sm font-medium text-storm-navy transition hover:border-storm-electric/40 hover:bg-blue-50/50"
+                        className="flex min-w-0 items-center gap-3 rounded-xl border bg-storm-light/15 p-3 text-sm font-medium text-storm-navy transition hover:border-storm-electric/40 hover:bg-blue-50/50 dark:hover:bg-blue-950/40"
                       >
                         {attachment.source_type === "upload"
                           ? <Download className="h-4 w-4 shrink-0 text-storm-electric" />
@@ -160,7 +160,7 @@ export default async function ClubAssignmentPage({ params }: AssignmentPageProps
                         href={template.external_url ?? "#"}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-between gap-3 rounded-xl border bg-blue-50/40 p-3 text-sm font-medium text-storm-navy"
+                        className="flex items-center justify-between gap-3 rounded-xl border bg-blue-50/40 p-3 text-sm font-medium text-storm-navy dark:bg-blue-950/35"
                       >
                         <span className="truncate">{template.file_name}</span>
                         <ExternalLink className="h-4 w-4 shrink-0" />
@@ -173,7 +173,7 @@ export default async function ClubAssignmentPage({ params }: AssignmentPageProps
           </Card>
 
           {submission?.status === "returned" && (
-            <Card className="mt-6 border-emerald-200 bg-emerald-50/35">
+            <Card className="mt-6 border-emerald-200 bg-emerald-50/35 dark:border-emerald-800 dark:bg-emerald-950/30">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-emerald-950">
                   <CheckCircle2 className="h-5 w-5" /> Grade returned
@@ -182,19 +182,19 @@ export default async function ClubAssignmentPage({ params }: AssignmentPageProps
               <CardContent>
                 <p className="text-3xl font-bold text-emerald-900">
                   {submission.grade_points ?? "—"}
-                  <span className="text-lg font-medium text-emerald-800/70"> / {assignment.points_possible}</span>
+                  <span className="text-lg font-medium text-emerald-800/70 dark:text-emerald-200/70"> / {assignment.points_possible}</span>
                 </p>
                 {submission.feedback ? (
-                  <div className="mt-5 rounded-xl border border-emerald-200 bg-white/70 p-4">
+                  <div className="mt-5 rounded-xl border border-emerald-200 bg-card/70 p-4 dark:border-emerald-900/70">
                     <p className="flex items-center gap-2 text-sm font-semibold text-emerald-950">
                       <MessageSquareText className="h-4 w-4" /> Private feedback
                     </p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-emerald-950/75">
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-emerald-950/75 dark:text-emerald-100/80">
                       {submission.feedback}
                     </p>
                   </div>
                 ) : (
-                  <p className="mt-2 text-sm text-emerald-900/70">No written feedback was added.</p>
+                  <p className="mt-2 text-sm text-emerald-900/70 dark:text-emerald-200/75">No written feedback was added.</p>
                 )}
               </CardContent>
             </Card>

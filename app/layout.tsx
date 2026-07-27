@@ -47,7 +47,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
         <SetupBanner />
         <main id="main-content" className="min-h-[calc(100vh-4rem)]" tabIndex={-1}>{children}</main>
-        <Footer role={profile?.role} />
+        <Footer />
         <Toaster />
       </body>
     </html>

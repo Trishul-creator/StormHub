@@ -66,6 +66,15 @@ export function canManageClub(
   return OFFICER_ROLES.includes(membershipRole as (typeof OFFICER_ROLES)[number]);
 }
 
+export function canManageClubPublication(
+  user: Profile | null,
+  club: Club
+): boolean {
+  if (!user) return false;
+  if (user.role === "super_admin") return true;
+  return user.role === "admin" && !!user.school_id && user.school_id === club.school_id;
+}
+
 export function canApproveClubContent(
   user: Profile | null,
   club: Club | string,

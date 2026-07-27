@@ -28,6 +28,33 @@ export function getAllowedSignupDomains(
     .filter((domain, index, domains) => domains.indexOf(domain) === index);
 }
 
+export function validateSignupEmailDomain(
+  email: string,
+  allowedDomains: string[],
+  blockedEnvironmentDomains?: string
+): string | null {
+  const normalizedEmail = email.trim().toLowerCase();
+  const emailDomain = normalizedEmail.split("@")[1];
+  const blockedDomains = (blockedEnvironmentDomains ?? "")
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ""))
+    .filter(Boolean);
+
+  if (allowedDomains.length === 0) {
+    return "Signups are not configured for this school yet. Contact the school administrator.";
+  }
+  if (
+    !allowedDomains.includes("*")
+    && (!emailDomain || !allowedDomains.includes(emailDomain))
+  ) {
+    return `Please use an approved school email address (${allowedDomains.join(", ")}).`;
+  }
+  if (emailDomain && blockedDomains.includes(emailDomain)) {
+    return "Please use a school email address.";
+  }
+  return null;
+}
+
 export function parseSignupDomainInput(input: string): {
   domains: string[];
   invalidDomains: string[];

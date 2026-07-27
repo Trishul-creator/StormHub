@@ -18,5 +18,9 @@ test.describe("student core flow", () => {
     await page.goto("/digest");
     await expect(page.getByRole("heading", { name: /weekly digest/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /copy digest/i })).toBeVisible();
+
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: "Open dashboard" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Sign in", exact: true })).toHaveCount(0);
   });
 });

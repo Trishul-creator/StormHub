@@ -133,17 +133,24 @@
   .dark .text-storm-navy\/85 { color: hsl(var(--foreground) / 0.86); }
   .dark .text-storm-blue { color: hsl(214 32% 82%); }
   .dark .text-storm-electric { color: hsl(213 94% 72%); }
+  .dark .text-amber-600,
   .dark .text-amber-800,
   .dark .text-amber-700,
   .dark .text-amber-900,
   .dark .text-amber-950 { color: hsl(45 93% 72%); }
+  .dark .text-emerald-950,
   .dark .text-emerald-900,
   .dark .text-emerald-800,
   .dark .text-emerald-700 { color: hsl(155 70% 72%); }
+  .dark .text-blue-950,
   .dark .text-blue-900 { color: hsl(213 94% 82%); }
   .dark .text-blue-800,
   .dark .text-blue-700 { color: hsl(213 94% 76%); }
+  .dark .text-violet-800,
   .dark .text-violet-700 { color: hsl(250 95% 80%); }
+  .dark .text-cyan-800,
+  .dark .text-cyan-700 { color: hsl(188 82% 72%); }
+  .dark .text-pink-800 { color: hsl(330 85% 78%); }
   .dark .text-red-950,
   .dark .text-red-900,
   .dark .text-red-800,
@@ -190,30 +197,40 @@
   .accent-surface-mint { background-color: hsl(var(--accent-mint)); }
   .accent-surface-violet { background-color: hsl(var(--accent-violet)); }
   .accent-surface-amber { background-color: hsl(var(--accent-amber)); }
+  .dark .accent-surface-mint {
+    border-color: hsl(160 48% 42% / 0.24);
+    background-color: hsl(var(--card));
+    background-image: linear-gradient(135deg, hsl(160 55% 42% / 0.15), transparent 72%);
+  }
+  .dark .accent-surface-violet {
+    border-color: hsl(250 62% 66% / 0.24);
+    background-color: hsl(var(--card));
+    background-image: linear-gradient(135deg, hsl(250 70% 62% / 0.14), transparent 72%);
+  }
+  .dark .accent-surface-amber {
+    border-color: hsl(42 70% 50% / 0.22);
+    background-color: hsl(var(--card));
+    background-image: linear-gradient(135deg, hsl(42 80% 48% / 0.13), transparent 72%);
+  }
 }
 
 @keyframes route-enter {
   from {
-    opacity: 0;
     transform: translateY(8px) scale(0.997);
   }
   to {
-    opacity: 1;
     transform: translateY(0) scale(1);
   }
 }
 
 @keyframes block-drop {
   0% {
-    opacity: 0;
     transform: translateY(-14px) scale(0.99);
   }
   72% {
-    opacity: 1;
     transform: translateY(2px) scale(1);
   }
   100% {
-    opacity: 1;
     transform: translateY(0) scale(1);
   }
 }
@@ -234,7 +251,6 @@
 
   .motion-block,
   .motion-stagger > * {
-    opacity: 0;
     animation: block-drop 520ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
   }
 
@@ -252,7 +268,6 @@
 
   /* Let a staggered wrapper carry the motion instead of animating its card twice. */
   .motion-stagger > * > .motion-block {
-    opacity: 1;
     animation: none;
   }
 

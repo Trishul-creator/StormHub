@@ -16,6 +16,7 @@ import {
   canDeleteUser,
   canEditRole,
   canManageClub,
+  canManageClubPublication,
   canManageClubCoursework,
   canManageClubRoster,
   isAdminRole,
@@ -54,12 +55,14 @@ import {
   hashSignupIdentifier,
   isMissingAllowedEmailDomainsColumn,
   parseSignupDomainInput,
+  validateSignupEmailDomain,
   type SignupBotProof,
   validateSignupBotProof,
 } from "@/lib/signup-security";
 import { verifyCaptchaToken } from "@/lib/captcha";
 import { checkDurableRateLimit, markRateLimitAttemptSuccessful } from "@/lib/request-rate-limit";
 import { getAuthCallbackUrl } from "@/lib/env";
+import { safeAuthRedirectPath } from "@/lib/auth-redirect";
 import {
   copyGoogleDriveFileForStudent,
   disconnectGoogleDrive,
@@ -969,7 +972,8 @@ export async function submitContent(data: {
   importance?: NotificationImportance;
   send_email_to_members?: boolean;
   deadline_reminder_enabled?: boolean;
-}): Promise<{ success: boolean; error?: string; approved?: boolean }> {
+  release_at?: string;
+}): Promise<{ success: boolean; error?: string; approved?: boolean; scheduled?: boolean }> {
   if (isDemoMode()) return { success: true, approved: false };
   const supabase = await createClient();
   const profile = await getCurrentProfile();
@@ -998,8 +1002,20 @@ export async function submitContent(data: {
     isAdminRole(profile.role) ||
     Boolean(club && canManageClub(profile, club, membership)) ||
     (profile.role === "teacher" && membership?.role === "sponsor");
-  const contentStatus = trustedPost ? "approved" : "pending";
-  const publishedAt = trustedPost ? new Date().toISOString() : null;
+  let scheduledFor: string | null = null;
+  if (data.type === "announcement" && data.release_at) {
+    const parsedRelease = new Date(data.release_at);
+    if (Number.isNaN(parsedRelease.getTime())) {
+      return { success: false, error: "Choose a valid release date and time." };
+    }
+    if (parsedRelease.getTime() <= Date.now()) {
+      return { success: false, error: "The scheduled release time must be in the future." };
+    }
+    scheduledFor = parsedRelease.toISOString();
+  }
+  const isScheduledAnnouncement = data.type === "announcement" && Boolean(scheduledFor);
+  const contentStatus = isScheduledAnnouncement ? "draft" : trustedPost ? "approved" : "pending";
+  const publishedAt = trustedPost && !isScheduledAnnouncement ? new Date().toISOString() : null;
 
   let table: string;
   let insert: Record<string, unknown>;
@@ -1016,6 +1032,7 @@ export async function submitContent(data: {
       importance: data.importance ?? "normal",
       send_email_to_members: Boolean(data.send_email_to_members),
       published_at: publishedAt,
+      scheduled_for: scheduledFor,
     };
   } else if (data.type === "event") {
     if (!club) return { success: false, error: "A club is required." };
@@ -1113,7 +1130,13 @@ export async function submitContent(data: {
       message: `${profile.full_name ?? profile.email ?? "A student"} submitted a ${data.type} and is waiting for review.`,
       link: "/manage/approvals",
     });
-  } else if (trustedPost && club && created?.id && ["announcement", "event", "resource"].includes(data.type)) {
+  } else if (
+    trustedPost &&
+    !isScheduledAnnouncement &&
+    club &&
+    created?.id &&
+    ["announcement", "event", "resource"].includes(data.type)
+  ) {
     await createNotificationsForClubMembers({
       clubId: club.id,
       type:
@@ -1149,7 +1172,7 @@ export async function submitContent(data: {
   revalidatePath("/events");
   revalidatePath("/calendar");
   revalidatePath("/opportunities");
-  return { success: true, approved: trustedPost };
+  return { success: true, approved: trustedPost, scheduled: isScheduledAnnouncement };
 }
 
 function normalizeHttpUrl(value?: string | null): string | null {
@@ -1284,6 +1307,7 @@ export async function createClubAssignment(data: {
   attachmentUrl?: string | null;
   submissionMode?: "submission" | "completion";
   publishNow?: boolean;
+  scheduledFor?: string | null;
 }): Promise<{ success: boolean; error?: string; assignmentId?: string }> {
   if (isDemoMode()) return { success: true, assignmentId: "demo-assignment" };
   const context = await getCourseworkManagerContext(data.clubSlug);
@@ -1315,7 +1339,18 @@ export async function createClubAssignment(data: {
   if (data.attachmentUrl?.trim() && !attachmentUrl) {
     return { success: false, error: "The assignment link must be a valid http or https URL." };
   }
-  const publishNow = data.publishNow !== false;
+  let scheduledFor: string | null = null;
+  if (data.scheduledFor) {
+    const parsedRelease = new Date(data.scheduledFor);
+    if (Number.isNaN(parsedRelease.getTime())) {
+      return { success: false, error: "Choose a valid release date and time." };
+    }
+    if (parsedRelease.getTime() <= Date.now()) {
+      return { success: false, error: "The scheduled release time must be in the future." };
+    }
+    scheduledFor = parsedRelease.toISOString();
+  }
+  const publishNow = data.publishNow !== false && !scheduledFor;
   const submissionMode = data.submissionMode === "completion" ? "completion" : "submission";
   const { data: assignment, error } = await context.supabase
     .from("club_assignments")
@@ -1330,6 +1365,7 @@ export async function createClubAssignment(data: {
       submission_mode: submissionMode,
       status: publishNow ? "published" : "draft",
       published_at: publishNow ? new Date().toISOString() : null,
+      scheduled_for: scheduledFor,
     })
     .select("id")
     .single();
@@ -1373,6 +1409,7 @@ export async function updateClubAssignmentStatus(data: {
   const update: Record<string, unknown> = { status: data.status };
   if (data.status === "published" && existing.status === "draft") {
     update.published_at = new Date().toISOString();
+    update.scheduled_for = null;
   }
   const { error } = await context.supabase
     .from("club_assignments")
@@ -2403,21 +2440,41 @@ export async function updateClubSettings(data: {
   if (!canManageClub(profile, club, membership)) {
     return { success: false, error: "You do not have permission to edit this club." };
   }
+  const canManagePublication = canManageClubPublication(profile, club as Club);
+  if (
+    !canManagePublication &&
+    (
+      data.status !== club.status ||
+      data.visibility !== club.visibility ||
+      data.isListed !== club.is_listed
+    )
+  ) {
+    return {
+      success: false,
+      error: "Only a school administrator can publish, unpublish, list, or change a club's visibility.",
+    };
+  }
+  if (!canManagePublication && data.isFeatured !== club.is_featured) {
+    return { success: false, error: "Only a school administrator can feature or unfeature a club." };
+  }
 
   const willPublish =
+    canManagePublication &&
     club.status === "draft" &&
     ["interest_open", "active"].includes(data.status) &&
     data.visibility === "public" &&
     data.isListed;
-  const sponsor = await getValidTeacherSponsor({
-    sponsorUserId: data.sponsorUserId,
-    schoolId: club.school_id,
-  });
-  if (data.sponsorUserId && !sponsor) {
+  const sponsor = canManagePublication
+    ? await getValidTeacherSponsor({
+        sponsorUserId: data.sponsorUserId,
+        schoolId: club.school_id,
+      })
+    : null;
+  if (canManagePublication && data.sponsorUserId && !sponsor) {
     return { success: false, error: "Choose a teacher from this school as the sponsor." };
   }
 
-  const { error } = await supabase.from("clubs").update({
+  const clubUpdate: Record<string, unknown> = {
     name: data.name,
     category: data.category?.trim() || null,
     short_description: data.shortDescription,
@@ -2425,21 +2482,29 @@ export async function updateClubSettings(data: {
     join_instructions: data.joinInstructions?.trim() || null,
     meeting_time: null,
     meeting_location: null,
-    sponsor_name: sponsor?.full_name || sponsor?.email || null,
-    sponsor_email: sponsor?.email || null,
-    status: data.status,
-    visibility: data.visibility,
-    is_listed: data.isListed,
-    is_featured: data.isFeatured,
-    is_active: ["interest_open", "active"].includes(data.status),
-  }).eq("id", data.clubId);
+  };
+  if (canManagePublication) {
+    Object.assign(clubUpdate, {
+      sponsor_name: sponsor?.full_name || sponsor?.email || null,
+      sponsor_email: sponsor?.email || null,
+      status: data.status,
+      visibility: data.visibility,
+      is_listed: data.isListed,
+      is_featured: data.isFeatured,
+      is_active: ["interest_open", "active"].includes(data.status),
+    });
+  }
+
+  const { error } = await supabase.from("clubs").update(clubUpdate).eq("id", data.clubId);
   if (error) return { success: false, error: friendlyError(error, "Could not update the club.") };
 
-  await syncClubSponsorMembership({
-    clubId: club.id,
-    sponsorUserId: sponsor?.id ?? null,
-    schoolId: club.school_id,
-  });
+  if (canManagePublication) {
+    await syncClubSponsorMembership({
+      clubId: club.id,
+      sponsorUserId: sponsor?.id ?? null,
+      schoolId: club.school_id,
+    });
+  }
 
   if (willPublish) {
     await notifySchoolStudentsAboutPublishedClub({
@@ -2512,6 +2577,120 @@ export async function supabaseSignIn(email: string, password: string, captchaTok
     return { success: true, redirectTo: defaultPathForProfile(profile) };
   }
   return { success: true };
+}
+
+export async function completeGoogleOnboarding(input: {
+  schoolId: string;
+  fullName: string;
+  gradeLevel?: string;
+  accessCode?: string;
+  next?: string;
+}): Promise<{ success: true; redirectTo: string } | { success: false; error: string }> {
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  if (!supabase || !admin) {
+    return { success: false, error: "Account setup is not configured for this deployment." };
+  }
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user?.email) {
+    return { success: false, error: "Your Google session expired. Sign in again." };
+  }
+
+  const providers = Array.isArray(user.app_metadata?.providers)
+    ? user.app_metadata.providers
+    : [];
+  if (user.app_metadata?.provider !== "google" && !providers.includes("google")) {
+    return { success: false, error: "Finish this account using Google sign-in." };
+  }
+
+  const requiredAccessCode = process.env.SIGNUP_ACCESS_CODE?.trim();
+  if (requiredAccessCode && input.accessCode?.trim() !== requiredAccessCode) {
+    return { success: false, error: "Enter the correct school signup code." };
+  }
+
+  const normalizedFullName = input.fullName.trim().replace(/\s+/g, " ");
+  if (normalizedFullName.length < 3 || normalizedFullName.length > 120) {
+    return { success: false, error: "Enter your full name." };
+  }
+  if (!input.schoolId) {
+    return { success: false, error: "Choose your school." };
+  }
+
+  const { data: existingProfile, error: profileError } = await admin
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profileError) {
+    return { success: false, error: "We couldn't load your account. Please try again." };
+  }
+  if (existingProfile?.school_id || existingProfile?.role === "super_admin") {
+    return {
+      success: true,
+      redirectTo: safeAuthRedirectPath(input.next, defaultPathForProfile(existingProfile as Profile)),
+    };
+  }
+
+  const { data: school, error: schoolError } = await admin
+    .from("schools")
+    .select("id,is_active,is_public,allowed_email_domains")
+    .eq("id", input.schoolId)
+    .maybeSingle();
+  if (schoolError) {
+    return { success: false, error: "We couldn't verify your school right now. Please try again." };
+  }
+  if (!school || school.is_active === false || school.is_public === false) {
+    return { success: false, error: "Choose an active school." };
+  }
+
+  const allowedDomains = getAllowedSignupDomains(
+    school.allowed_email_domains,
+    process.env.ALLOWED_SIGNUP_EMAIL_DOMAINS
+  );
+  const domainError = validateSignupEmailDomain(
+    user.email,
+    allowedDomains,
+    process.env.BLOCKED_SIGNUP_EMAIL_DOMAINS
+  );
+  if (domainError) return { success: false, error: domainError };
+
+  const parsedGrade = Number(input.gradeLevel);
+  const gradeLevel = Number.isInteger(parsedGrade) && parsedGrade >= 9 && parsedGrade <= 12
+    ? parsedGrade
+    : null;
+  const profileValues = {
+    email: user.email.trim().toLowerCase(),
+    full_name: normalizedFullName,
+    grade_level: gradeLevel,
+    school_id: school.id,
+    role: "student" as const,
+    account_status: "active" as const,
+  };
+
+  const profileMutation = existingProfile
+    ? admin
+        .from("profiles")
+        .update(profileValues)
+        .eq("id", user.id)
+        .is("school_id", null)
+        .select("*")
+        .maybeSingle()
+    : admin
+        .from("profiles")
+        .insert({ id: user.id, ...profileValues })
+        .select("*")
+        .maybeSingle();
+  const { data: completedProfile, error: updateError } = await profileMutation;
+  if (updateError || !completedProfile) {
+    return { success: false, error: "We couldn't finish setting up your account. Please try again." };
+  }
+
+  revalidatePath("/", "layout");
+  return {
+    success: true,
+    redirectTo: safeAuthRedirectPath(input.next, defaultPathForProfile(completedProfile as Profile)),
+  };
 }
 
 export async function supabaseSignUp(
@@ -2619,23 +2798,13 @@ export async function supabaseSignUp(
     schoolSignupConfig?.allowed_email_domains,
     process.env.ALLOWED_SIGNUP_EMAIL_DOMAINS
   );
-  const blockedDomains = (process.env.BLOCKED_SIGNUP_EMAIL_DOMAINS ?? "")
-    .split(",")
-    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ""))
-    .filter(Boolean);
-  const emailDomain = normalizedEmail.split("@")[1]?.toLowerCase();
-  if (allowedDomains.length === 0 && !usesLegacySchoolSchema) {
-    return { success: false, error: "Signups are not configured for this school yet. Contact the school administrator." };
-  }
-  const allowsEveryDomain = allowedDomains.includes("*");
-  if (!allowsEveryDomain && allowedDomains.length > 0 && (!emailDomain || !allowedDomains.includes(emailDomain))) {
-    return {
-      success: false,
-      error: `Please use an approved school email address (${allowedDomains.join(", ")}).`,
-    };
-  }
-  if (emailDomain && blockedDomains.includes(emailDomain)) {
-    return { success: false, error: "Please use a school email address." };
+  if (!usesLegacySchoolSchema || allowedDomains.length > 0) {
+    const domainError = validateSignupEmailDomain(
+      normalizedEmail,
+      allowedDomains,
+      process.env.BLOCKED_SIGNUP_EMAIL_DOMAINS
+    );
+    if (domainError) return { success: false, error: domainError };
   }
   const supabase = await createClient();
   if (!supabase) return { success: false, error: "Database not configured." };

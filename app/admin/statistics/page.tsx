@@ -59,7 +59,7 @@ export default async function AdminStatisticsPage({ searchParams }: AdminStatist
 
         {isSuperAdmin && schools.length > 0 && (
           <form method="get" className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-end">
-            <label className="text-xs font-semibold uppercase tracking-wide text-blue-950/70">
+            <label className="text-xs font-semibold uppercase tracking-wide text-blue-950/70 dark:text-blue-200/75">
               View scope
               <select
                 name="school"

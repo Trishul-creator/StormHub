@@ -19,10 +19,10 @@ export function AssignmentCard({
   const submission = assignment.submission;
   const status = submission?.status === "returned"
     ? "Graded"
-    : submission?.status === "submitted"
+      : submission?.status === "submitted"
       ? assignment.submission_mode === "completion" ? "Complete" : "Turned in"
       : assignment.status === "draft"
-        ? "Draft"
+        ? assignment.scheduled_for ? "Scheduled" : "Draft"
         : assignment.status === "closed"
           ? "Closed"
           : isPastDue
@@ -56,7 +56,7 @@ export function AssignmentCard({
                       ? "bg-emerald-100 text-emerald-800"
                       : status === "Past due"
                         ? "bg-red-100 text-red-800"
-                        : status === "Draft"
+                        : status === "Draft" || status === "Scheduled"
                           ? "bg-amber-100 text-amber-800"
                           : "bg-storm-light/70 text-storm-blue"
                   )}
@@ -71,6 +71,9 @@ export function AssignmentCard({
                 <span>
                   {assignment.due_at ? `Due ${formatDateTime(assignment.due_at)}` : "No due date"}
                 </span>
+                {assignment.scheduled_for && assignment.status === "draft" && (
+                  <span>Releases {formatDateTime(assignment.scheduled_for)}</span>
+                )}
                 <span>{assignment.points_possible} points</span>
                 {assignment.submission_mode === "completion" && <span>Mark complete</span>}
                 {assignment.attachment_url && (

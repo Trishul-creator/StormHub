@@ -65,7 +65,7 @@ export function RoleChecklist({
   }
 
   return (
-    <section className="rounded-xl border bg-white p-5">
+    <section className="rounded-xl border bg-card p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-storm-navy">{title}</h2>
@@ -84,7 +84,7 @@ export function RoleChecklist({
               key={item.id}
               className={cn(
                 "flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between",
-                item.status === "done" && "border-emerald-200 bg-emerald-50/60",
+                item.status === "done" && "border-emerald-200 bg-emerald-50/60 dark:border-emerald-800/80 dark:bg-emerald-950/35",
                 item.status === "locked" && "bg-muted/40 text-muted-foreground"
               )}
             >
@@ -92,7 +92,7 @@ export function RoleChecklist({
                 <Icon
                   className={cn(
                     "mt-0.5 h-5 w-5 shrink-0",
-                    item.status === "done" ? "text-emerald-600" : item.status === "active" ? "text-storm-electric" : "text-muted-foreground"
+                    item.status === "done" ? "text-emerald-600 dark:text-emerald-400" : item.status === "active" ? "text-storm-electric" : "text-muted-foreground"
                   )}
                 />
                 <div>

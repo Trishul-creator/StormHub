@@ -28,7 +28,11 @@ export function OpportunityCard({
 
   return (
     <Card className={`hover:shadow-md transition-shadow ${
-      isSignedUp ? "border-emerald-300 bg-emerald-50/50" : closingSoon ? "border-amber-300" : ""
+      isSignedUp
+        ? "border-emerald-300 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/35"
+        : closingSoon
+          ? "border-amber-300 dark:border-amber-800"
+          : ""
     }`}>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
@@ -71,7 +75,7 @@ export function OpportunityCard({
       <CardFooter className="gap-2">
         <Button variant="outline" size="sm" asChild className="flex-1">
           <Link href={`/opportunities/${opportunity.slug}`}>
-            {opportunity.action_label || "Learn More"}
+            View details
           </Link>
         </Button>
         {canParticipate && (

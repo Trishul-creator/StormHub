@@ -6,7 +6,6 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { getOpportunities, getOpportunityCategories } from "@/lib/data";
 import { getUserBookmarkIds, getUserOpportunitySignupIds } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { buildEmptyStateActions } from "@/lib/product";
@@ -21,7 +20,6 @@ interface OpportunitiesPageProps {
 export default async function OpportunitiesPage({ searchParams }: OpportunitiesPageProps) {
   const params = await searchParams;
   const { userId, isLoggedIn, profile } = await getAuthContext();
-  if (profile?.role === "teacher") redirect("/calendar");
   const { schools, selectedSchool } = await getSchoolFilterContext(profile, params.school);
 
   const selectedGrade = params.grade ? Number(params.grade) : undefined;
@@ -71,6 +69,8 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
         description={
           profile && ["admin", "super_admin"].includes(profile.role)
             ? "Review all school-wide opportunities. Administrator accounts can create and manage listings but cannot participate."
+            : profile?.role === "teacher"
+              ? "Browse school-wide opportunities in read-only mode. Teacher accounts cannot save, RSVP, or sign up."
             : "Signups, applications, tryouts, auditions, competitions, interest forms, and deadlines."
         }
       >
