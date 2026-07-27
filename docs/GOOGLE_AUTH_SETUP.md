@@ -63,7 +63,20 @@ client ID and secret, then enable the provider.
 Do not change the existing Email provider, confirmation, SMTP, or hCaptcha
 settings.
 
-## 4. Production verification
+## 4. Enable the production UI
+
+After the migration is applied and the Supabase provider is enabled, add this
+Vercel Production variable and redeploy:
+
+```text
+NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true
+```
+
+The Google buttons remain hidden until this flag is built into the production
+deployment. This prevents users from entering a partially configured OAuth
+flow during rollout.
+
+## 5. Production verification
 
 After deploying the matching application code:
 

@@ -178,7 +178,9 @@ Do not share administrator accounts. Every administrator needs an individual con
 Google authentication uses a separate OAuth client from Google Drive. Apply
 `20260727043000_google_oauth_onboarding.sql` before enabling the provider, then
 follow `docs/GOOGLE_AUTH_SETUP.md`. The Sign-In client secret belongs only in
-Supabase Auth. It is not a Vercel environment variable.
+Supabase Auth. It is not a Vercel environment variable. Keep
+`NEXT_PUBLIC_GOOGLE_AUTH_ENABLED` unset until the migration is applied and the
+provider is enabled, then set it to `true` in Vercel Production and redeploy.
 
 Retain password authentication and email confirmation as a fallback. A new
 Google identity must finish school onboarding and pass the selected school's

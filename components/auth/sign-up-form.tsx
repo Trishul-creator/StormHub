@@ -25,10 +25,12 @@ export function SignUpForm({
   schools,
   preselectedSchoolId,
   requiresAccessCode = false,
+  googleAuthEnabled = false,
 }: {
   schools: SignUpSchool[];
   preselectedSchoolId?: string | null;
   requiresAccessCode?: boolean;
+  googleAuthEnabled?: boolean;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -102,15 +104,19 @@ export function SignUpForm({
         <CardDescription>Create your account for your school workspace</CardDescription>
       </CardHeader>
       <CardContent>
-        <GoogleAuthButton />
-        <p className="mt-2 text-center text-xs text-muted-foreground">
-          New Google users choose and verify their school after Google confirms their email.
-        </p>
-        <div className="my-4 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
-          <span className="h-px flex-1 bg-border" />
-          <span>or create a password</span>
-          <span className="h-px flex-1 bg-border" />
-        </div>
+        {googleAuthEnabled && (
+          <>
+            <GoogleAuthButton />
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              New Google users choose and verify their school after Google confirms their email.
+            </p>
+            <div className="my-4 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
+              <span className="h-px flex-1 bg-border" />
+              <span>or create a password</span>
+              <span className="h-px flex-1 bg-border" />
+            </div>
+          </>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="schoolId">School</Label>
