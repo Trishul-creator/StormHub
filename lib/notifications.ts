@@ -397,6 +397,7 @@ export async function createAdminAttentionNotification(input: {
 export async function createApprovalNeededNotifications(input: {
   schoolId: string;
   clubId?: string | null;
+  clubMembershipRoles?: Array<"sponsor" | "president">;
   title: string;
   message: string;
   link: string;
@@ -418,18 +419,17 @@ export async function createApprovalNeededNotifications(input: {
   for (const profile of admins ?? []) recipientIds.add(profile.id);
 
   if (input.clubId) {
-    const { data: sponsors, error: sponsorsError } = await admin
+    const { data: clubApprovers, error: clubApproversError } = await admin
       .from("club_memberships")
-      .select("user_id,profiles!inner(role)")
+      .select("user_id")
       .eq("club_id", input.clubId)
       .eq("status", "active")
-      .eq("role", "sponsor")
-      .eq("profiles.role", "teacher");
+      .in("role", input.clubMembershipRoles ?? ["sponsor"]);
 
-    if (sponsorsError) {
-      console.error("[createApprovalNeededNotifications sponsors]", sponsorsError.message);
+    if (clubApproversError) {
+      console.error("[createApprovalNeededNotifications club approvers]", clubApproversError.message);
     }
-    for (const sponsor of sponsors ?? []) recipientIds.add(sponsor.user_id);
+    for (const approver of clubApprovers ?? []) recipientIds.add(approver.user_id);
   }
 
   await Promise.all(

@@ -63,7 +63,7 @@ export function ClubSettingsForm({
   }
 
   return (
-    <form onSubmit={submit} className="rounded-xl border bg-white p-6 space-y-4">
+    <form onSubmit={submit} className="rounded-xl border bg-card p-6 space-y-4">
       {publishMode && (
         <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
           <p className="font-semibold">Final publication review</p>
@@ -82,14 +82,14 @@ export function ClubSettingsForm({
       </p>
       {canManagePublication ? (
         <div>
-          <Label htmlFor="sponsor_user_id">Teacher sponsor</Label>
+          <Label htmlFor="sponsor_user_id">Club Advisor</Label>
           <select
             id="sponsor_user_id"
             name="sponsor_user_id"
             defaultValue={selectedSponsorUserId}
-            className="mt-1 h-10 w-full rounded-lg border bg-white px-3 text-sm"
+            className="mt-1 h-10 w-full rounded-lg border bg-card px-3 text-sm"
           >
-            <option value="">No sponsor assigned yet</option>
+            <option value="">No Advisor assigned yet</option>
             {teachers.map((teacher) => (
               <option key={teacher.id} value={teacher.id}>
                 {teacher.full_name || teacher.email || "Unnamed teacher"}
@@ -97,12 +97,12 @@ export function ClubSettingsForm({
             ))}
           </select>
           {club.sponsor_name && (
-            <p className="mt-1 text-xs text-muted-foreground">Current sponsor: {club.sponsor_name}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Current Advisor: {club.sponsor_name}</p>
           )}
         </div>
       ) : (
         <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
-          <span className="font-medium text-storm-navy">Teacher sponsor:</span>{" "}
+          <span className="font-medium text-storm-navy">Club Advisor:</span>{" "}
           <span className="text-muted-foreground">{club.sponsor_name || "Awaiting administrator assignment"}</span>
         </div>
       )}
@@ -111,7 +111,7 @@ export function ClubSettingsForm({
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <Label htmlFor="club-status">Status</Label>
-              <select id="club-status" value={status} onChange={(e) => setStatus(e.target.value as ClubStatus)} className="mt-1 h-10 w-full rounded-lg border bg-white px-3 text-sm">
+              <select id="club-status" value={status} onChange={(e) => setStatus(e.target.value as ClubStatus)} className="mt-1 h-10 w-full rounded-lg border bg-card px-3 text-sm">
                 {["draft", "interest_open", "active", "paused", "archived"].map((value) => (
                   <option key={value} value={value}>{value.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())}</option>
                 ))}
@@ -119,7 +119,7 @@ export function ClubSettingsForm({
             </div>
             <div>
               <Label htmlFor="club-visibility">Visibility</Label>
-              <select id="club-visibility" value={visibility} onChange={(e) => setVisibility(e.target.value as typeof visibility)} className="mt-1 h-10 w-full rounded-lg border bg-white px-3 text-sm">
+              <select id="club-visibility" value={visibility} onChange={(e) => setVisibility(e.target.value as typeof visibility)} className="mt-1 h-10 w-full rounded-lg border bg-card px-3 text-sm">
                 <option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option>
               </select>
             </div>

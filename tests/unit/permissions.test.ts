@@ -9,6 +9,9 @@ import {
   canManageClubPublication,
   canManageClubCoursework,
   canManageClubRoster,
+  canAssignClubLeadership,
+  canGradeClubCoursework,
+  canPublishClubCoursework,
   canManageSchool,
   canUseStudentFeatures,
   canViewMemberContent,
@@ -187,21 +190,29 @@ describe("club permissions", () => {
     expect(canManageClub(profile("super_admin"), club({ school_id: schoolB }))).toBe(true);
   });
 
-  it("limits roster management to admins or teacher sponsors", () => {
+  it("lets Vice Presidents coordinate general members while reserving leadership changes for adults", () => {
     expect(canManageClubRoster(profile("admin", { school_id: schoolA }), club({ school_id: schoolA }))).toBe(true);
     expect(canManageClubRoster(profile("admin", { school_id: schoolA }), club({ school_id: schoolB }))).toBe(false);
     expect(canManageClubRoster(profile("super_admin"), club({ school_id: schoolB }))).toBe(true);
     expect(canManageClubRoster(profile("teacher"), club(), membership("sponsor"))).toBe(true);
     expect(canManageClubRoster(profile("student"), club(), membership("president"))).toBe(false);
+    expect(canManageClubRoster(profile("student"), club(), membership("officer"))).toBe(true);
+    expect(canAssignClubLeadership(profile("student"), club(), membership("officer"))).toBe(false);
+    expect(canAssignClubLeadership(profile("teacher"), club(), membership("sponsor"))).toBe(true);
   });
 
-  it("limits coursework and grading to admins or teacher sponsors", () => {
+  it("separates assignment creation, publishing, and grading permissions", () => {
     expect(canManageClubCoursework(profile("admin", { school_id: schoolA }), club({ school_id: schoolA }))).toBe(true);
     expect(canManageClubCoursework(profile("admin", { school_id: schoolA }), club({ school_id: schoolB }))).toBe(false);
     expect(canManageClubCoursework(profile("super_admin"), club({ school_id: schoolB }))).toBe(true);
     expect(canManageClubCoursework(profile("teacher"), club(), membership("sponsor"))).toBe(true);
     expect(canManageClubCoursework(profile("teacher"), club(), membership("member"))).toBe(false);
-    expect(canManageClubCoursework(profile("student"), club(), membership("president"))).toBe(false);
+    expect(canManageClubCoursework(profile("student"), club(), membership("president"))).toBe(true);
+    expect(canManageClubCoursework(profile("student"), club(), membership("officer"))).toBe(true);
+    expect(canPublishClubCoursework(profile("student"), club(), membership("president"))).toBe(true);
+    expect(canPublishClubCoursework(profile("student"), club(), membership("officer"))).toBe(false);
+    expect(canGradeClubCoursework(profile("student"), club(), membership("president"))).toBe(false);
+    expect(canGradeClubCoursework(profile("teacher"), club(), membership("sponsor"))).toBe(true);
   });
 
   it("allows only scoped admins to publish or feature clubs", () => {

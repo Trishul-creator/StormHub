@@ -33,9 +33,9 @@ export async function getAssistantContext(): Promise<{ auth: AuthContext; contex
 
   const roleNotes =
     profile.role === "student"
-      ? "Students can join clubs, RSVP to events, save/sign up for opportunities, read notifications, and contact support. If they are a club officer or president, they can create club announcements, events, and resources."
+      ? "Students can join clubs, RSVP to events, save/sign up for opportunities, read notifications, and contact support. If they are a club Vice President or President, they can also use the club leadership workspace."
       : profile.role === "teacher"
-        ? "Teachers can manage assigned clubs, rosters, events, announcements, resources, and archive/delete club content for clubs they sponsor."
+        ? "Teachers act as club Advisors and can manage assigned clubs, rosters, events, announcements, resources, grading, and archived content."
         : "Admins can manage users, clubs, opportunities, notifications, and school-wide settings. Super admins can access the portal and create school workspaces, but should not receive school-specific task notifications.";
 
   const context = `
@@ -62,7 +62,7 @@ Known StormHub pages:
 - /notifications: notifications
 - /contact: support form
 - /dashboard: role-specific dashboard
-- /manage: club/content management for officers, presidents, teachers, and admins
+- /manage: club/content management for Vice Presidents, Presidents, Advisors, and admins
 `.trim();
 
   return { auth, context };

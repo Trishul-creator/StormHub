@@ -15,7 +15,7 @@ export default function PrivacyPage() {
             <li>Grade level (optional)</li>
             <li>Club memberships and event RSVPs</li>
             <li>Saved opportunities and club participation</li>
-            <li>Club assignment submissions, private attachments, sponsor feedback, and club coursework grades</li>
+            <li>Club assignment submissions, private attachments, Advisor feedback, and club coursework grades</li>
             <li>Google Drive connection details and selected-file access, only when you connect Drive</li>
           </ul>
         </section>
@@ -44,7 +44,7 @@ export default function PrivacyPage() {
           <h2 className="text-lg font-semibold text-storm-navy mb-2">Club coursework privacy</h2>
           <p>
             Assignment responses, private files, Google Drive selections, and grades are visible only to the student who submitted the work,
-            the club&apos;s teacher sponsor, and authorized school or platform administrators. Other club
+            the club&apos;s Advisor, and authorized school or platform administrators. Other club
             members can see names and club roles in the People directory, but not email addresses,
             submissions, grades, or private feedback.
           </p>

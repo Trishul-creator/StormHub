@@ -2,9 +2,10 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { getManagedClubBySlug, getClubMemberCount, getClubRoster } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
-import { canManageClubRoster } from "@/lib/permissions";
+import { canAssignClubLeadership, canBanClubMember, canManageClubRoster } from "@/lib/permissions";
 import { RoleBadge } from "@/components/ui/badge";
 import { RosterMemberActions } from "@/components/manage/roster-member-actions";
+import { ClubRoleGuide } from "@/components/manage/club-role-guide";
 
 interface PageProps { params: Promise<{ slug: string }> }
 
@@ -18,10 +19,13 @@ export default async function ManageMembersPage({ params }: PageProps) {
     getClubRoster(club.id),
   ]);
   const canEditRoster = canManageClubRoster(profile, club, membership);
+  const canAssignLeadership = canAssignClubLeadership(profile, club, membership);
+  const canBan = canBanClubMember(profile, club, membership);
 
   return (
     <div className="container mx-auto px-4 py-8">
       <PageHeader title={`Members — ${club.name}`} description={`${count} people currently joined`} />
+      <ClubRoleGuide />
       <div className="overflow-hidden rounded-xl border">
         <table className="w-full text-sm">
           <thead className="bg-storm-light/50">
@@ -41,15 +45,20 @@ export default async function ManageMembersPage({ params }: PageProps) {
                 <td className="p-4">
                   {member.role === "sponsor" ? (
                     <span className="text-xs text-muted-foreground">Managed in Users & Roles</span>
+                  ) : !canAssignLeadership && member.role !== "member" ? (
+                    <span className="text-xs text-muted-foreground">Advisor approval required</span>
                   ) : canEditRoster ? (
                     <RosterMemberActions
                       clubId={club.id}
                       userId={member.user_id}
                       currentRole={member.role}
                       disabled={member.user_id === profile.id}
+                      canAssignLeadership={canAssignLeadership}
+                      canBan={canBan}
+                      canRemove={canAssignLeadership || member.role === "member"}
                     />
                   ) : (
-                    <span className="text-xs text-muted-foreground">Teacher/admin access required</span>
+                    <span className="text-xs text-muted-foreground">Roster is view only</span>
                   )}
                 </td>
               </tr>

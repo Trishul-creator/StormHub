@@ -1,14 +1,12 @@
 import type {
   Club,
   ClubMembership,
+  MembershipRole,
   Profile,
   UserRole,
 } from "@/types/database";
 
-const OFFICER_ROLES = [
-  "officer",
-  "president",
-] as const;
+const CLUB_LEADER_ROLES: MembershipRole[] = ["officer", "president", "sponsor"];
 
 const ADMIN_ROLES: UserRole[] = ["admin", "super_admin"];
 const MANAGER_ROLES: UserRole[] = ["teacher", "admin", "super_admin"];
@@ -63,7 +61,7 @@ export function canManageClub(
   if (!isActiveForClub || !membershipRole) return false;
   if (user.role === "teacher") return membershipRole === "sponsor";
   if (user.role !== "student") return false;
-  return OFFICER_ROLES.includes(membershipRole as (typeof OFFICER_ROLES)[number]);
+  return membershipRole === "officer" || membershipRole === "president";
 }
 
 export function canManageClubPublication(
@@ -88,6 +86,24 @@ export function canApproveClubContent(
   if (user.role === "admin" && typeof club === "string") return true;
   if (user.role !== "teacher") return false;
   return canManageClub(user, club, membership);
+}
+
+export function canPublishClubContent(
+  user: Profile | null,
+  club: Club | string,
+  membership: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null | undefined,
+  contentType: "announcement" | "event" | "resource"
+): boolean {
+  if (!user) return false;
+  if (user.role === "super_admin") return true;
+  if (user.role === "admin") {
+    return typeof club === "string" || (!!user.school_id && user.school_id === club.school_id);
+  }
+  if (!canManageClub(user, club, membership)) return false;
+  const membershipRole = typeof membership === "string" ? membership : membership?.role;
+  if (user.role === "teacher") return membershipRole === "sponsor";
+  if (user.role !== "student" || membershipRole !== "president") return false;
+  return contentType !== "event";
 }
 
 export function canViewMemberContent(
@@ -187,10 +203,15 @@ export function canManageClubRoster(
   if (user.role === "admin") {
     return typeof club !== "string" && !!user.school_id && user.school_id === club.school_id;
   }
-  return user.role === "teacher" && canManageClub(user, club, membership);
+  if (!canManageClub(user, club, membership)) return false;
+  const membershipRole = typeof membership === "string" ? membership : membership?.role;
+  return (
+    (user.role === "teacher" && membershipRole === "sponsor")
+    || (user.role === "student" && membershipRole === "officer")
+  );
 }
 
-export function canManageClubCoursework(
+export function canAssignClubLeadership(
   user: Profile | null,
   club: Club | string,
   membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
@@ -200,7 +221,77 @@ export function canManageClubCoursework(
   if (user.role === "admin") {
     return typeof club !== "string" && !!user.school_id && user.school_id === club.school_id;
   }
-  return user.role === "teacher" && canManageClub(user, club, membership);
+  const membershipRole = typeof membership === "string" ? membership : membership?.role;
+  return user.role === "teacher"
+    && membershipRole === "sponsor"
+    && canManageClub(user, club, membership);
+}
+
+export function canBanClubMember(
+  user: Profile | null,
+  club: Club | string,
+  membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
+): boolean {
+  return canAssignClubLeadership(user, club, membership);
+}
+
+export function canCreateClubCoursework(
+  user: Profile | null,
+  club: Club | string,
+  membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
+): boolean {
+  return canManageClub(user, club, membership);
+}
+
+export function canPublishClubCoursework(
+  user: Profile | null,
+  club: Club | string,
+  membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
+): boolean {
+  if (!user) return false;
+  if (user.role === "super_admin") return true;
+  if (user.role === "admin") {
+    return typeof club !== "string" && !!user.school_id && user.school_id === club.school_id;
+  }
+  if (!canManageClub(user, club, membership)) return false;
+  const membershipRole = typeof membership === "string" ? membership : membership?.role;
+  return (
+    (user.role === "teacher" && membershipRole === "sponsor")
+    || (user.role === "student" && membershipRole === "president")
+  );
+}
+
+export function canGradeClubCoursework(
+  user: Profile | null,
+  club: Club | string,
+  membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
+): boolean {
+  return canAssignClubLeadership(user, club, membership);
+}
+
+export function canTrackClubSubmissions(
+  user: Profile | null,
+  club: Club | string,
+  membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
+): boolean {
+  return canCreateClubCoursework(user, club, membership);
+}
+
+/** Compatibility name for existing callers that need assignment workspace access. */
+export function canManageClubCoursework(
+  user: Profile | null,
+  club: Club | string,
+  membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
+): boolean {
+  return canCreateClubCoursework(user, club, membership);
+}
+
+export function canArchiveClub(
+  user: Profile | null,
+  club: Club | string,
+  membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
+): boolean {
+  return canAssignClubLeadership(user, club, membership);
 }
 
 export function canCreateOpportunity(user: Profile | null): boolean {
@@ -241,13 +332,13 @@ export function canViewSchoolEmailLog(user: Profile | null, schoolId?: string | 
 }
 
 export function isOfficerRole(role?: string): boolean {
-  return !!role && OFFICER_ROLES.includes(role as (typeof OFFICER_ROLES)[number]);
+  return !!role && CLUB_LEADER_ROLES.includes(role as MembershipRole);
 }
 
 export function roleLabel(role: UserRole): string {
   const labels: Record<UserRole, string> = {
     student: "Student",
-    teacher: "Teacher/Sponsor",
+    teacher: "Teacher/Advisor",
     admin: "School Admin",
     super_admin: "Platform Admin",
   };

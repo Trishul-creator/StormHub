@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(93);
+SELECT plan(98);
 
 SELECT is(
   (SELECT public FROM storage.buckets WHERE id = 'coursework-private'),
@@ -333,7 +333,7 @@ SELECT is(
 SELECT throws_ok(
   $$SELECT public.manage_club_roster_member('b1000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001', 'member', FALSE)$$,
   'P0001',
-  'Teacher sponsor or administrator access required',
+  'Club Vice President, Advisor, or administrator access required',
   'teacher sponsors cannot manage another school roster'
 );
 SELECT lives_ok(
@@ -349,8 +349,20 @@ SELECT throws_ok(
 SELECT throws_ok(
   $$UPDATE public.clubs SET status = 'active', visibility = 'public', is_listed = TRUE, is_featured = TRUE WHERE id = 'a1000000-0000-4000-8000-000000000001'$$,
   'P0001',
-  'Only a school administrator can change club publication or featured status',
+  'Only a school administrator can change this club publication setting',
   'teacher sponsors cannot publish or feature a club through direct database access'
+);
+SELECT lives_ok(
+  $$UPDATE public.clubs
+    SET status = 'archived', visibility = 'unlisted', is_listed = FALSE, is_active = FALSE
+    WHERE id = 'a1000000-0000-4000-8000-000000000001'$$,
+  'club Advisors can archive their club without changing its featured status'
+);
+SELECT lives_ok(
+  $$UPDATE public.clubs
+    SET status = 'active', visibility = 'public', is_listed = TRUE, is_active = TRUE
+    WHERE id = 'a1000000-0000-4000-8000-000000000001'$$,
+  'club Advisors can restore their club publication state for continued management'
 );
 RESET ROLE;
 DELETE FROM public.account_deletion_requests
@@ -516,9 +528,37 @@ SELECT throws_ok(
       100,
       'published'
     )$$,
-  '42501',
-  NULL,
-  'student officers cannot create or grade coursework'
+  'P0001',
+  'Only the President, Advisor, or an administrator can publish or schedule assignments',
+  'Vice Presidents cannot directly publish assignments'
+);
+SELECT lives_ok(
+  $$INSERT INTO public.club_assignments (
+      club_id, author_id, title, instructions, points_possible, status
+    ) VALUES (
+      'a1000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+      'Vice President draft',
+      'Prepared for President or Advisor review.',
+      10,
+      'draft'
+    )$$,
+  'Vice Presidents can prepare assignment drafts'
+);
+SELECT is(
+  (SELECT count(*) FROM public.get_club_assignment_submission_statuses(
+    'a3000000-0000-4000-8000-000000000001'
+  )),
+  1::BIGINT,
+  'Vice Presidents can track submission status without opening private work'
+);
+SELECT lives_ok(
+  $$SELECT public.set_club_event_attendance(
+    'a2000000-0000-4000-8000-000000000001',
+    '10000000-0000-4000-8000-000000000001',
+    'present'
+  )$$,
+  'Vice Presidents can record event attendance'
 );
 RESET ROLE;
 

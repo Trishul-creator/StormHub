@@ -15,10 +15,11 @@ import { cn } from "@/lib/cn";
 interface ContentFormProps {
   type: "announcement" | "event" | "resource" | "opportunity";
   clubSlug?: string;
+  canPublish?: boolean;
   className?: string;
 }
 
-export function ContentForm({ type, clubSlug, className }: ContentFormProps) {
+export function ContentForm({ type, clubSlug, canPublish = true, className }: ContentFormProps) {
   const [loading, setLoading] = useState(false);
   const [importance, setImportance] = useState<NotificationImportance>("normal");
   const [sendEmail, setSendEmail] = useState(false);
@@ -71,7 +72,16 @@ export function ContentForm({ type, clubSlug, className }: ContentFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className={cn("space-y-4 rounded-xl border bg-white p-6", className)}>
+    <form onSubmit={handleSubmit} className={cn("space-y-4 rounded-xl border bg-card p-6", className)}>
+      {!canPublish && clubSlug && (
+        <div className="rounded-xl border border-amber-300/70 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-700/70 dark:bg-amber-950/40 dark:text-amber-100">
+          <p className="font-semibold">This will be saved for review</p>
+          <p className="mt-1 text-amber-800 dark:text-amber-200">
+            Vice Presidents can prepare drafts. Presidents may publish announcements and resources,
+            while an Advisor must approve club events.
+          </p>
+        </div>
+      )}
       <div>
         <Label htmlFor="title">Title</Label>
         <Input id="title" name="title" required className="mt-1" />
@@ -179,7 +189,7 @@ export function ContentForm({ type, clubSlug, className }: ContentFormProps) {
           </div>
         </>
       )}
-      {type === "announcement" && (
+      {type === "announcement" && canPublish && (
         <fieldset className="rounded-xl border bg-storm-light/20 p-4">
           <legend className="px-1 text-sm font-medium text-storm-navy">Release timing</legend>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -241,29 +251,35 @@ export function ContentForm({ type, clubSlug, className }: ContentFormProps) {
                 if (next === "normal") setSendEmail(false);
                 if (next === "urgent") setSendEmail(true);
               }}
-              className="mt-1 h-10 w-full rounded-md border bg-white px-3 text-sm"
+              className="mt-1 h-10 w-full rounded-md border bg-card px-3 text-sm"
             >
               <option value="normal">Normal — in-app only</option>
               <option value="important">Important — email optional</option>
               <option value="urgent">Urgent — email by default</option>
             </select>
           </div>
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              name="send_email_to_members"
-              checked={sendEmail}
-              onChange={(event) => setSendEmail(event.target.checked)}
-              disabled={importance === "normal"}
-              className="mt-1 h-4 w-4"
-            />
-            <span>
-              <span className="font-medium">Queue email notification</span>
-              <span className="block text-xs text-muted-foreground">
-                Normal announcements create in-app notifications only. Use email only for important changes.
+          {canPublish ? (
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="send_email_to_members"
+                checked={sendEmail}
+                onChange={(event) => setSendEmail(event.target.checked)}
+                disabled={importance === "normal"}
+                className="mt-1 h-4 w-4"
+              />
+              <span>
+                <span className="font-medium">Queue email notification</span>
+                <span className="block text-xs text-muted-foreground">
+                  Normal announcements create in-app notifications only. Use email only for important changes.
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Notifications are sent only after an authorized club leader publishes this draft.
+            </p>
+          )}
           {type === "event" && importance === "urgent" && (
             <p className="text-xs text-red-700">
               Urgent is appropriate for cancellations or major time/location changes.

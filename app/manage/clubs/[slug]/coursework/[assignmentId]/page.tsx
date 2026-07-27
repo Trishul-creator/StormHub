@@ -19,11 +19,16 @@ import { AssignmentAttachmentsManager } from "@/components/coursework/assignment
 import {
   getClubAssignment,
   getClubAssignmentSubmissions,
+  getClubAssignmentSubmissionStatuses,
   getClubMemberDirectory,
   getManagedClubBySlug,
 } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
-import { canManageClubCoursework } from "@/lib/permissions";
+import {
+  canGradeClubCoursework,
+  canManageClubCoursework,
+  canPublishClubCoursework,
+} from "@/lib/permissions";
 import { formatDateTime } from "@/lib/utils";
 
 interface AssignmentReviewPageProps {
@@ -38,18 +43,26 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
   if (!canManageClubCoursework(profile, club, membership)) {
     redirect(`/manage/clubs/${slug}?error=coursework_permission_required`);
   }
+  const canPublish = canPublishClubCoursework(profile, club, membership);
+  const canGrade = canGradeClubCoursework(profile, club, membership);
 
-  const [assignment, submissions, directory] = await Promise.all([
+  const [assignment, submissionStatuses, submissions, directory] = await Promise.all([
     getClubAssignment(assignmentId),
-    getClubAssignmentSubmissions(assignmentId),
+    getClubAssignmentSubmissionStatuses(assignmentId),
+    canGrade ? getClubAssignmentSubmissions(assignmentId) : Promise.resolve([]),
     getClubMemberDirectory(club.id),
   ]);
   if (!assignment || assignment.club_id !== club.id) notFound();
 
   const studentMembers = directory.filter((member) => member.membership_role !== "sponsor");
-  const submittedIds = new Set(submissions.map((submission) => submission.student_id));
+  const submittedIds = new Set(
+    submissionStatuses
+      .filter((entry) => Boolean(entry.submission_id))
+      .map((entry) => entry.user_id)
+  );
   const missingMembers = studentMembers.filter((member) => !submittedIds.has(member.user_id));
-  const returnedCount = submissions.filter((submission) => submission.status === "returned").length;
+  const returnedCount = submissionStatuses.filter((entry) => entry.submission_status === "returned").length;
+  const submittedCount = submissionStatuses.filter((entry) => Boolean(entry.submission_id)).length;
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-8">
@@ -72,7 +85,9 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
             {assignment.due_at ? `Due ${formatDateTime(assignment.due_at)}` : "No due date"}
           </p>
         </div>
-        <AssignmentStatusActions clubSlug={slug} assignmentId={assignment.id} status={assignment.status} />
+        {canPublish && (
+          <AssignmentStatusActions clubSlug={slug} assignmentId={assignment.id} status={assignment.status} />
+        )}
       </div>
 
       <div className="mb-8 grid gap-4 sm:grid-cols-3">
@@ -80,7 +95,7 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
         <SummaryCard
           icon={FileCheck2}
           label={assignment.submission_mode === "completion" ? "Completed" : "Turned in"}
-          value={submissions.length}
+          value={submittedCount}
         />
         <SummaryCard icon={CheckCircle2} label="Graded" value={returnedCount} />
       </div>
@@ -116,6 +131,7 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
         </CardContent>
       </Card>
 
+      {canGrade ? (
       <section>
         <div className="mb-4">
           <h2 className="text-xl font-semibold text-storm-navy">Student work</h2>
@@ -125,13 +141,13 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
         </div>
 
         {submissions.length === 0 ? (
-          <div className="rounded-xl border border-dashed bg-white p-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-xl border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
             No submissions yet.
           </div>
         ) : (
           <div className="space-y-5">
             {submissions.map((submission) => (
-              <article key={submission.id} className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+              <article key={submission.id} className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <div className="p-5">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
@@ -206,9 +222,45 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
           </div>
         )}
       </section>
+      ) : (
+        <section>
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold text-storm-navy">Submission tracker</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Presidents and Vice Presidents can track status, but only the Advisor can open
+              private work, assign grades, or read private feedback.
+            </p>
+          </div>
+          <div className="overflow-hidden rounded-xl border bg-card">
+            {submissionStatuses.map((entry) => (
+              <div
+                key={entry.user_id}
+                className="flex flex-col gap-2 border-b p-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="font-medium text-storm-navy">{entry.full_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {entry.submitted_at ? formatDateTime(entry.submitted_at) : "No submission yet"}
+                  </p>
+                </div>
+                <span className="w-fit rounded-full bg-storm-light/60 px-2.5 py-1 text-xs font-medium capitalize text-storm-blue">
+                  {entry.submission_status === "returned"
+                    ? "Returned"
+                    : entry.submission_id
+                      ? assignment.submission_mode === "completion" ? "Completed" : "Turned in"
+                      : assignment.submission_mode === "completion" ? "Not completed" : "Not turned in"}
+                </span>
+              </div>
+            ))}
+            {submissionStatuses.length === 0 && (
+              <p className="p-8 text-center text-sm text-muted-foreground">No student members yet.</p>
+            )}
+          </div>
+        </section>
+      )}
 
       {missingMembers.length > 0 && (
-        <section className="mt-8 rounded-2xl border bg-white p-5">
+        <section className="mt-8 rounded-2xl border bg-card p-5">
           <h2 className="font-semibold text-storm-navy">
             {assignment.submission_mode === "completion" ? "Not completed" : "Not turned in"}
           </h2>

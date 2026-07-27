@@ -10,17 +10,21 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { clubRoleLabel } from "@/lib/club-roles";
+import type { MembershipRole } from "@/types/database";
 
 interface ClubManagementNavigationProps {
   clubName: string;
   slug: string;
   canManageRoster: boolean;
+  membershipRole?: MembershipRole | null;
 }
 
 export function ClubManagementNavigation({
   clubName,
   slug,
   canManageRoster,
+  membershipRole,
 }: ClubManagementNavigationProps) {
   const pathname = usePathname();
   const baseHref = `/manage/clubs/${slug}`;
@@ -54,6 +58,9 @@ export function ClubManagementNavigation({
               Club workspace
             </p>
             <p className="truncate font-semibold text-storm-navy">{clubName}</p>
+            <p className="text-xs text-muted-foreground">
+              {membershipRole ? clubRoleLabel(membershipRole) : "Administrator"}
+            </p>
           </div>
           <Link
             href={`/clubs/${slug}/member`}

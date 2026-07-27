@@ -13,11 +13,17 @@ export function RosterMemberActions({
   userId,
   currentRole,
   disabled,
+  canAssignLeadership,
+  canBan,
+  canRemove = true,
 }: {
   clubId: string;
   userId: string;
   currentRole: MembershipRole;
   disabled?: boolean;
+  canAssignLeadership: boolean;
+  canBan: boolean;
+  canRemove?: boolean;
 }) {
   const [role, setRole] = useState<MembershipRole>(currentRole);
   const [pending, startTransition] = useTransition();
@@ -63,26 +69,34 @@ export function RosterMemberActions({
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
-      <select
-        value={role}
-        onChange={(event) => setRole(event.target.value as MembershipRole)}
-        disabled={disabled || pending}
-        className="h-8 rounded-md border bg-white px-2 text-xs"
-      >
-        <option value="member">Member</option>
-        <option value="officer">Officer</option>
-        <option value="president">President</option>
-      </select>
-      <Button size="sm" variant="outline" onClick={save} disabled={disabled || pending}>
-        {pending && <Loader2 className="h-3 w-3 animate-spin" />}
-        Save
-      </Button>
-      <Button size="sm" variant="destructive" onClick={remove} disabled={disabled || pending}>
-        <Trash2 className="h-3 w-3" /> Remove
-      </Button>
-      <Button size="sm" variant="destructive" onClick={ban} disabled={disabled || pending}>
-        Ban
-      </Button>
+      {canAssignLeadership && (
+        <>
+          <select
+            value={role}
+            onChange={(event) => setRole(event.target.value as MembershipRole)}
+            disabled={disabled || pending}
+            className="h-8 rounded-md border bg-card px-2 text-xs"
+          >
+            <option value="member">Member</option>
+            <option value="officer">Vice President</option>
+            <option value="president">President</option>
+          </select>
+          <Button size="sm" variant="outline" onClick={save} disabled={disabled || pending || role === currentRole}>
+            {pending && <Loader2 className="h-3 w-3 animate-spin" />}
+            Save
+          </Button>
+        </>
+      )}
+      {canRemove && (
+        <Button size="sm" variant="destructive" onClick={remove} disabled={disabled || pending}>
+          <Trash2 className="h-3 w-3" /> Remove
+        </Button>
+      )}
+      {canBan && (
+        <Button size="sm" variant="destructive" onClick={ban} disabled={disabled || pending}>
+          Ban
+        </Button>
+      )}
     </div>
   );
 }

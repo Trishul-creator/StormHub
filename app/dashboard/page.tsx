@@ -95,7 +95,7 @@ export default async function DashboardPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-storm-navy">
-          {manageableClubs.length ? "Student Officer Dashboard" : "Your Dashboard"}
+          {manageableClubs.length ? "Student Leader Dashboard" : "Your Dashboard"}
         </h1>
         <p className="mt-1 text-muted-foreground">Your clubs, events, and opportunities at a glance.</p>
       </div>

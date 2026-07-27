@@ -13,7 +13,7 @@ export default async function ApprovalsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <PageHeader title="Approval Queue" description="Review pending content from club officers." />
+      <PageHeader title="Approval Queue" description="Review pending content from club leaders." />
       <div className="space-y-3">
         {pendingItems.map((item) => (
           <div key={item.id} className="flex items-center justify-between rounded-xl border p-4">

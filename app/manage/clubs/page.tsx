@@ -16,7 +16,7 @@ export default async function ManageClubsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <PageHeader title="Manage Clubs" description="Published clubs you can manage as an officer, sponsor, or administrator.">
+      <PageHeader title="Manage Clubs" description="Published clubs you can manage as a President, Vice President, Advisor, or administrator.">
         {(profile.role === "teacher" || isAdminRole(profile.role)) && (
           <Button variant="outline" asChild>
             <Link href="/manage/clubs/drafts"><FilePenLine className="h-4 w-4" /> Draft clubs</Link>

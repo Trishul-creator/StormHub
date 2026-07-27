@@ -100,7 +100,7 @@ export function DraftClubCatalog({
           )}
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Templates are private and inactive. Review the sponsor and details before publishing one for your school.
+          Templates are private and inactive. Review the Advisor and details before publishing one for your school.
         </p>
       </div>
 
