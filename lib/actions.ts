@@ -2725,6 +2725,7 @@ export async function completeGoogleOnboarding(input: {
 export async function supabaseSignUp(
   email: string,
   password: string,
+  confirmPassword: string,
   fullName: string,
   gradeLevel?: number | null,
   accessCode?: string,
@@ -2741,6 +2742,9 @@ export async function supabaseSignUp(
   }
   if (password.length < 12) {
     return { success: false, error: "Password must be at least 12 characters." };
+  }
+  if (password !== confirmPassword) {
+    return { success: false, error: "Passwords do not match." };
   }
   if (requiredAccessCode && accessCode?.trim() !== requiredAccessCode) {
     return { success: false, error: "Enter the correct school signup code." };

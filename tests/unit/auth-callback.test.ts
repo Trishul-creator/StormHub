@@ -102,6 +102,25 @@ describe("email verification callback", () => {
     expect(response.headers.get("location")).toBe("https://stormhubapp.com/dashboard");
   });
 
+  it("continues password recovery to the reset form after exchanging the email code", async () => {
+    exchangeCodeForSession.mockResolvedValue({
+      data: {
+        user: {
+          id: "user-1",
+          email: "student@example.edu",
+          user_metadata: { full_name: "Test Student" },
+        },
+      },
+      error: null,
+    });
+
+    const response = await GET(new Request(
+      "https://stormhubapp.com/auth/callback?code=recovery-code&next=%2Fauth%2Freset-password"
+    ));
+
+    expect(response.headers.get("location")).toBe("https://stormhubapp.com/auth/reset-password");
+  });
+
   it("returns to sign in when the confirmation code cannot be exchanged", async () => {
     exchangeCodeForSession.mockResolvedValue({
       data: { user: null },
@@ -110,7 +129,9 @@ describe("email verification callback", () => {
 
     const response = await GET(new Request("https://stormhubapp.com/auth/callback?code=expired"));
 
-    expect(response.headers.get("location")).toBe("https://stormhubapp.com/auth/sign-in");
+    expect(response.headers.get("location")).toBe(
+      "https://stormhubapp.com/auth/sign-in?error=invalid_or_expired_link"
+    );
     expect(mocks.createProfileIfMissing).not.toHaveBeenCalled();
   });
 });

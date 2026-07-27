@@ -124,6 +124,7 @@ API-key restrictions, and pilot test steps.
 Enabled core surfaces:
 
 - Clubs and membership
+- Searchable school draft-club catalog with shared starter templates
 - Club announcements
 - Club events/calendar
 - Club resources
@@ -136,6 +137,7 @@ Enabled core surfaces:
 - Immutable administrative audit log
 - School admin/user/role management
 - Super-admin school workspace creation
+- Email/password confirmation, password recovery, and Google sign-in
 - Optional AI assistant, disabled until district approval
 
 Roles:

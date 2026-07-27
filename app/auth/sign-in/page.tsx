@@ -12,6 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import { Zap } from "lucide-react";
 import { Captcha } from "@/components/auth/captcha";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
+import { PasswordInput } from "@/components/auth/password-input";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -20,7 +21,19 @@ export default function SignInPage() {
   const googleAuthEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("error") === "google_sign_in_failed") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("password_updated") === "1") {
+      toast({
+        title: "Password updated",
+        description: "Sign in with your new password.",
+      });
+    } else if (params.get("error") === "invalid_or_expired_link") {
+      toast({
+        title: "Link unavailable",
+        description: "That email link is invalid or expired. Request a new one and try again.",
+        variant: "destructive",
+      });
+    } else if (params.get("error") === "google_sign_in_failed") {
       toast({
         title: "Google sign-in failed",
         description: "Google could not finish signing you in. Please try again.",
@@ -78,7 +91,18 @@ export default function SignInPage() {
             </div>
             <div>
               <Label htmlFor="password">Password</Label>
-              <Input id="password" name="password" type="password" required className="mt-1" />
+              <PasswordInput
+                id="password"
+                name="password"
+                required
+                autoComplete="current-password"
+                className="mt-1"
+              />
+              <div className="mt-2 text-right">
+                <Link href="/auth/forgot-password" className="text-sm text-storm-electric underline underline-offset-2">
+                  Forgot password?
+                </Link>
+              </div>
             </div>
             <Captcha onToken={setCaptchaToken} />
             <Button type="submit" className="w-full" disabled={loading}>

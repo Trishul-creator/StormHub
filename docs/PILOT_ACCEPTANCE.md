@@ -17,6 +17,7 @@ Record a result and evidence for every item before inviting pilot users.
 On one district-managed Chromebook and one physical phone:
 
 - Create and confirm a student account with hCaptcha and an allowed school domain.
+- Request a password reset, open the emailed link, set matching passwords, and sign in with the new password.
 - Reject a personal-domain signup and a missing CAPTCHA.
 - Join/leave a club, RSVP/remove RSVP, bookmark/remove bookmark.
 - Open school calendar and opportunity filters.
@@ -35,6 +36,7 @@ On one district-managed Chromebook and one physical phone:
 - Suspend/reactivate a test student and confirm session/access behavior.
 - Run graduation cleanup only against staging test users.
 - Approve/reject content and verify actor, reason, and time in the audit log.
+- Search and filter the shared draft catalog, publish one template, and confirm it is visible only in that school.
 - Submit, review, export, and complete a test deletion request.
 
 ## Operations

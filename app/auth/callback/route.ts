@@ -32,6 +32,8 @@ export async function GET(request: Request) {
   const signIn = new URL("/auth/sign-in", origin);
   if (searchParams.get("error")) {
     signIn.searchParams.set("error", "google_sign_in_failed");
+  } else if (code) {
+    signIn.searchParams.set("error", "invalid_or_expired_link");
   }
   return NextResponse.redirect(signIn);
 }

@@ -158,6 +158,15 @@ describe("supabaseSignUp", () => {
       error: "Too many verification emails have been requested. Wait a few minutes before trying again.",
     });
   });
+
+  it("rejects mismatched password confirmation before contacting Auth", async () => {
+    const { signUp } = setupClients();
+
+    const result = await submitSignup("Student@Example.edu", "DifferentPassword123");
+
+    expect(result).toEqual({ success: false, error: "Passwords do not match." });
+    expect(signUp).not.toHaveBeenCalled();
+  });
 });
 
 type QueryResult = {
@@ -228,10 +237,11 @@ function setupClients(input: {
   return { admin, authClient, deleteUser, signOut, signUp };
 }
 
-function submitSignup(email = "Student@Example.edu") {
+function submitSignup(email = "Student@Example.edu", confirmPassword = "StrongPassword123") {
   return supabaseSignUp(
     email,
     "StrongPassword123",
+    confirmPassword,
     "Test Student",
     10,
     "",

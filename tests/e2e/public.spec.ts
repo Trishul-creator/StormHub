@@ -19,6 +19,13 @@ test.describe("public platform surfaces", () => {
     await expect(page.getByRole("link", { name: "stormhubsupport@gmail.com" })).toBeVisible();
   });
 
+  test("sign in exposes password recovery", async ({ page }) => {
+    await page.goto("/auth/sign-in");
+    await page.getByRole("link", { name: "Forgot password?" }).click();
+    await expect(page).toHaveURL(/\/auth\/forgot-password$/);
+    await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible();
+  });
+
   test("public responses include security headers and hide framework details", async ({ request }) => {
     const response = await request.get("/");
     expect(response.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
