@@ -30,9 +30,11 @@ export default async function DashboardPage() {
     });
     return (
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-storm-navy">Teacher Dashboard</h1>
-        <p className="mt-1 text-muted-foreground">Manage your assigned clubs, coursework, rosters, events, and announcements.</p>
-        <div className="mt-6">
+        <div data-tour="role-overview">
+          <h1 className="text-3xl font-bold text-storm-navy">Teacher Dashboard</h1>
+          <p className="mt-1 text-muted-foreground">Manage your assigned clubs, coursework, rosters, events, and announcements.</p>
+        </div>
+        <div className="mt-6" data-tour="role-checklist">
           <RoleChecklist
             title="Teacher launch checklist"
             description="The fastest path to keeping club operations current."
@@ -45,7 +47,7 @@ export default async function DashboardPage() {
           <DashboardMetric label="Assigned clubs" value={manageableClubs.length} icon={Users} />
           {pending.length > 0 && <DashboardMetric label="Pending approvals" value={pending.length} icon={CheckSquare} />}
         </div>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-tour="managed-clubs">
           <DashboardLink
             href="/manage"
             title="My clubs command center"
@@ -93,14 +95,14 @@ export default async function DashboardPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
+      <div className="mb-8" data-tour="role-overview">
         <h1 className="text-3xl font-bold text-storm-navy">
           {manageableClubs.length ? "Student Leader Dashboard" : "Your Dashboard"}
         </h1>
         <p className="mt-1 text-muted-foreground">Your clubs, events, and opportunities at a glance.</p>
       </div>
 
-      <div className="mb-8">
+      <div className="mb-8" data-tour="role-checklist">
         <RoleChecklist
           title={officerMemberships.length ? "New club leader checklist" : "Student launch checklist"}
           description={
@@ -154,12 +156,13 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
-        <DashboardCard
-          title="Your clubs"
-          action={dashboard.memberships.length > 0
-            ? <Button variant="ghost" size="sm" asChild><Link href="/my-clubs">View all</Link></Button>
-            : undefined}
-        >
+        <div data-tour="student-clubs">
+          <DashboardCard
+            title="Your clubs"
+            action={dashboard.memberships.length > 0
+              ? <Button variant="ghost" size="sm" asChild><Link href="/my-clubs">View all</Link></Button>
+              : undefined}
+          >
           {dashboard.memberships.length === 0 ? (
             <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed bg-storm-light/20 p-5">
               <div>
@@ -181,9 +184,11 @@ export default async function DashboardPage() {
               ))}
             </div>
           )}
-        </DashboardCard>
+          </DashboardCard>
+        </div>
 
-        <DashboardCard title="Upcoming classwork">
+        <div data-tour="student-classwork">
+          <DashboardCard title="Upcoming classwork">
           {dashboard.upcomingAssignments.length === 0 ? (
             <p className="text-sm text-muted-foreground">No current assignments from your clubs.</p>
           ) : (
@@ -207,7 +212,8 @@ export default async function DashboardPage() {
               ))}
             </div>
           )}
-        </DashboardCard>
+          </DashboardCard>
+        </div>
 
         <DashboardCard title="Recent announcements">
           {dashboard.recentAnnouncements.length === 0 ? (

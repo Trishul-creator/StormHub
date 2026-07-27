@@ -77,6 +77,14 @@ export function Navbar({
     if (role === "super_admin" && href === primaryHref && pathname.startsWith("/admin")) return true;
     return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
   };
+  const tourTargetForLink = (href: string, label: string) => {
+    if (href === primaryHref) return "primary-nav";
+    if (label === "Clubs") return "clubs-nav";
+    if (label === "Calendar") return "calendar-nav";
+    if (label === "Opportunities") return "opportunities-nav";
+    if (label === "Administration") return "administration-nav";
+    return undefined;
+  };
 
   async function handleSignOut() {
     if (isDemoMode) await demoSignOut();
@@ -88,7 +96,7 @@ export function Navbar({
   return (
     <header className="sticky top-0 z-50 border-b bg-card/95 shadow-sm transition-shadow duration-300 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <Link href="/" className="group flex items-center gap-2 font-bold text-storm-navy">
+        <Link href="/" data-tour="brand" className="group flex items-center gap-2 font-bold text-storm-navy">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-storm-gradient shadow-sm transition-[transform,box-shadow] duration-300 group-hover:rotate-3 group-hover:scale-105 group-hover:shadow-md motion-reduce:transform-none">
             <Zap className="h-4 w-4 text-white" />
           </div>
@@ -100,6 +108,7 @@ export function Navbar({
             <Link
               key={link.href}
               href={link.href}
+              data-tour={tourTargetForLink(link.href, link.label)}
               aria-current={isActivePath(link.href) ? "page" : undefined}
               className={cn(
                 "relative py-2 text-sm font-medium transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:origin-left after:rounded-full after:bg-storm-electric after:transition-transform after:duration-200 hover:text-storm-electric hover:after:scale-x-100",
@@ -121,14 +130,19 @@ export function Navbar({
               </Button>
               {canManage && role !== "super_admin" && primaryHref !== "/manage" && (
                 <Button variant="ghost" size="sm" asChild>
-                  <Link href="/manage"><Shield className="h-4 w-4 mr-1" />Manage</Link>
+                  <Link href="/manage" data-tour="manage-nav"><Shield className="h-4 w-4 mr-1" />Manage</Link>
                 </Button>
               )}
-              <NotificationBell notifications={notifications} unreadCount={unreadNotificationCount} />
-              <ThemeToggle />
+              <span data-tour="notifications" className="inline-flex">
+                <NotificationBell notifications={notifications} unreadCount={unreadNotificationCount} />
+              </span>
+              <span data-tour="appearance" className="inline-flex">
+                <ThemeToggle />
+              </span>
               <Button variant="ghost" size="sm" asChild>
                 <Link
                   href="/settings"
+                  data-tour="settings"
                   aria-label="Settings"
                   aria-current={isActivePath("/settings") ? "page" : undefined}
                   className={isActivePath("/settings") ? "bg-storm-light/70 text-storm-electric" : undefined}
@@ -153,7 +167,7 @@ export function Navbar({
           )}
         </div>
 
-        <button className="rounded-lg p-2 transition-colors hover:bg-storm-light/60 lg:hidden" onClick={() => setOpen(!open)} aria-label="Toggle menu" aria-expanded={open}>
+        <button data-tour="mobile-menu" className="rounded-lg p-2 transition-colors hover:bg-storm-light/60 lg:hidden" onClick={() => setOpen(!open)} aria-label="Toggle menu" aria-expanded={open}>
           {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
       </div>
@@ -165,6 +179,7 @@ export function Navbar({
               <Link
                 key={link.href}
                 href={link.href}
+                data-tour={tourTargetForLink(link.href, link.label)}
                 aria-current={isActivePath(link.href) ? "page" : undefined}
                 className={cn(
                   "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
@@ -178,14 +193,15 @@ export function Navbar({
             <hr className="my-2" />
             {isLoggedIn ? (
               <>
-                <ThemeToggle showLabel />
+                <span data-tour="appearance"><ThemeToggle showLabel /></span>
                 <Link href="/search" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Search</Link>
-                {canManage && role !== "super_admin" && primaryHref !== "/manage" && <Link href="/manage" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Manage</Link>}
-                <Link href="/notifications" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>
+                {canManage && role !== "super_admin" && primaryHref !== "/manage" && <Link href="/manage" data-tour="manage-nav" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Manage</Link>}
+                <Link href="/notifications" data-tour="notifications" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>
                   Notifications{unreadNotificationCount > 0 ? ` (${unreadNotificationCount})` : ""}
                 </Link>
                 <Link
                   href="/settings"
+                  data-tour="settings"
                   aria-current={isActivePath("/settings") ? "page" : undefined}
                   className={cn(
                     "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
