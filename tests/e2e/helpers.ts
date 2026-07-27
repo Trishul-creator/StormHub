@@ -40,7 +40,9 @@ export async function signIn(page: Page, role: E2ERole) {
   if (!credentials) throw new Error(`Missing E2E credentials for ${role}.`);
   await page.goto("/auth/sign-in");
   await page.getByLabel(/email/i).fill(credentials.email);
-  await page.getByLabel(/password/i).fill(credentials.password);
+  await page
+    .getByRole("textbox", { name: "Password", exact: true })
+    .fill(credentials.password);
   await page.getByRole("button", { name: /sign in/i }).click();
 
   const signInError = page
