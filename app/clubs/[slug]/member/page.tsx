@@ -25,6 +25,7 @@ import { MemberBlocked } from "@/components/clubs/member-blocked";
 import { canManageClub } from "@/lib/permissions";
 import { getSchoolById } from "@/lib/schools";
 import type { ClubMemberDirectoryEntry } from "@/types/database";
+import { clubRoleLabel } from "@/lib/club-roles";
 
 type WorkspaceView = "stream" | "classwork" | "people";
 
@@ -143,7 +144,7 @@ export default async function MemberClubPage({ params, searchParams }: MemberPag
           {assignments.length === 0 ? (
             <EmptyState
               title="No classwork yet"
-              description="Assignments from the club sponsor will appear here."
+              description="Assignments from club leadership will appear here."
             />
           ) : (
             <div className="motion-stagger grid gap-5 lg:grid-cols-2">
@@ -331,10 +332,10 @@ function PeopleView({ directory }: { directory: ClubMemberDirectoryEntry[] }) {
 
       <div className="space-y-8">
         <DirectoryGroup
-          title="Sponsors"
+          title="Advisors"
           icon={ShieldCheck}
           members={sponsors}
-          emptyMessage="No sponsor is currently listed."
+          emptyMessage="No Advisor is currently listed."
         />
         {studentLeaders.length > 0 && (
           <DirectoryGroup title="Student leaders" icon={Users} members={studentLeaders} />
@@ -381,7 +382,7 @@ function DirectoryGroup({
                 <div className="min-w-0">
                   <p className="truncate font-medium text-storm-navy">{member.full_name}</p>
                   <p className="text-xs capitalize text-muted-foreground">
-                    {member.membership_role.replaceAll("_", " ")}
+                    {clubRoleLabel(member.membership_role)}
                   </p>
                 </div>
               </CardContent>

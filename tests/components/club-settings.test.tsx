@@ -61,6 +61,6 @@ describe("club publication settings", () => {
 
     expect(screen.getByLabelText("Status")).toBeVisible();
     expect(screen.getByLabelText("Featured")).toBeVisible();
-    expect(screen.getByLabelText("Teacher sponsor")).toBeVisible();
+    expect(screen.getByLabelText("Club Advisor")).toBeVisible();
   });
 });

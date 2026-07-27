@@ -90,13 +90,15 @@ export default async function AdminSchoolsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <PageHeader
-        title="Platform Admin"
-        description="Choose a school workspace before viewing or managing school-specific content."
-      />
+      <div data-tour="role-overview">
+        <PageHeader
+          title="Platform Admin"
+          description="Choose a school workspace before viewing or managing school-specific content."
+        />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        <div className="space-y-4">
+        <div className="space-y-4" data-tour="school-workspaces">
           {schools.map((school) => {
             const schoolStats = stats[school.id] ?? emptySchoolStats;
             return (

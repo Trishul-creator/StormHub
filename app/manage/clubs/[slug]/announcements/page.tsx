@@ -5,7 +5,8 @@ import { notFound } from "next/navigation";
 import { StatusBadge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/utils";
 import { ArchiveContentButton } from "@/components/manage/archive-content-button";
-import { canApproveClubContent, canManageClubCoursework } from "@/lib/permissions";
+import { ApprovalActions } from "@/components/manage/approval-actions";
+import { canApproveClubContent, canManageClubCoursework, canPublishClubContent } from "@/lib/permissions";
 import type { ClubAnnouncement } from "@/types/database";
 import { ClubCreateNavigation } from "@/components/manage/club-create-navigation";
 import { ContentForm } from "@/components/forms/content-form";
@@ -21,6 +22,7 @@ export default async function ManageAnnouncementsPage({ params }: PageProps) {
   const auth = await requireClubManager(club);
   const announcements = (await getClubManagedContent(club.id, "announcement")) as ClubAnnouncement[];
   const canDelete = canApproveClubContent(auth.profile, club, auth.membership);
+  const canPublish = canPublishClubContent(auth.profile, club, auth.membership, "announcement");
   const courseworkEnabled = canManageClubCoursework(auth.profile, club, auth.membership);
 
   return (
@@ -31,7 +33,7 @@ export default async function ManageAnnouncementsPage({ params }: PageProps) {
         activeType="announcement"
         courseworkEnabled={courseworkEnabled}
       />
-      <ContentForm type="announcement" clubSlug={slug} />
+      <ContentForm type="announcement" clubSlug={slug} canPublish={canPublish} />
       <section className="mt-8 rounded-xl border bg-card p-5 shadow-sm">
         <h2 className="font-semibold text-storm-navy">Previous announcements</h2>
         <div className="mt-4 space-y-3">
@@ -50,7 +52,12 @@ export default async function ManageAnnouncementsPage({ params }: PageProps) {
                       : `Posted ${formatDateTime(announcement.published_at ?? announcement.created_at)}`}
                   </p>
                 </div>
-                {canDelete && <ArchiveContentButton id={announcement.id} type="announcement" />}
+                <div className="flex flex-wrap justify-end gap-2">
+                  {canPublish && announcement.status === "pending" && (
+                    <ApprovalActions id={announcement.id} type="announcement" />
+                  )}
+                  {canDelete && <ArchiveContentButton id={announcement.id} type="announcement" />}
+                </div>
               </div>
             </div>
           ))}

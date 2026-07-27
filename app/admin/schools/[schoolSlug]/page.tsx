@@ -64,7 +64,7 @@ export default async function AdminSchoolPage({ params }: AdminSchoolPageProps) 
             "Create or review clubs",
             "Publish clubs that are ready",
             "Create dated club meetings as events",
-            "Assign sponsors and officers",
+            "Assign Advisors and student leaders",
             "Add initial opportunities",
             "Test student signup and join flow",
             "Share launch link",

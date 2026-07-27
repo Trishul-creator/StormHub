@@ -129,6 +129,28 @@ describe("club coursework controls", () => {
     });
   });
 
+  it("keeps Vice President assignments in draft review", async () => {
+    render(<AssignmentForm clubSlug="science-bowl" canPublish={false} />);
+
+    expect(screen.getByText(/Vice Presidents can prepare assignment drafts/i)).toBeVisible();
+    expect(screen.queryByRole("radio", { name: /^schedule/i })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Assignment title"), {
+      target: { value: "Member reflection" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save draft/i }));
+
+    await waitFor(() => {
+      expect(createClubAssignment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clubSlug: "science-bowl",
+          title: "Member reflection",
+          publishNow: false,
+          scheduledFor: null,
+        })
+      );
+    });
+  });
+
   it("schedules an announcement instead of notifying members immediately", async () => {
     vi.mocked(submitContent).mockResolvedValue({ success: true, approved: true, scheduled: true });
     render(<ContentForm type="announcement" clubSlug="science-bowl" />);
@@ -146,6 +168,30 @@ describe("club coursework controls", () => {
         expect.objectContaining({
           type: "announcement",
           release_at: "2099-01-02T09:30",
+        })
+      );
+    });
+  });
+
+  it("keeps Vice President announcements in the approval workflow", async () => {
+    vi.mocked(submitContent).mockResolvedValue({ success: true, approved: false });
+    render(<ContentForm type="announcement" clubSlug="science-bowl" canPublish={false} />);
+
+    expect(screen.getByText(/Vice Presidents can prepare drafts/i)).toBeVisible();
+    expect(screen.queryByRole("radio", { name: /schedule for later/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("Queue email notification")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Prepared update" } });
+    fireEvent.change(screen.getByLabelText("Content"), { target: { value: "Ready for review." } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Announcement" }));
+
+    await waitFor(() => {
+      expect(submitContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "announcement",
+          clubSlug: "science-bowl",
+          send_email_to_members: false,
+          release_at: undefined,
         })
       );
     });

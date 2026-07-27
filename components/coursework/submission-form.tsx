@@ -51,7 +51,7 @@ export function SubmissionForm({
     }
     toast({
       title: submission ? "Assignment resubmitted" : "Assignment turned in",
-      description: "Your club sponsor can now review your work.",
+      description: "Your club Advisor can now review your work.",
     });
     router.refresh();
   }

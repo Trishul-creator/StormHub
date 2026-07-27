@@ -15,12 +15,19 @@ import {
   canApproveClubContent,
   canDeleteUser,
   canEditRole,
+  canArchiveClub,
+  canAssignClubLeadership,
+  canBanClubMember,
   canManageClub,
   canManageClubPublication,
   canManageClubCoursework,
   canManageClubRoster,
+  canGradeClubCoursework,
+  canPublishClubContent,
+  canPublishClubCoursework,
   isAdminRole,
 } from "@/lib/permissions";
+import { clubRoleLabel, clubRoleRank } from "@/lib/club-roles";
 import type {
   ApprovalContentType,
   Club,
@@ -83,7 +90,7 @@ const DEMO_OPPORTUNITY_SIGNUPS_COOKIE = "stormhub_demo_opportunity_signups";
 const DEMO_READ_NOTIFICATIONS_COOKIE = "stormhub_demo_read_notifications";
 
 function formatMembershipRole(role: MembershipRole): string {
-  return role.replace(/_/g, " ");
+  return clubRoleLabel(role);
 }
 
 function userRoleRank(role: UserRole): number {
@@ -91,7 +98,7 @@ function userRoleRank(role: UserRole): number {
 }
 
 function membershipRoleRank(role: MembershipRole): number {
-  return { member: 1, officer: 2, president: 3, sponsor: 4 }[role];
+  return clubRoleRank(role);
 }
 
 function contentReviewLink(contentType: ApprovalContentType, content: Record<string, unknown> | null, club?: { slug: string } | null): string {
@@ -998,12 +1005,20 @@ export async function submitContent(data: {
     return { success: false, error: "Only an administrator can submit school-wide content." };
   }
 
-  const trustedPost =
-    isAdminRole(profile.role) ||
-    Boolean(club && canManageClub(profile, club, membership)) ||
-    (profile.role === "teacher" && membership?.role === "sponsor");
+  const canPublishClubPost = Boolean(
+    club
+    && data.type !== "opportunity"
+    && canPublishClubContent(profile, club, membership, data.type)
+  );
+  const trustedPost = isAdminRole(profile.role) || canPublishClubPost;
   let scheduledFor: string | null = null;
   if (data.type === "announcement" && data.release_at) {
+    if (!canPublishClubPost) {
+      return {
+        success: false,
+        error: "Only the club President, Advisor, or an administrator can schedule an announcement.",
+      };
+    }
     const parsedRelease = new Date(data.release_at);
     if (Number.isNaN(parsedRelease.getTime())) {
       return { success: false, error: "Choose a valid release date and time." };
@@ -1030,7 +1045,7 @@ export async function submitContent(data: {
       visibility: "members",
       status: contentStatus,
       importance: data.importance ?? "normal",
-      send_email_to_members: Boolean(data.send_email_to_members),
+      send_email_to_members: trustedPost && Boolean(data.send_email_to_members),
       published_at: publishedAt,
       scheduled_for: scheduledFor,
     };
@@ -1061,7 +1076,7 @@ export async function submitContent(data: {
       visibility: "public",
       status: contentStatus,
       importance: data.importance ?? "normal",
-      send_email_to_members: Boolean(data.send_email_to_members),
+      send_email_to_members: trustedPost && Boolean(data.send_email_to_members),
     };
   } else if (data.type === "resource") {
     if (!club) return { success: false, error: "A club is required." };
@@ -1101,7 +1116,7 @@ export async function submitContent(data: {
       visibility: "public",
       status: contentStatus,
       importance: data.importance ?? "normal",
-      send_email_to_members: Boolean(data.send_email_to_members),
+      send_email_to_members: trustedPost && Boolean(data.send_email_to_members),
       deadline_reminder_enabled: Boolean(data.deadline_reminder_enabled),
     };
   }
@@ -1126,6 +1141,10 @@ export async function submitContent(data: {
     await createApprovalNeededNotifications({
       schoolId: profile.school_id,
       clubId: club?.id ?? null,
+      clubMembershipRoles:
+        club && ["announcement", "resource"].includes(data.type)
+          ? ["sponsor", "president"]
+          : ["sponsor"],
       title: `${data.title} needs approval`,
       message: `${profile.full_name ?? profile.email ?? "A student"} submitted a ${data.type} and is waiting for review.`,
       link: "/manage/approvals",
@@ -1293,9 +1312,14 @@ async function getCourseworkManagerContext(clubSlug: string) {
     .eq("status", "active")
     .maybeSingle();
   if (!canManageClubCoursework(profile, club, membership as ClubMembership | null)) {
-    return { error: "Only the teacher sponsor or a school administrator can manage assignments." } as const;
+    return { error: "Only a club President, Vice President, Advisor, or administrator can manage assignments." } as const;
   }
-  return { supabase, profile, club, membership } as const;
+  return {
+    supabase,
+    profile,
+    club,
+    membership: membership as ClubMembership | null,
+  } as const;
 }
 
 export async function createClubAssignment(data: {
@@ -1308,7 +1332,14 @@ export async function createClubAssignment(data: {
   submissionMode?: "submission" | "completion";
   publishNow?: boolean;
   scheduledFor?: string | null;
-}): Promise<{ success: boolean; error?: string; assignmentId?: string }> {
+}): Promise<{
+  success: boolean;
+  error?: string;
+  assignmentId?: string;
+  published?: boolean;
+  scheduled?: boolean;
+  forcedDraft?: boolean;
+}> {
   if (isDemoMode()) return { success: true, assignmentId: "demo-assignment" };
   const context = await getCourseworkManagerContext(data.clubSlug);
   if ("error" in context) return { success: false, error: context.error };
@@ -1339,8 +1370,19 @@ export async function createClubAssignment(data: {
   if (data.attachmentUrl?.trim() && !attachmentUrl) {
     return { success: false, error: "The assignment link must be a valid http or https URL." };
   }
+  const canPublish = canPublishClubCoursework(
+    context.profile,
+    context.club,
+    context.membership
+  );
   let scheduledFor: string | null = null;
   if (data.scheduledFor) {
+    if (!canPublish) {
+      return {
+        success: false,
+        error: "Only the club President, Advisor, or an administrator can schedule an assignment.",
+      };
+    }
     const parsedRelease = new Date(data.scheduledFor);
     if (Number.isNaN(parsedRelease.getTime())) {
       return { success: false, error: "Choose a valid release date and time." };
@@ -1350,7 +1392,8 @@ export async function createClubAssignment(data: {
     }
     scheduledFor = parsedRelease.toISOString();
   }
-  const publishNow = data.publishNow !== false && !scheduledFor;
+  const requestedPublishNow = data.publishNow !== false && !scheduledFor;
+  const publishNow = canPublish && requestedPublishNow;
   const submissionMode = data.submissionMode === "completion" ? "completion" : "submission";
   const { data: assignment, error } = await context.supabase
     .from("club_assignments")
@@ -1386,7 +1429,13 @@ export async function createClubAssignment(data: {
   revalidatePath(`/manage/clubs/${context.club.slug}`);
   revalidatePath(`/manage/clubs/${context.club.slug}/coursework`);
   revalidatePath(`/clubs/${context.club.slug}/member`);
-  return { success: true, assignmentId: assignment.id };
+  return {
+    success: true,
+    assignmentId: assignment.id,
+    published: publishNow,
+    scheduled: Boolean(scheduledFor),
+    forcedDraft: requestedPublishNow && !canPublish,
+  };
 }
 
 export async function updateClubAssignmentStatus(data: {
@@ -1397,6 +1446,12 @@ export async function updateClubAssignmentStatus(data: {
   if (isDemoMode()) return { success: true };
   const context = await getCourseworkManagerContext(data.clubSlug);
   if ("error" in context) return { success: false, error: context.error };
+  if (!canPublishClubCoursework(context.profile, context.club, context.membership)) {
+    return {
+      success: false,
+      error: "Only the club President, Advisor, or an administrator can publish or close assignments.",
+    };
+  }
 
   const { data: existing } = await context.supabase
     .from("club_assignments")
@@ -1962,6 +2017,12 @@ export async function gradeClubAssignmentSubmission(data: {
   if (isDemoMode()) return { success: true };
   const context = await getCourseworkManagerContext(data.clubSlug);
   if ("error" in context) return { success: false, error: context.error };
+  if (!canGradeClubCoursework(context.profile, context.club, context.membership)) {
+    return {
+      success: false,
+      error: "Only the club Advisor or an administrator can grade submissions or change a returned grade.",
+    };
+  }
   const { data: submission } = await context.supabase
     .from("club_assignment_submissions")
     .select("id,student_id,assignment_id")
@@ -2355,8 +2416,10 @@ export async function updateClubMember(data: {
     .eq("status", "active")
     .maybeSingle();
   if (!canManageClubRoster(actor, club, actorMembership)) {
-    return { success: false, error: "Only an assigned teacher or administrator can manage this roster." };
+    return { success: false, error: "Only the club Vice President, Advisor, or an administrator can manage this roster." };
   }
+  const canAssignLeadership = canAssignClubLeadership(actor, club, actorMembership);
+  const canBan = canBanClubMember(actor, club, actorMembership);
   if (data.userId === actor.id) {
     return { success: false, error: "You cannot change your own roster assignment here." };
   }
@@ -2374,19 +2437,34 @@ export async function updateClubMember(data: {
     .maybeSingle();
   const targetName = targetProfile?.full_name ?? targetProfile?.email ?? "A club member";
   const nextRole = data.remove || data.ban ? "member" : (data.role ?? "member");
+  const currentTargetRole = (targetMembership?.role as MembershipRole | undefined) ?? "member";
+  if (currentTargetRole === "sponsor") {
+    return { success: false, error: "Advisor assignments are managed by school administrators." };
+  }
+  if (data.ban && !canBan) {
+    return { success: false, error: "Only the club Advisor or an administrator can ban a member." };
+  }
+  if (
+    !canAssignLeadership
+    && (
+      currentTargetRole !== "member"
+      || nextRole !== "member"
+      || (!data.remove && !data.ban)
+    )
+  ) {
+    return {
+      success: false,
+      error: "Vice Presidents can remove general members, but an Advisor or administrator must change leadership roles.",
+    };
+  }
 
-  const { error } = data.ban
-    ? await supabase
-        .from("club_memberships")
-        .update({ status: "rejected", role: "member" })
-        .eq("club_id", data.clubId)
-        .eq("user_id", data.userId)
-    : await supabase.rpc("manage_club_roster_member", {
-        target_club_id: data.clubId,
-        target_user_id: data.userId,
-        new_membership_role: nextRole,
-        remove_member: !!data.remove,
-      });
+  const { error } = await supabase.rpc("manage_club_roster_member", {
+    target_club_id: data.clubId,
+    target_user_id: data.userId,
+    new_membership_role: nextRole,
+    remove_member: !!data.remove,
+    ban_member: !!data.ban,
+  });
   if (error) return { success: false, error: friendlyError(error, "Could not update the roster.") };
 
   if (data.ban) {
@@ -2395,7 +2473,7 @@ export async function updateClubMember(data: {
       type: "system_message",
       importance: "urgent",
       title: `Blocked from ${club.name}`,
-      message: `A teacher or administrator blocked you from rejoining ${club.name}. Contact the club sponsor if this seems incorrect.`,
+      message: `The club Advisor or an administrator blocked you from rejoining ${club.name}. Contact your school if this seems incorrect.`,
       link: `/clubs/${club.slug}`,
       clubId: club.id,
       sendEmail: true,
@@ -2437,6 +2515,98 @@ export async function updateClubMember(data: {
   revalidatePath(`/manage/clubs/${club.slug}/members`);
   revalidatePath(`/clubs/${club.slug}`);
   revalidatePath("/dashboard");
+  return { success: true };
+}
+
+export async function setClubEventAttendance(data: {
+  clubSlug: string;
+  eventId: string;
+  userId: string;
+  status: "present" | "absent" | "excused" | null;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: false, error: "Attendance editing is unavailable in demo mode." };
+  const supabase = await createClient();
+  const actor = await getCurrentProfile();
+  if (!supabase || !actor) return { success: false, error: "Please sign in." };
+  const club = await getManagedClubBySlug(data.clubSlug);
+  if (!club) return { success: false, error: "Club not found." };
+  const [{ data: event }, { data: membership }] = await Promise.all([
+    supabase.from("events").select("id,club_id").eq("id", data.eventId).maybeSingle(),
+    supabase
+      .from("club_memberships")
+      .select("club_id,status,role")
+      .eq("club_id", club.id)
+      .eq("user_id", actor.id)
+      .eq("status", "active")
+      .maybeSingle(),
+  ]);
+  if (!event || event.club_id !== club.id) return { success: false, error: "Club event not found." };
+  if (!canManageClubRoster(actor, club, membership as ClubMembership | null)) {
+    return { success: false, error: "Only the club Vice President, Advisor, or an administrator can record attendance." };
+  }
+  const { error } = await supabase.rpc("set_club_event_attendance", {
+    event_uuid: data.eventId,
+    target_user_id: data.userId,
+    attendance_value: data.status,
+  });
+  if (error) return { success: false, error: friendlyError(error, "Could not update attendance.") };
+  revalidatePath(`/manage/clubs/${club.slug}/events`);
+  revalidatePath(`/manage/clubs/${club.slug}/events/${data.eventId}/attendance`);
+  return { success: true };
+}
+
+export async function archiveClubWorkspace(data: {
+  clubId: string;
+  confirmationName: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: false, error: "Club archival is unavailable in demo mode." };
+  const supabase = await createClient();
+  const actor = await getCurrentProfile();
+  if (!supabase || !actor) return { success: false, error: "Please sign in." };
+
+  const { data: club } = await supabase.from("clubs").select("*").eq("id", data.clubId).maybeSingle();
+  if (!club) return { success: false, error: "Club not found." };
+  const { data: membership } = await supabase
+    .from("club_memberships")
+    .select("club_id,status,role")
+    .eq("club_id", club.id)
+    .eq("user_id", actor.id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!canArchiveClub(actor, club, membership as ClubMembership | null)) {
+    return { success: false, error: "Only the club Advisor or an administrator can archive this club." };
+  }
+  if (data.confirmationName.trim() !== club.name) {
+    return { success: false, error: "Enter the club name exactly to confirm archival." };
+  }
+  if (club.status === "archived") return { success: true };
+
+  const { error } = await supabase
+    .from("clubs")
+    .update({
+      status: "archived",
+      visibility: "unlisted",
+      is_listed: false,
+      is_featured: false,
+      is_active: false,
+    })
+    .eq("id", club.id);
+  if (error) return { success: false, error: friendlyError(error, "Could not archive this club.") };
+
+  await createNotificationsForClubMembers({
+    clubId: club.id,
+    type: "system_message",
+    importance: "important",
+    title: `${club.name} was archived`,
+    message: "The club is no longer active or listed. Contact your school administrator with questions.",
+    link: "/clubs",
+    sendEmail: false,
+  });
+
+  revalidatePath("/clubs");
+  revalidatePath("/manage/clubs");
+  revalidatePath(`/manage/clubs/${club.slug}`);
+  revalidatePath(`/clubs/${club.slug}`);
   return { success: true };
 }
 
@@ -3119,7 +3289,7 @@ export async function archiveClubContent(
     .eq("status", "active")
     .maybeSingle();
   if (!canApproveClubContent(profile, club, membership)) {
-    return { success: false, error: "Only the teacher sponsor or an admin can delete club content." };
+    return { success: false, error: "Only the club Advisor or an administrator can archive club content." };
   }
 
   const { error } = await supabase.from(table).update({ status: "archived" }).eq("id", id);
@@ -3131,7 +3301,7 @@ export async function archiveClubContent(
       type: "system_message",
       importance: "important",
       title: `${content.title ?? "Content"} was removed`,
-      message: `A teacher sponsor or admin removed your ${contentType}.`,
+      message: `A club Advisor or administrator removed your ${contentType}.`,
       link: `/clubs/${club.slug}/member`,
       clubId: club.id,
       eventId: contentType === "event" ? id : null,
@@ -3162,14 +3332,40 @@ export async function approveContent(
   if (!supabase) return { success: false, error: "Database not configured." };
 
   const profile = await getCurrentProfile();
-  if (!profile || !canApproveContent(profile)) {
-    return { success: false, error: "You do not have permission to approve this item." };
-  }
+  if (!profile) return { success: false, error: "Please sign in." };
 
   const table = APPROVAL_TABLES[contentType];
   if (!table) return { success: false, error: "Unknown content type." };
 
   const { data: content } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
+  if (!content) return { success: false, error: "Content not found." };
+  let mayReview = canApproveContent(profile);
+  let contentClub: Club | null = null;
+  if (content.club_id && ["announcement", "event", "resource"].includes(contentType)) {
+    const [{ data: clubData }, { data: membershipData }] = await Promise.all([
+      supabase.from("clubs").select("*").eq("id", content.club_id).maybeSingle(),
+      supabase
+        .from("club_memberships")
+        .select("club_id,status,role")
+        .eq("club_id", content.club_id)
+        .eq("user_id", profile.id)
+        .eq("status", "active")
+        .maybeSingle(),
+    ]);
+    contentClub = clubData as Club | null;
+    mayReview = Boolean(
+      contentClub
+      && canPublishClubContent(
+        profile,
+        contentClub,
+        membershipData as ClubMembership | null,
+        contentType as "announcement" | "event" | "resource"
+      )
+    );
+  }
+  if (!mayReview) {
+    return { success: false, error: "You do not have permission to approve this item." };
+  }
   const { data: approval } = await supabase
     .from("approval_requests")
     .select("submitted_by")
@@ -3180,15 +3376,13 @@ export async function approveContent(
   if (contentType === "announcement") updatePayload.published_at = new Date().toISOString();
   const { error } = await supabase.from(table).update(updatePayload).eq("id", id);
   if (error) return { success: false, error: friendlyError(error) };
-  await supabase
+  const approvalWriter = createAdminClient() ?? supabase;
+  await approvalWriter
     .from("approval_requests")
     .update({ status: "approved", reviewed_by: profile.id, reviewed_at: new Date().toISOString() })
     .eq("content_id", id)
     .eq("status", "pending");
   const contentRecord = (content as Record<string, unknown> | null) ?? null;
-  const { data: contentClub } = content?.club_id
-    ? await supabase.from("clubs").select("name,slug").eq("id", content.club_id).maybeSingle()
-    : { data: null };
   const submitterLink = contentReviewLink(contentType, contentRecord, contentClub);
 
   if (approval?.submitted_by) {
@@ -3239,14 +3433,40 @@ export async function rejectContent(
   if (!supabase) return { success: false, error: "Database not configured." };
 
   const profile = await getCurrentProfile();
-  if (!profile || !canApproveContent(profile)) {
-    return { success: false, error: "You do not have permission to reject this item." };
-  }
+  if (!profile) return { success: false, error: "Please sign in." };
 
   const table = APPROVAL_TABLES[contentType];
   if (!table) return { success: false, error: "Unknown content type." };
 
   const { data: content } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
+  if (!content) return { success: false, error: "Content not found." };
+  let mayReview = canApproveContent(profile);
+  let contentClub: Club | null = null;
+  if (content.club_id && ["announcement", "event", "resource"].includes(contentType)) {
+    const [{ data: clubData }, { data: membershipData }] = await Promise.all([
+      supabase.from("clubs").select("*").eq("id", content.club_id).maybeSingle(),
+      supabase
+        .from("club_memberships")
+        .select("club_id,status,role")
+        .eq("club_id", content.club_id)
+        .eq("user_id", profile.id)
+        .eq("status", "active")
+        .maybeSingle(),
+    ]);
+    contentClub = clubData as Club | null;
+    mayReview = Boolean(
+      contentClub
+      && canPublishClubContent(
+        profile,
+        contentClub,
+        membershipData as ClubMembership | null,
+        contentType as "announcement" | "event" | "resource"
+      )
+    );
+  }
+  if (!mayReview) {
+    return { success: false, error: "You do not have permission to reject this item." };
+  }
   const { data: approval } = await supabase
     .from("approval_requests")
     .select("submitted_by")
@@ -3255,7 +3475,8 @@ export async function rejectContent(
     .maybeSingle();
   const { error } = await supabase.from(table).update({ status: "rejected" }).eq("id", id);
   if (error) return { success: false, error: friendlyError(error) };
-  await supabase
+  const approvalWriter = createAdminClient() ?? supabase;
+  await approvalWriter
     .from("approval_requests")
     .update({
       status: "rejected",
@@ -3266,10 +3487,6 @@ export async function rejectContent(
     .eq("content_id", id)
     .eq("status", "pending");
   const contentRecord = (content as Record<string, unknown> | null) ?? null;
-  const { data: contentClub } = content?.club_id
-    ? await supabase.from("clubs").select("slug").eq("id", content.club_id).maybeSingle()
-    : { data: null };
-
   if (approval?.submitted_by) {
     await createNotification({
       recipientUserId: approval.submitted_by,

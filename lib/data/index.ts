@@ -20,6 +20,8 @@ import type {
   ClubAssignmentAttachment,
   ClubAssignmentStudentCopy,
   ClubAssignmentSubmission,
+  ClubAssignmentSubmissionStatusEntry,
+  ClubEventAttendanceEntry,
   ClubSubmissionAttachment,
   ClubMemberDirectoryEntry,
   ClubMembership,
@@ -496,6 +498,38 @@ export async function getClubAssignmentSubmissions(
         ? null
         : Number(submission.grade_points),
   }));
+}
+
+export async function getClubAssignmentSubmissionStatuses(
+  assignmentId: string
+): Promise<ClubAssignmentSubmissionStatusEntry[]> {
+  if (isDemoMode()) return [];
+  const supabase = await createClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("get_club_assignment_submission_statuses", {
+    assignment_uuid: assignmentId,
+  });
+  if (error) {
+    console.error("[getClubAssignmentSubmissionStatuses]", error.message);
+    return [];
+  }
+  return (data as ClubAssignmentSubmissionStatusEntry[]) ?? [];
+}
+
+export async function getClubEventAttendance(
+  eventId: string
+): Promise<ClubEventAttendanceEntry[]> {
+  if (isDemoMode()) return [];
+  const supabase = await createClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("get_club_event_attendance", {
+    event_uuid: eventId,
+  });
+  if (error) {
+    console.error("[getClubEventAttendance]", error.message);
+    return [];
+  }
+  return (data as ClubEventAttendanceEntry[]) ?? [];
 }
 
 export async function getClubMemberDirectory(clubId: string): Promise<ClubMemberDirectoryEntry[]> {

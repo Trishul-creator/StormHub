@@ -38,6 +38,7 @@ async function readExportSection<T>(
 function exportResponse(profile: NonNullable<Awaited<ReturnType<typeof getAuthContext>>["profile"]>, data?: {
   clubMemberships?: unknown[] | null;
   eventRsvps?: unknown[] | null;
+  eventAttendance?: unknown[] | null;
   opportunitySignups?: unknown[] | null;
   bookmarks?: unknown[] | null;
   notifications?: unknown[] | null;
@@ -56,6 +57,7 @@ function exportResponse(profile: NonNullable<Awaited<ReturnType<typeof getAuthCo
     profile,
     club_memberships: data?.clubMemberships ?? [],
     event_rsvps: data?.eventRsvps ?? [],
+    event_attendance: data?.eventAttendance ?? [],
     opportunity_signups: data?.opportunitySignups ?? [],
     bookmarks: data?.bookmarks ?? [],
     notifications: data?.notifications ?? [],
@@ -93,6 +95,7 @@ export async function GET() {
   const [
     memberships,
     rsvps,
+    eventAttendance,
     opportunitySignups,
     bookmarks,
     notifications,
@@ -111,6 +114,13 @@ export async function GET() {
     readExportSection(
       "Event RSVPs",
       () => supabase.from("event_rsvps").select("*").eq("user_id", auth.userId),
+      [],
+    ),
+    readExportSection(
+      "Event attendance",
+      () => admin
+        ? admin.from("club_event_attendance").select("*").eq("user_id", auth.userId)
+        : Promise.resolve({ data: [], error: null }),
       [],
     ),
     readExportSection(
@@ -169,6 +179,7 @@ export async function GET() {
   const warnings = [
     memberships,
     rsvps,
+    eventAttendance,
     opportunitySignups,
     bookmarks,
     notifications,
@@ -183,6 +194,7 @@ export async function GET() {
   return exportResponse(auth.profile, {
     clubMemberships: memberships.data,
     eventRsvps: rsvps.data,
+    eventAttendance: eventAttendance.data,
     opportunitySignups: opportunitySignups.data,
     bookmarks: bookmarks.data,
     notifications: notifications.data,

@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { requireAuth } from "@/lib/auth";
-import { Bell, Cloud, Palette, Shield, User } from "lucide-react";
+import { Bell, Cloud, Compass, Palette, Shield, User } from "lucide-react";
 import { NotificationPreferencesForm } from "@/components/notifications/preferences-form";
 import { getNotificationPreferences } from "@/lib/notifications";
 import { ProfileSettingsForm } from "@/components/settings/profile-settings-form";
@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getGoogleDriveConnectionStatus } from "@/lib/google-drive";
 import { GoogleDriveSettings } from "@/components/settings/google-drive-settings";
 import { ThemeSettings } from "@/components/theme/theme-controls";
+import { GuidedTourSettings } from "@/components/settings/guided-tour-settings";
 
 export default async function SettingsPage() {
   const { profile } = await requireAuth("/settings");
@@ -123,6 +124,27 @@ export default async function SettingsPage() {
               </CardHeader>
               <CardContent className="pt-6">
                 <ThemeSettings />
+              </CardContent>
+            </Card>
+          </section>
+
+          <section id="walkthrough" className="scroll-mt-24" aria-labelledby="walkthrough-heading">
+            <Card>
+              <CardHeader className="border-b bg-storm-light/20">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-storm-electric dark:bg-blue-950/60 dark:text-blue-300">
+                    <Compass className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 id="walkthrough-heading" className="font-semibold leading-none tracking-tight">Guided walkthrough</h2>
+                    <CardDescription className="mt-1">
+                      Review the navigation and the tools available to your current role.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <GuidedTourSettings role={profile.role} />
               </CardContent>
             </Card>
           </section>

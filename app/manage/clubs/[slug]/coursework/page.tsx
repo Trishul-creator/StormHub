@@ -9,11 +9,11 @@ import { AssignmentForm } from "@/components/coursework/assignment-form";
 import { AssignmentStatusActions } from "@/components/coursework/assignment-status-actions";
 import {
   getClubAssignments,
-  getClubAssignmentSubmissions,
+  getClubAssignmentSubmissionStatuses,
   getManagedClubBySlug,
 } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
-import { canManageClubCoursework } from "@/lib/permissions";
+import { canGradeClubCoursework, canManageClubCoursework, canPublishClubCoursework } from "@/lib/permissions";
 
 interface CourseworkPageProps {
   params: Promise<{ slug: string }>;
@@ -27,22 +27,28 @@ export default async function ManageCourseworkPage({ params }: CourseworkPagePro
   if (!canManageClubCoursework(profile, club, membership)) {
     redirect(`/manage/clubs/${slug}?error=coursework_permission_required`);
   }
+  const canPublish = canPublishClubCoursework(profile, club, membership);
+  const canGrade = canGradeClubCoursework(profile, club, membership);
 
   const assignments = await getClubAssignments(club.id);
   const submissionSets = await Promise.all(
-    assignments.map((assignment) => getClubAssignmentSubmissions(assignment.id))
+    assignments.map((assignment) => getClubAssignmentSubmissionStatuses(assignment.id))
   );
   const assignmentsWithCounts = assignments.map((assignment, index) => ({
     ...assignment,
-    submission_count: submissionSets[index].length,
-    returned_count: submissionSets[index].filter((submission) => submission.status === "returned").length,
+    submission_count: submissionSets[index].filter((entry) => Boolean(entry.submission_id)).length,
+    returned_count: submissionSets[index].filter((entry) => entry.submission_status === "returned").length,
   }));
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-8">
       <PageHeader
         title={`Coursework — ${club.name}`}
-        description="Create assignments, review submissions, and return grades and private feedback."
+        description={
+          canGrade
+            ? "Create assignments, review student work, and return grades and private feedback."
+            : "Create coursework and track who has submitted. Private work and grades remain visible only to the Advisor."
+        }
       >
         <Button variant="outline" size="sm" asChild>
           <Link href={`/clubs/${slug}/member?view=classwork`}>
@@ -52,7 +58,7 @@ export default async function ManageCourseworkPage({ params }: CourseworkPagePro
       </PageHeader>
 
       <ClubCreateNavigation clubSlug={slug} activeType="assignment" />
-      <AssignmentForm clubSlug={slug} />
+      <AssignmentForm clubSlug={slug} canPublish={canPublish} />
 
       <section className="mt-10">
         <div className="mb-4 flex items-end justify-between gap-4">
@@ -65,7 +71,7 @@ export default async function ManageCourseworkPage({ params }: CourseworkPagePro
         </div>
 
         {assignmentsWithCounts.length === 0 ? (
-          <div className="rounded-2xl border border-dashed bg-white p-10 text-center">
+          <div className="rounded-2xl border border-dashed bg-card p-10 text-center">
             <p className="font-medium text-storm-navy">No assignments yet</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Use the assignment form above to publish the first piece of classwork.
@@ -74,7 +80,7 @@ export default async function ManageCourseworkPage({ params }: CourseworkPagePro
         ) : (
           <div className="grid gap-5 lg:grid-cols-2">
             {assignmentsWithCounts.map((assignment) => (
-              <div key={assignment.id} className="overflow-hidden rounded-xl border bg-white shadow-sm">
+              <div key={assignment.id} className="overflow-hidden rounded-xl border bg-card shadow-sm">
                 <AssignmentCard
                   assignment={assignment}
                   href={`/manage/clubs/${slug}/coursework/${assignment.id}`}
@@ -84,11 +90,13 @@ export default async function ManageCourseworkPage({ params }: CourseworkPagePro
                   <p className="text-xs text-muted-foreground">
                     {assignment.returned_count} graded · {assignment.submission_count} turned in
                   </p>
-                  <AssignmentStatusActions
-                    clubSlug={slug}
-                    assignmentId={assignment.id}
-                    status={assignment.status}
-                  />
+                  {canPublish && (
+                    <AssignmentStatusActions
+                      clubSlug={slug}
+                      assignmentId={assignment.id}
+                      status={assignment.status}
+                    />
+                  )}
                 </div>
               </div>
             ))}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Bell, ChevronRight, Cloud, Palette, Shield, User } from "lucide-react";
+import { Bell, ChevronRight, Cloud, Compass, Palette, Shield, User } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const settingsSections = [
@@ -29,6 +29,12 @@ const settingsSections = [
     label: "Appearance",
     description: "Light, dark, or system",
     icon: Palette,
+  },
+  {
+    id: "walkthrough",
+    label: "Walkthrough",
+    description: "Replay the guided tour",
+    icon: Compass,
   },
   {
     id: "account",

@@ -1,5 +1,7 @@
 import { cn } from "@/lib/cn";
+import { clubRoleLabel } from "@/lib/club-roles";
 import { humanizeLabel } from "@/lib/utils";
+import type { MembershipRole } from "@/types/database";
 
 interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: "default" | "secondary" | "outline" | "success" | "warning" | "destructive";
@@ -61,7 +63,11 @@ export function ApprovalStatusBadge({ status }: { status: string }) {
 }
 
 export function RoleBadge({ role }: { role: string }) {
-  return <Badge variant="outline">{humanizeLabel(role)}</Badge>;
+  const clubRoles: MembershipRole[] = ["member", "officer", "president", "sponsor"];
+  const label = clubRoles.includes(role as MembershipRole)
+    ? clubRoleLabel(role as MembershipRole)
+    : humanizeLabel(role);
+  return <Badge variant="outline">{label}</Badge>;
 }
 
 export function EventTypeBadge({ type }: { type: string }) {

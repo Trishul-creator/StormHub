@@ -17,7 +17,7 @@ export default async function AboutPage() {
           <h2 className="text-xl font-semibold text-storm-navy">Our mission</h2>
           <p className="text-muted-foreground leading-relaxed mt-2">
             {APP_NAME} brings clubs, scheduled events, applications, tryouts, auditions, and deadlines into one clean place.
-            Built for {school?.name ?? "school"} students, sponsors, and club leaders — designed to help students discover opportunities
+            Built for {school?.name ?? "school"} students, Advisors, and club leaders — designed to help students discover opportunities
             that could shape their high school experience.
           </p>
         </section>
@@ -41,7 +41,7 @@ export default async function AboutPage() {
           <p className="text-sm text-muted-foreground">
             <strong className="text-storm-navy">Disclaimer:</strong> StormHub is a student-built platform.
             It is not an official school system unless approved by school administration.
-            Always verify important dates and requirements with club sponsors and school staff.
+            Always verify important dates and requirements with club Advisors and school staff.
           </p>
         </section>
       </div>

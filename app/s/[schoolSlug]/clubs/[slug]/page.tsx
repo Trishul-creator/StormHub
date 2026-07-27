@@ -131,7 +131,7 @@ export default async function SchoolClubPage({ params }: SchoolClubPageProps) {
             <div className="mt-5 space-y-3 text-sm">
               {club.sponsor_name && (
                 <div>
-                  <p className="font-medium text-storm-navy">Sponsor</p>
+                  <p className="font-medium text-storm-navy">Advisor</p>
                   <p className="text-muted-foreground">{club.sponsor_name}</p>
                 </div>
               )}

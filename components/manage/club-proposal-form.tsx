@@ -63,14 +63,14 @@ export function ClubProposalForm({
           <Input id="category" name="category" placeholder="STEM, Service, Arts..." required className="mt-1" />
         </div>
         <div>
-          <Label htmlFor="sponsorUserId">Teacher sponsor</Label>
+          <Label htmlFor="sponsorUserId">Club Advisor</Label>
           <select
             id="sponsorUserId"
             name="sponsorUserId"
             defaultValue={defaultSponsorUserId ?? ""}
             className="mt-1 h-10 w-full rounded-lg border bg-white px-3 text-sm"
           >
-            <option value="">No sponsor assigned yet</option>
+            <option value="">No Advisor assigned yet</option>
             {teachers.map((teacher) => (
               <option key={teacher.id} value={teacher.id}>
                 {teacher.full_name || teacher.email || "Unnamed teacher"}

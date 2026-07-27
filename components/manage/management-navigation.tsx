@@ -36,7 +36,7 @@ export function ManagementNavigation({
   return (
     <WorkspaceNavigation
       ariaLabel="Management"
-      eyebrow={role === "admin" ? "School" : role === "teacher" ? "Sponsor" : "Club"}
+      eyebrow={role === "admin" ? "School" : role === "teacher" ? "Advisor" : "Club"}
       title="Management tools"
       icon={Building2}
       links={links}

@@ -44,7 +44,7 @@ export function getRoleOnboardingItems(role: UserRole, signals: OnboardingSignal
         {
           id: "plan-first-update",
           label: "Plan your first club update",
-          description: "Coordinate with the sponsor before posting an announcement or event.",
+          description: "Coordinate with the Advisor before posting an announcement or event.",
           href: "/manage/clubs",
           status: "active",
         },
@@ -68,7 +68,7 @@ export function getRoleOnboardingItems(role: UserRole, signals: OnboardingSignal
       {
         id: "rsvp-event",
         label: "RSVP to an event",
-        description: "RSVPs help students plan and help sponsors understand expected turnout.",
+        description: "RSVPs help students plan and help Advisors understand expected turnout.",
         href: "/calendar",
         status: (signals.rsvpedEvents ?? 0) > 0 ? "done" : "active",
       },
@@ -87,14 +87,14 @@ export function getRoleOnboardingItems(role: UserRole, signals: OnboardingSignal
       {
         id: "review-approvals",
         label: "Review pending approvals",
-        description: "Approve or send back student-created content that needs sponsor attention.",
+        description: "Approve or send back student-created content that needs Advisor attention.",
         href: "/manage/approvals",
         status: (signals.pendingApprovals ?? 0) === 0 ? "done" : "active",
       },
       {
         id: "manage-roster",
         label: "Check club rosters",
-        description: "Keep sponsors, officers, presidents, and members accurate before events start.",
+        description: "Keep Advisors, Vice Presidents, Presidents, and Members accurate before events start.",
         href: "/manage/clubs",
         status: (signals.manageableClubs ?? 0) > 0 ? "active" : "locked",
       },
@@ -112,7 +112,7 @@ export function getRoleOnboardingItems(role: UserRole, signals: OnboardingSignal
     {
       id: "manage-users",
       label: "Verify users and roles",
-      description: "Confirm students, teachers, sponsors, and administrators have the right access.",
+      description: "Confirm students, teachers, Advisors, and administrators have the right access.",
       href: "/admin/users",
       status: (signals.usersManaged ?? 0) > 0 ? "done" : "active",
     },

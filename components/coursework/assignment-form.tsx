@@ -28,14 +28,18 @@ interface DriveAttachmentDraft extends PickedGoogleDriveFile {
 
 export function AssignmentForm({
   clubSlug,
+  canPublish = true,
   className,
 }: {
   clubSlug: string;
+  canPublish?: boolean;
   className?: string;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [releaseMode, setReleaseMode] = useState<"now" | "draft" | "scheduled">("now");
+  const [releaseMode, setReleaseMode] = useState<"now" | "draft" | "scheduled">(
+    canPublish ? "now" : "draft"
+  );
   const [submissionMode, setSubmissionMode] = useState<"submission" | "completion">("submission");
   const [localFiles, setLocalFiles] = useState<File[]>([]);
   const [driveFiles, setDriveFiles] = useState<DriveAttachmentDraft[]>([]);
@@ -149,7 +153,7 @@ export function AssignmentForm({
       return;
     }
 
-    if (releaseMode === "now" && hasPendingAttachments) {
+    if (canPublish && releaseMode === "now" && hasPendingAttachments) {
       const published = await updateClubAssignmentStatus({
         clubSlug,
         assignmentId,
@@ -182,7 +186,7 @@ export function AssignmentForm({
           : "Only coursework managers can see this draft.",
     });
     formElement.reset();
-    setReleaseMode("now");
+    setReleaseMode(canPublish ? "now" : "draft");
     setSubmissionMode("submission");
     setLocalFiles([]);
     setDriveFiles([]);
@@ -398,7 +402,7 @@ export function AssignmentForm({
                         className="mt-0.5 h-4 w-4 accent-storm-electric"
                       />
                       <span className="text-xs leading-relaxed text-storm-navy">
-                        Make an individual editable copy for each student. Copies stay in the teacher&apos;s Drive and are shared privately with each student.
+                        Make an individual editable copy for each student. Copies stay in your Drive and are shared privately with each student.
                       </span>
                     </label>
                   )}
@@ -411,14 +415,21 @@ export function AssignmentForm({
       </div>
 
       <div className="space-y-4 border-t pt-5">
+        {!canPublish && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100">
+            Vice Presidents can prepare assignment drafts. A President, Advisor, or administrator publishes them.
+          </div>
+        )}
         <fieldset>
           <legend className="text-sm font-medium text-storm-navy">Release timing</legend>
-          <div className="mt-2 grid gap-3 sm:grid-cols-3">
+          <div className={cn("mt-2 grid gap-3", canPublish ? "sm:grid-cols-3" : "sm:grid-cols-1")}>
             {([
               ["now", "Publish now", "Available as soon as materials finish uploading."],
               ["draft", "Save draft", "Keep private until you publish it manually."],
               ["scheduled", "Schedule", "Release automatically at a future time."],
-            ] as const).map(([value, label, description]) => (
+            ] as const)
+              .filter(([value]) => canPublish || value === "draft")
+              .map(([value, label, description]) => (
               <label
                 key={value}
                 className={cn(

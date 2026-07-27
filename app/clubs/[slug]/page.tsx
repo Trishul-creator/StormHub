@@ -142,7 +142,7 @@ export default async function ClubPage({ params }: ClubPageProps) {
               <>
                 <hr className="my-4" />
                 <div className="text-sm">
-                  <p className="font-medium text-storm-navy">Sponsor</p>
+                  <p className="font-medium text-storm-navy">Advisor</p>
                   <p className="text-muted-foreground">{club.sponsor_name}</p>
                   {club.sponsor_email && (
                     <p className="text-storm-electric text-xs mt-1">{club.sponsor_email}</p>

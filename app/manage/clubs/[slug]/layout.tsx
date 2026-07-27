@@ -21,6 +21,7 @@ export default async function ClubManageLayout({ children, params }: ClubManageL
         clubName={club.name}
         slug={slug}
         canManageRoster={canManageClubRoster(profile, club, membership)}
+        membershipRole={membership?.role ?? null}
       />
       {children}
     </>

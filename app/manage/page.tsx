@@ -29,11 +29,13 @@ export default async function ManagePage() {
   });
   return (
     <div className="container mx-auto px-4 py-8">
-      <PageHeader
-        title="Management"
-        description="Your operational overview. Use the top menu for Clubs, Calendar, Opportunities, and Administration; use the management tools above for approvals and the weekly digest."
-      />
-      <div className="mb-6">
+      <div data-tour="role-overview">
+        <PageHeader
+          title="Management"
+          description="Your operational overview. Use the top menu for Clubs, Calendar, Opportunities, and Administration; use the management tools above for approvals and the weekly digest."
+        />
+      </div>
+      <div className="mb-6" data-tour="role-checklist">
         <RoleChecklist
           title={profile.role === "teacher" ? "Teacher command checklist" : "Admin operating checklist"}
           description={profile.role === "teacher" ? "Keep club content and rosters ready for students." : "A quick operational pass before publishing or presenting the app."}
@@ -78,7 +80,7 @@ export default async function ManagePage() {
         </section>
       )}
       {profile.role === "teacher" && manageableClubs.length > 0 && (
-        <section className="mb-6">
+        <section className="mb-6" data-tour="managed-clubs">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-storm-navy">My clubs command center</h2>
             <Button variant="ghost" size="sm" asChild><Link href="/manage/clubs">View all</Link></Button>

@@ -64,7 +64,7 @@ export default async function HomePage() {
           </p>
         </div>
         <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <PlatformCard icon={Users} title="Clubs" description="Students find clubs; sponsors and leaders keep club portals organized." />
+          <PlatformCard icon={Users} title="Clubs" description="Students find clubs; Advisors and student leaders keep club portals organized." />
           <PlatformCard icon={Calendar} title="Calendar" description="Meetings, deadlines, auditions, and competitions are visible in one place." />
           <PlatformCard icon={GraduationCap} title="Opportunities" description="Schools publish interest forms, tryouts, applications, and deadline-based items." />
           <PlatformCard icon={Bell} title="Notifications" description="Normal updates stay in-app. Important or urgent updates can also be emailed." />

@@ -210,6 +210,28 @@ export interface ClubAssignmentSubmission {
   student_copies?: ClubAssignmentStudentCopy[];
 }
 
+export interface ClubAssignmentSubmissionStatusEntry {
+  user_id: string;
+  full_name: string;
+  avatar_url?: string | null;
+  membership_role: MembershipRole;
+  submission_id?: string | null;
+  submission_status?: AssignmentSubmissionStatus | null;
+  submitted_at?: string | null;
+  returned_at?: string | null;
+}
+
+export type ClubEventAttendanceStatus = "present" | "absent" | "excused";
+
+export interface ClubEventAttendanceEntry {
+  user_id: string;
+  full_name: string;
+  membership_role: MembershipRole;
+  rsvp_status?: RSVPStatus | null;
+  attendance_status?: ClubEventAttendanceStatus | null;
+  marked_at?: string | null;
+}
+
 export interface ClubAssignmentAttachment {
   id: string;
   assignment_id: string;

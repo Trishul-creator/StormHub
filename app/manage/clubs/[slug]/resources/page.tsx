@@ -7,7 +7,8 @@ import { Link as LinkIcon } from "lucide-react";
 import { StatusBadge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/utils";
 import { ArchiveContentButton } from "@/components/manage/archive-content-button";
-import { canApproveClubContent, canManageClubCoursework } from "@/lib/permissions";
+import { ApprovalActions } from "@/components/manage/approval-actions";
+import { canApproveClubContent, canManageClubCoursework, canPublishClubContent } from "@/lib/permissions";
 import { ClubCreateNavigation } from "@/components/manage/club-create-navigation";
 import type { ClubResource } from "@/types/database";
 
@@ -20,12 +21,13 @@ export default async function ManageResourcesPage({ params }: PageProps) {
   const auth = await requireClubManager(club);
   const resources = (await getClubManagedContent(club.id, "resource")) as ClubResource[];
   const canDelete = canApproveClubContent(auth.profile, club, auth.membership);
+  const canPublish = canPublishClubContent(auth.profile, club, auth.membership, "resource");
   const courseworkEnabled = canManageClubCoursework(auth.profile, club, auth.membership);
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <PageHeader title="Create resource" description={`Share links and materials with ${club.name} members.`} />
       <ClubCreateNavigation clubSlug={slug} activeType="resource" courseworkEnabled={courseworkEnabled} />
-      <ContentForm type="resource" clubSlug={slug} />
+      <ContentForm type="resource" clubSlug={slug} canPublish={canPublish} />
       <section className="mt-8 rounded-xl border bg-card p-5 shadow-sm">
         <h2 className="font-semibold text-storm-navy">Previous resources</h2>
         <div className="mt-4 space-y-3">
@@ -51,7 +53,12 @@ export default async function ManageResourcesPage({ params }: PageProps) {
                   )}
                   <p className="mt-2 text-xs text-muted-foreground">Posted {formatDateTime(resource.created_at)}</p>
                 </div>
-                {canDelete && <ArchiveContentButton id={resource.id} type="resource" />}
+                <div className="flex flex-wrap justify-end gap-2">
+                  {canPublish && resource.status === "pending" && (
+                    <ApprovalActions id={resource.id} type="resource" />
+                  )}
+                  {canDelete && <ArchiveContentButton id={resource.id} type="resource" />}
+                </div>
               </div>
             </div>
           ))}
