@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Cloud, Loader2, PlugZap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -33,12 +33,13 @@ interface GooglePickerBuilder {
   setAppId(appId: string): GooglePickerBuilder;
   setOrigin(origin: string): GooglePickerBuilder;
   setSize(width: number, height: number): GooglePickerBuilder;
+  setTitle(title: string): GooglePickerBuilder;
   setCallback(callback: (data: PickerCallbackData) => void): GooglePickerBuilder;
   build(): { setVisible(value: boolean): void };
 }
 
 interface GooglePickerApi {
-  Action: { PICKED: string; ERROR: string };
+  Action: { PICKED: string; CANCEL: string; ERROR: string };
   DocsViewMode: { LIST: string };
   Feature: { MULTISELECT_ENABLED: string };
   ViewId: { DOCS: string };
@@ -47,6 +48,7 @@ interface GooglePickerApi {
     setMode(mode: string): unknown;
     setSelectFolderEnabled(value: boolean): unknown;
   };
+  DocsUploadView: new () => unknown;
   PickerBuilder: new () => GooglePickerBuilder;
 }
 
@@ -87,6 +89,45 @@ function loadPickerApi(): Promise<void> {
   });
 }
 
+function guardWindowScroll(): () => void {
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
+  let frameId: number | null = null;
+  let released = false;
+
+  const restore = () => {
+    if (released) return;
+    if (window.scrollX !== scrollX || window.scrollY !== scrollY) {
+      window.scrollTo(scrollX, scrollY);
+    }
+  };
+  const handleScroll = () => {
+    if (frameId !== null) return;
+    frameId = window.requestAnimationFrame(() => {
+      frameId = null;
+      restore();
+    });
+  };
+
+  window.addEventListener("scroll", handleScroll, { passive: true });
+  frameId = window.requestAnimationFrame(() => {
+    frameId = null;
+    restore();
+  });
+  const focusTimer = window.setTimeout(restore, 150);
+
+  return () => {
+    if (released) return;
+    released = true;
+    window.removeEventListener("scroll", handleScroll);
+    if (frameId !== null) window.cancelAnimationFrame(frameId);
+    window.clearTimeout(focusTimer);
+    if (window.scrollX !== scrollX || window.scrollY !== scrollY) {
+      window.scrollTo(scrollX, scrollY);
+    }
+  };
+}
+
 export function GoogleDrivePicker({
   onPicked,
   multiple = true,
@@ -105,9 +146,15 @@ export function GoogleDrivePicker({
   const [loading, setLoading] = useState(false);
   const [needsConnection, setNeedsConnection] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const releaseScrollGuardRef = useRef<(() => void) | null>(null);
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_DRIVE_API_KEY?.trim();
   const appId = process.env.NEXT_PUBLIC_GOOGLE_DRIVE_APP_ID?.trim();
   const pickerConfigured = Boolean(apiKey && appId);
+
+  useEffect(() => () => {
+    releaseScrollGuardRef.current?.();
+    releaseScrollGuardRef.current = null;
+  }, []);
 
   const openPicker = useCallback(async () => {
     if (!apiKey || !appId) {
@@ -139,25 +186,34 @@ export function GoogleDrivePicker({
       // drive.file does not grant thumbnail access. Google's recommended list
       // mode keeps the file catalog usable with this privacy-limited scope.
       view.setMode(pickerApi.DocsViewMode.LIST);
-      const pickerWidth = Math.max(566, Math.min(1051, window.innerWidth - 32));
-      const pickerHeight = Math.max(350, Math.min(650, window.innerHeight - 32));
+      const pickerWidth = Math.max(566, Math.min(900, window.innerWidth - 48));
+      const pickerHeight = Math.max(350, Math.min(560, window.innerHeight - 48));
       let picker: { setVisible(value: boolean): void } | null = null;
+      let releaseScrollGuard: (() => void) | null = null;
       let builder = new pickerApi.PickerBuilder()
         .addView(view)
+        .addView(new pickerApi.DocsUploadView())
         .setOAuthToken(tokenPayload.accessToken)
         .setDeveloperKey(apiKey)
         .setAppId(appId)
         .setOrigin(window.location.origin)
         .setSize(pickerWidth, pickerHeight)
+        .setTitle("Choose assignment materials")
         .setCallback((data) => {
           if (data.action === pickerApi.Action.ERROR) {
             picker?.setVisible(false);
+            releaseScrollGuard?.();
             setError(
               "Google Drive could not load your files. Reconnect Drive; if this continues, verify the Picker API key and project number."
             );
             return;
           }
+          if (data.action === pickerApi.Action.CANCEL) {
+            releaseScrollGuard?.();
+            return;
+          }
           if (data.action !== pickerApi.Action.PICKED || !data.docs) return;
+          releaseScrollGuard?.();
           setError(null);
           void onPicked(data.docs.map((file) => ({
             id: file.id,
@@ -169,8 +225,19 @@ export function GoogleDrivePicker({
         });
       if (multiple) builder = builder.enableFeature(pickerApi.Feature.MULTISELECT_ENABLED);
       picker = builder.build();
+      releaseScrollGuardRef.current?.();
+      const cleanupScrollGuard = guardWindowScroll();
+      releaseScrollGuard = () => {
+        cleanupScrollGuard();
+        if (releaseScrollGuardRef.current === releaseScrollGuard) {
+          releaseScrollGuardRef.current = null;
+        }
+      };
+      releaseScrollGuardRef.current = releaseScrollGuard;
       picker.setVisible(true);
     } catch (pickerError) {
+      releaseScrollGuardRef.current?.();
+      releaseScrollGuardRef.current = null;
       setError(pickerError instanceof Error ? pickerError.message : "Could not open Google Drive.");
     } finally {
       setLoading(false);
