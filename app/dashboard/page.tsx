@@ -56,6 +56,11 @@ export default async function DashboardPage() {
             title="Calendar"
             description="View school-wide events and events from your assigned clubs."
           />
+          <DashboardLink
+            href="/opportunities"
+            title="Opportunities"
+            description="Browse school opportunities in read-only mode without student signup actions."
+          />
           {manageableClubs.map((club) => (
             <DashboardLink
               key={club.id}

@@ -78,9 +78,9 @@ export function StudentDriveCopies({
   if (!templates.length) return null;
 
   return (
-    <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50/40 p-4">
+    <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50/40 p-4 dark:border-blue-900/70 dark:bg-blue-950/35">
       <div className="flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-storm-electric">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-card text-storm-electric">
           <FileText className="h-4 w-4" />
         </div>
         <div>
@@ -94,7 +94,7 @@ export function StudentDriveCopies({
         {templates.map((template) => {
           const state = states[template.id] ?? { status: "preparing" };
           return (
-            <div key={template.id} className="rounded-lg border bg-white p-3">
+            <div key={template.id} className="rounded-lg border bg-card p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-storm-navy">{template.file_name}</p>

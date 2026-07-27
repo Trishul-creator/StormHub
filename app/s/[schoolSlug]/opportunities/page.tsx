@@ -56,7 +56,11 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
     <div className="container mx-auto px-4 py-8">
       <PageHeader
         title={`${school.short_name || school.name} Opportunities`}
-        description="Signups, applications, tryouts, auditions, competitions, interest forms, and deadlines for this school."
+        description={
+          profile?.role === "teacher"
+            ? "Browse this school’s opportunities in read-only mode. Teacher accounts cannot save, RSVP, or sign up."
+            : "Signups, applications, tryouts, auditions, competitions, interest forms, and deadlines for this school."
+        }
       >
         {canManage && (
           <Button asChild>

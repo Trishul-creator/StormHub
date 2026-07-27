@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { SUPPORT_EMAIL } from "@/lib/schools";
 import { APP_NAME } from "@/lib/utils";
-import type { UserRole } from "@/types/database";
 
-export function Footer({ role }: { role?: UserRole }) {
+export function Footer() {
   return (
     <footer className="border-t bg-storm-navy text-storm-silver">
       <div className="container mx-auto px-4 py-12">
@@ -24,9 +23,7 @@ export function Footer({ role }: { role?: UserRole }) {
             <p className="mb-3 font-semibold text-white">Explore</p>
             <ul className="space-y-2 text-sm">
               <li><Link href="/clubs" className="hover:text-white transition-colors">Clubs</Link></li>
-              {role !== "teacher" && (
-                <li><Link href="/opportunities" className="hover:text-white transition-colors">Opportunities</Link></li>
-              )}
+              <li><Link href="/opportunities" className="hover:text-white transition-colors">Opportunities</Link></li>
               <li><Link href="/calendar" className="hover:text-white transition-colors">Calendar</Link></li>
             </ul>
           </div>

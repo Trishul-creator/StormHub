@@ -100,9 +100,9 @@ export function SubmissionForm({
           </div>
         </>
       ) : (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-800 dark:bg-emerald-950/35">
           <p className="text-sm font-medium text-emerald-950">No file or written response is required.</p>
-          <p className="mt-1 text-xs leading-relaxed text-emerald-900/70">
+          <p className="mt-1 text-xs leading-relaxed text-emerald-900/70 dark:text-emerald-200/75">
             Use the button below when you finish the activity.
           </p>
         </div>

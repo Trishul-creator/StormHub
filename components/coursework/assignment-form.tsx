@@ -234,7 +234,9 @@ export function AssignmentForm({
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
           <label className={cn(
             "cursor-pointer rounded-xl border p-4 transition",
-            submissionMode === "submission" ? "border-storm-electric bg-blue-50/60" : "hover:bg-storm-light/25"
+            submissionMode === "submission"
+              ? "border-storm-electric bg-blue-50/60 dark:bg-blue-950/40"
+              : "hover:bg-storm-light/25"
           )}>
             <input
               type="radio"
@@ -251,7 +253,9 @@ export function AssignmentForm({
           </label>
           <label className={cn(
             "cursor-pointer rounded-xl border p-4 transition",
-            submissionMode === "completion" ? "border-storm-electric bg-blue-50/60" : "hover:bg-storm-light/25"
+            submissionMode === "completion"
+              ? "border-storm-electric bg-blue-50/60 dark:bg-blue-950/40"
+              : "hover:bg-storm-light/25"
           )}>
             <input
               type="radio"

@@ -67,4 +67,21 @@ describe("OpportunityCard", () => {
     expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
     expect(container.firstChild).toHaveClass("border-emerald-300");
   });
+
+  it("shows a details-only experience when participation is disabled", () => {
+    render(
+      <OpportunityCard
+        opportunity={opportunity}
+        isLoggedIn
+        canParticipate={false}
+      />
+    );
+
+    expect(screen.getByRole("link", { name: "View details" })).toHaveAttribute(
+      "href",
+      "/opportunities/science-fair"
+    );
+    expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+  });
 });

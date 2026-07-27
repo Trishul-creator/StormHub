@@ -69,7 +69,7 @@ export function AccountControls({
         </Button>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-red-200 bg-red-50/40 transition-shadow duration-200 hover:shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-red-200 bg-red-50/40 transition-shadow duration-200 hover:shadow-sm dark:border-red-900/70 dark:bg-red-950/30">
         <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex gap-3">
             <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-700">
@@ -94,7 +94,7 @@ export function AccountControls({
         </div>
 
         {activeRequest && (
-          <div className="animate-in border-t border-red-200 bg-white/70 p-4 duration-300 fade-in slide-in-from-top-2" role="status">
+          <div className="animate-in border-t border-red-200 bg-card/70 p-4 duration-300 fade-in slide-in-from-top-2 dark:border-red-900/70" role="status">
             <div className="flex gap-3">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
               <div>
@@ -111,7 +111,7 @@ export function AccountControls({
         {showDeleteForm && !activeRequest && (
           <form
             onSubmit={submitDeletionRequest}
-            className="animate-in space-y-4 border-t border-red-200 bg-white/80 p-4 duration-300 fade-in slide-in-from-top-2"
+            className="animate-in space-y-4 border-t border-red-200 bg-card/80 p-4 duration-300 fade-in slide-in-from-top-2 dark:border-red-900/70"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -141,7 +141,7 @@ export function AccountControls({
                 maxLength={1000}
                 rows={3}
                 onChange={(event) => setReason(event.target.value)}
-                className="mt-1 w-full resize-y rounded-lg border border-input bg-white px-3 py-2 text-sm shadow-sm transition-[border-color,box-shadow] duration-200 placeholder:text-muted-foreground focus-visible:border-storm-electric/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                className="mt-1 w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm transition-[border-color,box-shadow] duration-200 placeholder:text-muted-foreground focus-visible:border-storm-electric/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                 placeholder="Tell the reviewer anything they should know"
               />
             </div>

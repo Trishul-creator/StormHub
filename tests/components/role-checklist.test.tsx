@@ -4,7 +4,7 @@ import { RoleChecklist } from "@/components/dashboard/role-checklist";
 
 describe("RoleChecklist", () => {
   it("renders progress and disables locked actions", () => {
-    render(
+    const { container } = render(
       <RoleChecklist
         items={[
           {
@@ -28,5 +28,8 @@ describe("RoleChecklist", () => {
     expect(screen.getByText("1/2 complete")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "View" })).toHaveAttribute("href", "/clubs");
     expect(screen.getByRole("button", { name: "Locked" })).toBeDisabled();
+    expect(container.querySelector(".bg-emerald-50\\/60")).toHaveClass(
+      "dark:bg-emerald-950/35"
+    );
   });
 });

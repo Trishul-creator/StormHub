@@ -30,7 +30,9 @@ const Toast = React.forwardRef<
     ref={ref}
     className={cn(
       "group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-lg border p-4 pr-8 shadow-lg transition-all data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)]",
-      variant === "destructive" ? "border-red-200 bg-red-50" : "border bg-white",
+      variant === "destructive"
+        ? "border-red-200 bg-red-50 dark:border-red-900/70 dark:bg-red-950/40"
+        : "border bg-card",
       className
     )}
     {...props}
