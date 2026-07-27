@@ -52,12 +52,20 @@ export default async function DraftClubsPage() {
                   Open workspace
                 </Link>
               </Button>
-              <Button size="sm" asChild>
-                <Link href={`/manage/clubs/${club.slug}/edit?publish=1`}>
-                  <Rocket className="mr-1 h-4 w-4" />
-                  Publish
-                </Link>
-              </Button>
+              {profile.role === "admin" ? (
+                <Button size="sm" asChild>
+                  <Link href={`/manage/clubs/${club.slug}/edit?publish=1`}>
+                    <Rocket className="mr-1 h-4 w-4" />
+                    Review &amp; publish
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="secondary" size="sm" asChild>
+                  <Link href={`/manage/clubs/${club.slug}/edit`}>
+                    Awaiting admin review
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         ))}

@@ -148,6 +148,7 @@ export interface ClubAnnouncement {
   importance?: NotificationImportance;
   send_email_to_members?: boolean;
   published_at?: string | null;
+  scheduled_for?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -179,6 +180,7 @@ export interface ClubAssignment {
   submission_mode: AssignmentSubmissionMode;
   status: AssignmentStatus;
   published_at?: string | null;
+  scheduled_for?: string | null;
   created_at: string;
   updated_at: string;
   submission?: ClubAssignmentSubmission | null;

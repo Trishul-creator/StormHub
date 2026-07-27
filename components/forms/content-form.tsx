@@ -22,6 +22,7 @@ export function ContentForm({ type, clubSlug, className }: ContentFormProps) {
   const [loading, setLoading] = useState(false);
   const [importance, setImportance] = useState<NotificationImportance>("normal");
   const [sendEmail, setSendEmail] = useState(false);
+  const [announcementRelease, setAnnouncementRelease] = useState<"now" | "scheduled">("now");
   const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -46,6 +47,10 @@ export function ContentForm({ type, clubSlug, className }: ContentFormProps) {
       importance,
       send_email_to_members: form.get("send_email_to_members") === "on",
       deadline_reminder_enabled: form.get("deadline_reminder_enabled") === "on",
+      release_at:
+        type === "announcement" && announcementRelease === "scheduled"
+          ? String(form.get("release_at") ?? "") || undefined
+          : undefined,
     });
     setLoading(false);
     if (!result.success) {
@@ -53,12 +58,15 @@ export function ContentForm({ type, clubSlug, className }: ContentFormProps) {
       return;
     }
     toast({
-      title: result.approved ? "Published" : "Submitted for approval",
-      description: result.approved
+      title: result.scheduled ? "Scheduled" : result.approved ? "Published" : "Submitted for approval",
+      description: result.scheduled
+        ? `Your ${type} will release at the selected time.`
+        : result.approved
         ? `Your ${type} is now available.`
         : `Your ${type} has been submitted and is pending review.`,
     });
     (e.target as HTMLFormElement).reset();
+    setAnnouncementRelease("now");
     router.refresh();
   }
 
@@ -171,6 +179,54 @@ export function ContentForm({ type, clubSlug, className }: ContentFormProps) {
           </div>
         </>
       )}
+      {type === "announcement" && (
+        <fieldset className="rounded-xl border bg-storm-light/20 p-4">
+          <legend className="px-1 text-sm font-medium text-storm-navy">Release timing</legend>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className={cn(
+              "cursor-pointer rounded-lg border p-3 text-sm transition-colors",
+              announcementRelease === "now"
+                ? "border-storm-electric bg-blue-50/60 dark:bg-blue-950/40"
+                : "bg-card hover:border-storm-electric/30"
+            )}>
+              <input
+                type="radio"
+                name="announcement_release"
+                value="now"
+                checked={announcementRelease === "now"}
+                onChange={() => setAnnouncementRelease("now")}
+                className="mr-2 accent-storm-electric"
+              />
+              Publish now
+            </label>
+            <label className={cn(
+              "cursor-pointer rounded-lg border p-3 text-sm transition-colors",
+              announcementRelease === "scheduled"
+                ? "border-storm-electric bg-blue-50/60 dark:bg-blue-950/40"
+                : "bg-card hover:border-storm-electric/30"
+            )}>
+              <input
+                type="radio"
+                name="announcement_release"
+                value="scheduled"
+                checked={announcementRelease === "scheduled"}
+                onChange={() => setAnnouncementRelease("scheduled")}
+                className="mr-2 accent-storm-electric"
+              />
+              Schedule for later
+            </label>
+          </div>
+          {announcementRelease === "scheduled" && (
+            <div className="mt-4">
+              <Label htmlFor="release_at">Release date and time</Label>
+              <Input id="release_at" name="release_at" type="datetime-local" required className="mt-1 bg-card" />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Scheduled posts are private drafts until the release worker publishes them.
+              </p>
+            </div>
+          )}
+        </fieldset>
+      )}
       {type !== "resource" && (
         <div className="rounded-xl border bg-storm-light/20 p-4 space-y-3">
           <div>
@@ -227,7 +283,13 @@ export function ContentForm({ type, clubSlug, className }: ContentFormProps) {
         </div>
       )}
       <Button type="submit" disabled={loading}>
-        {loading ? "Submitting..." : type === "opportunity" ? "Publish Opportunity" : `Create ${humanizeLabel(type)}`}
+        {loading
+          ? "Submitting..."
+          : type === "opportunity"
+            ? "Publish Opportunity"
+            : type === "announcement" && announcementRelease === "scheduled"
+              ? "Schedule Announcement"
+              : `Create ${humanizeLabel(type)}`}
       </Button>
     </form>
   );

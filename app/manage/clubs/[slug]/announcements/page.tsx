@@ -43,7 +43,9 @@ export default async function ManageAnnouncementsPage({ params }: PageProps) {
                   </div>
                   <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{announcement.body}</p>
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Posted {formatDateTime(announcement.published_at ?? announcement.created_at)}
+                    {announcement.scheduled_for && announcement.status === "draft"
+                      ? `Scheduled for ${formatDateTime(announcement.scheduled_for)}`
+                      : `Posted ${formatDateTime(announcement.published_at ?? announcement.created_at)}`}
                   </p>
                 </div>
                 {canDelete && <ArchiveContentButton id={announcement.id} type="announcement" />}

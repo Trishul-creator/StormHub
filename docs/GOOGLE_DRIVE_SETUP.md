@@ -83,6 +83,24 @@ NEXT_PUBLIC_GOOGLE_DRIVE_APP_ID=<numeric Google Cloud project number>
 
 Never prefix the client secret or encryption key with `NEXT_PUBLIC_`.
 
+StormHub intentionally shows **Google Drive is not enabled** unless all five values are
+present in the environment serving that page. Adding only the OAuth client, or adding
+variables to Production but not Preview, leaves the button disabled. After saving the
+variables, redeploy that environment because `NEXT_PUBLIC_` values are embedded during
+the Next.js build.
+
+If the button is still disabled, check the deployment (not only `.env.local`) for:
+
+```text
+GOOGLE_DRIVE_CLIENT_ID
+GOOGLE_DRIVE_CLIENT_SECRET
+GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY
+NEXT_PUBLIC_GOOGLE_DRIVE_API_KEY
+NEXT_PUBLIC_GOOGLE_DRIVE_APP_ID
+```
+
+Do not paste their values into logs or support messages.
+
 ## 6. Apply the database migration
 
 The private bucket, attachment records, encrypted connection records, and per-student

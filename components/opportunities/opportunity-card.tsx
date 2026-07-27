@@ -75,7 +75,7 @@ export function OpportunityCard({
       <CardFooter className="gap-2">
         <Button variant="outline" size="sm" asChild className="flex-1">
           <Link href={`/opportunities/${opportunity.slug}`}>
-            {canParticipate ? opportunity.action_label || "Learn More" : "View details"}
+            View details
           </Link>
         </Button>
         {canParticipate && (

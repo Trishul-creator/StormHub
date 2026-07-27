@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(78);
+SELECT plan(80);
 
 SELECT is(
   (SELECT public FROM storage.buckets WHERE id = 'coursework-private'),
@@ -265,6 +265,12 @@ SELECT throws_ok(
   '42501',
   NULL,
   'teachers cannot create student opportunity signups'
+);
+SELECT throws_ok(
+  $$UPDATE public.clubs SET status = 'active', visibility = 'public', is_listed = TRUE, is_featured = TRUE WHERE id = 'a1000000-0000-4000-8000-000000000001'$$,
+  'P0001',
+  'Only a school administrator can change club publication or featured status',
+  'teacher sponsors cannot publish or feature a club through direct database access'
 );
 RESET ROLE;
 DELETE FROM public.account_deletion_requests
@@ -565,6 +571,10 @@ SELECT lives_ok(
 SELECT lives_ok(
   $$SELECT public.set_school_signup_domains('a0000000-0000-4000-8000-000000000001', ARRAY['school-a.edu'])$$,
   'school admins can update accepted email domains for their own school'
+);
+SELECT lives_ok(
+  $$UPDATE public.clubs SET is_featured = TRUE WHERE id = 'a1000000-0000-4000-8000-000000000001'$$,
+  'school admins can feature clubs in their own school'
 );
 SELECT lives_ok(
   $$INSERT INTO public.account_deletion_requests (user_id, school_id, reason) VALUES ('30000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001', 'Admin self-service request')$$,

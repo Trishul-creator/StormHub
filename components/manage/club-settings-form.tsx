@@ -14,10 +14,12 @@ import type { Club, ClubStatus, Profile } from "@/types/database";
 export function ClubSettingsForm({
   club,
   publishMode = false,
+  canManagePublication = false,
   teachers = [],
 }: {
   club: Club;
   publishMode?: boolean;
+  canManagePublication?: boolean;
   teachers?: Profile[];
 }) {
   const [pending, startTransition] = useTransition();
@@ -78,45 +80,61 @@ export function ClubSettingsForm({
       <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900">
         Create dated meetings from the club dashboard using Create Event. Club profile settings do not control meeting dates.
       </p>
-      <div>
-        <Label htmlFor="sponsor_user_id">Teacher sponsor</Label>
-        <select
-          id="sponsor_user_id"
-          name="sponsor_user_id"
-          defaultValue={selectedSponsorUserId}
-          className="mt-1 h-10 w-full rounded-lg border bg-white px-3 text-sm"
-        >
-          <option value="">No sponsor assigned yet</option>
-          {teachers.map((teacher) => (
-            <option key={teacher.id} value={teacher.id}>
-              {teacher.full_name || teacher.email || "Unnamed teacher"}
-            </option>
-          ))}
-        </select>
-        {club.sponsor_name && (
-          <p className="mt-1 text-xs text-muted-foreground">Current sponsor: {club.sponsor_name}</p>
-        )}
-      </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      {canManagePublication ? (
         <div>
-          <Label>Status</Label>
-          <select value={status} onChange={(e) => setStatus(e.target.value as ClubStatus)} className="mt-1 h-10 w-full rounded-lg border bg-white px-3 text-sm">
-            {["draft", "interest_open", "active", "paused", "archived"].map((value) => (
-              <option key={value} value={value}>{value.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())}</option>
+          <Label htmlFor="sponsor_user_id">Teacher sponsor</Label>
+          <select
+            id="sponsor_user_id"
+            name="sponsor_user_id"
+            defaultValue={selectedSponsorUserId}
+            className="mt-1 h-10 w-full rounded-lg border bg-white px-3 text-sm"
+          >
+            <option value="">No sponsor assigned yet</option>
+            {teachers.map((teacher) => (
+              <option key={teacher.id} value={teacher.id}>
+                {teacher.full_name || teacher.email || "Unnamed teacher"}
+              </option>
             ))}
           </select>
+          {club.sponsor_name && (
+            <p className="mt-1 text-xs text-muted-foreground">Current sponsor: {club.sponsor_name}</p>
+          )}
         </div>
-        <div>
-          <Label>Visibility</Label>
-          <select value={visibility} onChange={(e) => setVisibility(e.target.value as typeof visibility)} className="mt-1 h-10 w-full rounded-lg border bg-white px-3 text-sm">
-            <option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option>
-          </select>
+      ) : (
+        <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
+          <span className="font-medium text-storm-navy">Teacher sponsor:</span>{" "}
+          <span className="text-muted-foreground">{club.sponsor_name || "Awaiting administrator assignment"}</span>
         </div>
-      </div>
-      <div className="flex flex-wrap gap-5 text-sm">
-        <label className="flex items-center gap-2"><input type="checkbox" checked={isListed} onChange={(e) => setIsListed(e.target.checked)} /> Listed publicly</label>
-        <label className="flex items-center gap-2"><input type="checkbox" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} /> Featured</label>
-      </div>
+      )}
+      {canManagePublication ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label htmlFor="club-status">Status</Label>
+              <select id="club-status" value={status} onChange={(e) => setStatus(e.target.value as ClubStatus)} className="mt-1 h-10 w-full rounded-lg border bg-white px-3 text-sm">
+                {["draft", "interest_open", "active", "paused", "archived"].map((value) => (
+                  <option key={value} value={value}>{value.replace("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="club-visibility">Visibility</Label>
+              <select id="club-visibility" value={visibility} onChange={(e) => setVisibility(e.target.value as typeof visibility)} className="mt-1 h-10 w-full rounded-lg border bg-white px-3 text-sm">
+                <option value="public">Public</option><option value="unlisted">Unlisted</option><option value="private">Private</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-5 text-sm">
+            <label className="flex items-center gap-2"><input type="checkbox" checked={isListed} onChange={(e) => setIsListed(e.target.checked)} /> Listed publicly</label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} /> Featured</label>
+          </div>
+        </>
+      ) : (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          You can edit the club profile and coursework. A school administrator must approve publication,
+          visibility, listing, and featured-club changes.
+        </div>
+      )}
       <Button type="submit" disabled={pending}>
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : publishMode ? <Send className="h-4 w-4" /> : null}
         {pending ? "Saving..." : publishMode ? "Finalize publication" : "Save changes"}

@@ -35,7 +35,7 @@ export function AssignmentForm({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [publishNow, setPublishNow] = useState(true);
+  const [releaseMode, setReleaseMode] = useState<"now" | "draft" | "scheduled">("now");
   const [submissionMode, setSubmissionMode] = useState<"submission" | "completion">("submission");
   const [localFiles, setLocalFiles] = useState<File[]>([]);
   const [driveFiles, setDriveFiles] = useState<DriveAttachmentDraft[]>([]);
@@ -57,7 +57,11 @@ export function AssignmentForm({
         pointsPossible: Number(form.get("points_possible") ?? 100),
         attachmentUrl: String(form.get("attachment_url") ?? "") || null,
         submissionMode,
-        publishNow: publishNow && !hasPendingAttachments,
+        publishNow: releaseMode === "now" && !hasPendingAttachments,
+        scheduledFor:
+          releaseMode === "scheduled"
+            ? String(form.get("scheduled_for") ?? "") || null
+            : null,
       });
       if (!result.success || !result.assignmentId) {
         setLoading(false);
@@ -145,7 +149,7 @@ export function AssignmentForm({
       return;
     }
 
-    if (publishNow && hasPendingAttachments) {
+    if (releaseMode === "now" && hasPendingAttachments) {
       const published = await updateClubAssignmentStatus({
         clubSlug,
         assignmentId,
@@ -165,13 +169,20 @@ export function AssignmentForm({
     setLoading(false);
 
     toast({
-      title: publishNow ? "Assignment published" : "Draft saved",
-      description: publishNow
+      title:
+        releaseMode === "now"
+          ? "Assignment published"
+          : releaseMode === "scheduled"
+            ? "Assignment scheduled"
+            : "Draft saved",
+      description: releaseMode === "now"
         ? "Club members can now view and submit this assignment."
-        : "Only coursework managers can see this draft.",
+        : releaseMode === "scheduled"
+          ? "Only coursework managers can see it until the scheduled release time."
+          : "Only coursework managers can see this draft.",
     });
     formElement.reset();
-    setPublishNow(true);
+    setReleaseMode("now");
     setSubmissionMode("submission");
     setLocalFiles([]);
     setDriveFiles([]);
@@ -399,24 +410,66 @@ export function AssignmentForm({
         <p className="mt-3 text-xs text-muted-foreground">Maximum private upload size: 20 MB per file.</p>
       </div>
 
-      <div className="flex flex-col gap-4 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
-        <label className="flex cursor-pointer items-start gap-3">
-          <input
-            type="checkbox"
-            checked={publishNow}
-            onChange={(event) => setPublishNow(event.target.checked)}
-            className="mt-1 h-4 w-4 accent-storm-electric"
-          />
-          <span>
-            <span className="block text-sm font-medium text-storm-navy">Publish now</span>
-            <span className="block text-xs text-muted-foreground">
-              Turn this off to save a private draft.
-            </span>
-          </span>
-        </label>
-        <Button type="submit" disabled={loading} className="sm:min-w-40">
-          {loading ? "Saving..." : publishNow ? "Publish assignment" : "Save draft"}
-        </Button>
+      <div className="space-y-4 border-t pt-5">
+        <fieldset>
+          <legend className="text-sm font-medium text-storm-navy">Release timing</legend>
+          <div className="mt-2 grid gap-3 sm:grid-cols-3">
+            {([
+              ["now", "Publish now", "Available as soon as materials finish uploading."],
+              ["draft", "Save draft", "Keep private until you publish it manually."],
+              ["scheduled", "Schedule", "Release automatically at a future time."],
+            ] as const).map(([value, label, description]) => (
+              <label
+                key={value}
+                className={cn(
+                  "cursor-pointer rounded-xl border p-3 transition-colors",
+                  releaseMode === value
+                    ? "border-storm-electric bg-blue-50/60 dark:bg-blue-950/40"
+                    : "bg-card hover:border-storm-electric/30"
+                )}
+              >
+                <input
+                  type="radio"
+                  name="release_mode"
+                  value={value}
+                  checked={releaseMode === value}
+                  onChange={() => setReleaseMode(value)}
+                  className="mr-2 accent-storm-electric"
+                />
+                <span className="text-sm font-medium text-storm-navy">{label}</span>
+                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{description}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        {releaseMode === "scheduled" && (
+          <div>
+            <Label htmlFor="assignment-scheduled-for">
+              <CalendarClock className="mr-1.5 inline h-4 w-4" /> Release date and time
+            </Label>
+            <Input
+              id="assignment-scheduled-for"
+              name="scheduled_for"
+              type="datetime-local"
+              required
+              className="mt-1.5"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Members will not see the assignment before this time.
+            </p>
+          </div>
+        )}
+        <div className="flex justify-end">
+          <Button type="submit" disabled={loading} className="sm:min-w-44">
+            {loading
+              ? "Saving..."
+              : releaseMode === "now"
+                ? "Publish assignment"
+                : releaseMode === "scheduled"
+                  ? "Schedule assignment"
+                  : "Save draft"}
+          </Button>
+        </div>
       </div>
     </form>
   );

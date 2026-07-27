@@ -63,7 +63,7 @@ supabase db push
 | Sender email | `auth@stormhubapp.com` (or an address on the verified sending domain) |
 | Sender name | `StormHub` |
 | Host | `smtp.resend.com` |
-| Port | `465` |
+| Port | `587` |
 | Username | `resend` |
 | Password | The Resend API key |
 
@@ -90,6 +90,8 @@ To reduce junk-folder placement:
    shorteners or attachment-heavy Auth messages.
 5. Test Gmail, Outlook, and a district-managed mailbox. In each received message, inspect the
    headers and require SPF, DKIM, and DMARC to report `PASS`.
+6. In Resend, disable click tracking for transactional authentication mail. Rewritten tracking
+   links can make a confirmation message look less trustworthy to a mailbox filter.
 
 No application can guarantee inbox placement because the recipient's mail administrator controls
 filtering. Domain authentication, alignment, a stable sender reputation, and low complaint/bounce
@@ -112,6 +114,28 @@ EMAIL_REPLY_TO=stormhubsupport@gmail.com
 SUPPORT_EMAIL=stormhubsupport@gmail.com
 NEXT_PUBLIC_SUPPORT_EMAIL=stormhubsupport@gmail.com
 ```
+
+## 2A. Enable Scheduled Club Releases
+
+The scheduled-content migration adds private release timestamps, and StormHub exposes a protected
+worker at `/api/cron/publish-scheduled`. Vercel Hobby only permits daily cron schedules, so use the
+free Supabase Cron module for a useful five-minute release interval instead of adding a frequent
+job to `vercel.json`.
+
+1. Apply `20260726220000_scheduled_club_content.sql` with the normal migration chain.
+2. In Supabase, open **Integrations > Cron** and enable the Cron module.
+3. Create an **HTTP Request** job named `publish-scheduled-stormhub-content`.
+4. Use schedule `*/5 * * * *`, method `GET`, and URL
+   `https://stormhubapp.com/api/cron/publish-scheduled`.
+5. Add the header `Authorization: Bearer <CRON_SECRET>`, using the exact same `CRON_SECRET`
+   configured in Vercel Production. Store the value as a Supabase Vault secret when the Cron
+   interface offers that option; never put it in source control.
+6. After deployment, schedule one announcement and one assignment about ten minutes ahead.
+   Confirm both stay private, release within five minutes of the selected time, and create member
+   notifications. Review the job under **Integrations > Cron > History** if either remains a draft.
+
+The worker is idempotent: overlapping calls can claim each scheduled item only once. A school on a
+Vercel Pro plan may use a frequent Vercel Cron instead, but it should not configure both schedulers.
 
 ## 3. Enable hCaptcha
 

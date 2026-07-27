@@ -13,6 +13,21 @@ for (const path of publicPages) {
   });
 }
 
+for (const path of ["/", "/clubs", "/opportunities"]) {
+  test(`${path} keeps accessible contrast in dark mode`, async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("stormhub-theme", "dark");
+    });
+    await page.goto(path);
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    const results = await new AxeBuilder({ page }).analyze();
+    const serious = results.violations.filter(
+      (violation) => violation.impact === "serious" || violation.impact === "critical"
+    );
+    expect(serious, `${path}\n${JSON.stringify(serious, null, 2)}`).toEqual([]);
+  });
+}
+
 test("primary navigation and sign-in are keyboard reachable", async ({ page }, testInfo) => {
   test.skip(
     testInfo.project.name === "webkit" || testInfo.project.name === "mobile-safari",
