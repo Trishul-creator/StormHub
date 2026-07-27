@@ -7,7 +7,8 @@ import { formatDateTime } from "@/lib/utils";
 import { ArchiveContentButton } from "@/components/manage/archive-content-button";
 import { canApproveClubContent, canManageClubCoursework } from "@/lib/permissions";
 import type { ClubAnnouncement } from "@/types/database";
-import { ClubPostComposer } from "@/components/manage/club-post-composer";
+import { ClubCreateNavigation } from "@/components/manage/club-create-navigation";
+import { ContentForm } from "@/components/forms/content-form";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -24,12 +25,13 @@ export default async function ManageAnnouncementsPage({ params }: PageProps) {
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
-      <PageHeader title="Create a club post" description={`Publish assignments, announcements, events, and materials for ${club.name}.`} />
-      <ClubPostComposer
+      <PageHeader title="Create for your club" description={`Publish announcements, assignments, events, and materials for ${club.name}.`} />
+      <ClubCreateNavigation
         clubSlug={slug}
-        defaultType="announcement"
+        activeType="announcement"
         courseworkEnabled={courseworkEnabled}
       />
+      <ContentForm type="announcement" clubSlug={slug} />
       <section className="mt-8 rounded-xl border bg-card p-5 shadow-sm">
         <h2 className="font-semibold text-storm-navy">Previous announcements</h2>
         <div className="mt-4 space-y-3">

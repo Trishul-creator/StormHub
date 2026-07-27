@@ -157,6 +157,26 @@ export function canDeleteUser(actor: Profile | null, target: Profile): boolean {
   return true;
 }
 
+export function getSponsorAssignableClubs(
+  clubs: Club[],
+  schoolId?: string | null
+): Club[] {
+  if (!schoolId) return [];
+
+  const seenClubIds = new Set<string>();
+  return clubs.filter((club) => {
+    const isEligible =
+      club.school_id === schoolId
+      && club.is_active
+      && club.is_listed
+      && club.visibility === "public"
+      && ["interest_open", "active"].includes(club.status);
+    if (!isEligible || seenClubIds.has(club.id)) return false;
+    seenClubIds.add(club.id);
+    return true;
+  });
+}
+
 export function canManageClubRoster(
   user: Profile | null,
   club: Club | string,

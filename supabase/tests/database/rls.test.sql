@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(83);
+SELECT plan(90);
 
 SELECT is(
   (SELECT public FROM storage.buckets WHERE id = 'coursework-private'),
@@ -633,6 +633,25 @@ RESET ROLE;
 DELETE FROM public.account_deletion_requests
 WHERE user_id = '30000000-0000-4000-8000-000000000001';
 
+INSERT INTO public.clubs (
+  id, school_id, name, slug, status, is_listed, is_active, visibility
+) VALUES
+  (
+    'a1100000-0000-4000-8000-000000000001',
+    'a0000000-0000-4000-8000-000000000001',
+    'School A Draft Club', 'school-a-draft-club', 'draft', FALSE, FALSE, 'unlisted'
+  ),
+  (
+    'a1100000-0000-4000-8000-000000000002',
+    'a0000000-0000-4000-8000-000000000001',
+    'School A Inactive Club', 'school-a-inactive-club', 'active', TRUE, FALSE, 'public'
+  ),
+  (
+    'a1100000-0000-4000-8000-000000000003',
+    'a0000000-0000-4000-8000-000000000001',
+    'School A Unlisted Club', 'school-a-unlisted-club', 'active', FALSE, TRUE, 'public'
+  );
+
 SELECT set_config(
   'request.jwt.claims',
   '{"sub":"30000000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}',
@@ -641,6 +660,76 @@ SELECT set_config(
 SET LOCAL ROLE authenticated;
 SELECT is((SELECT count(*) FROM public.profiles), 3::BIGINT, 'higher-assurance school admin sessions retain same-school access');
 SELECT is((SELECT count(*) FROM public.account_deletion_requests), 1::BIGINT, 'higher-assurance school admin sessions retain deletion-request access');
+SELECT lives_ok(
+  $$SELECT public.admin_set_user_role_and_clubs(
+      '20000000-0000-4000-8000-000000000001',
+      'teacher',
+      ARRAY[]::UUID[]
+    )$$,
+  'teacher accounts can remain unassigned until a club is published'
+);
+SELECT throws_ok(
+  $$SELECT public.admin_set_user_role_and_clubs(
+      '20000000-0000-4000-8000-000000000001',
+      'teacher',
+      ARRAY['a1100000-0000-4000-8000-000000000001']::UUID[]
+    )$$,
+  'P0001',
+  'Sponsors can only be assigned to published, active clubs in their school',
+  'draft clubs cannot receive sponsors'
+);
+SELECT throws_ok(
+  $$SELECT public.admin_set_user_role_and_clubs(
+      '20000000-0000-4000-8000-000000000001',
+      'teacher',
+      ARRAY['a1100000-0000-4000-8000-000000000002']::UUID[]
+    )$$,
+  'P0001',
+  'Sponsors can only be assigned to published, active clubs in their school',
+  'inactive clubs cannot receive sponsors'
+);
+SELECT throws_ok(
+  $$SELECT public.admin_set_user_role_and_clubs(
+      '20000000-0000-4000-8000-000000000001',
+      'teacher',
+      ARRAY['a1100000-0000-4000-8000-000000000003']::UUID[]
+    )$$,
+  'P0001',
+  'Sponsors can only be assigned to published, active clubs in their school',
+  'unpublished clubs cannot receive sponsors'
+);
+SELECT throws_ok(
+  $$SELECT public.admin_set_user_role_and_clubs(
+      '20000000-0000-4000-8000-000000000001',
+      'teacher',
+      ARRAY['b1000000-0000-4000-8000-000000000002']::UUID[]
+    )$$,
+  'P0001',
+  'Sponsors can only be assigned to published, active clubs in their school',
+  'school admins cannot assign a sponsor to another school club'
+);
+SELECT lives_ok(
+  $$SELECT public.admin_set_user_role_and_clubs(
+      '20000000-0000-4000-8000-000000000001',
+      'teacher',
+      ARRAY[
+        'a1000000-0000-4000-8000-000000000001',
+        'a1000000-0000-4000-8000-000000000001'
+      ]::UUID[]
+    )$$,
+  'duplicate club ids are safely deduplicated during sponsor assignment'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.club_memberships
+    WHERE user_id = '20000000-0000-4000-8000-000000000001'
+      AND role = 'sponsor'
+      AND status = 'active'
+  ),
+  1::BIGINT,
+  'a teacher receives only one active sponsorship for the selected club'
+);
 SELECT lives_ok(
   $$UPDATE public.account_deletion_requests SET status = 'rejected', reviewed_by = '30000000-0000-4000-8000-000000000001', reviewed_at = NOW() WHERE user_id = '10000000-0000-4000-8000-000000000001'$$,
   'school admins can review same-school deletion requests'
@@ -668,6 +757,13 @@ SELECT throws_ok(
   'audit records are immutable to admins'
 );
 RESET ROLE;
+
+DELETE FROM public.clubs
+WHERE id IN (
+  'a1100000-0000-4000-8000-000000000001',
+  'a1100000-0000-4000-8000-000000000002',
+  'a1100000-0000-4000-8000-000000000003'
+);
 
 SELECT set_config(
   'request.jwt.claims',

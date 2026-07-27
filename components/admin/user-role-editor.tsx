@@ -6,6 +6,7 @@ import { Ban, CheckCircle2, Loader2, Trash2 } from "lucide-react";
 import { deleteUserAccount, updateUserAccountStatus, updateUserRoleAndClubs } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { getSponsorAssignableClubs } from "@/lib/permissions";
 import type { AdminUser, Club, UserRole } from "@/types/database";
 
 export function UserRoleEditor({
@@ -20,11 +21,22 @@ export function UserRoleEditor({
   actorRole: UserRole;
 }) {
   const [role, setRole] = useState<UserRole>(user.role);
+  const assignableClubs = useMemo(
+    () => getSponsorAssignableClubs(clubs, user.school_id),
+    [clubs, user.school_id]
+  );
   const initialClubIds = useMemo(
-    () => user.club_assignments
-      .filter((assignment) => assignment.role === "sponsor" && assignment.status === "active")
-      .map((assignment) => assignment.club_id),
-    [user.club_assignments]
+    () => {
+      const assignableClubIds = new Set(assignableClubs.map((club) => club.id));
+      return user.club_assignments
+        .filter((assignment) =>
+          assignment.role === "sponsor"
+          && assignment.status === "active"
+          && assignableClubIds.has(assignment.club_id)
+        )
+        .map((assignment) => assignment.club_id);
+    },
+    [assignableClubs, user.club_assignments]
   );
   const [clubIds, setClubIds] = useState<string[]>(initialClubIds);
   const [pending, startTransition] = useTransition();
@@ -123,7 +135,7 @@ export function UserRoleEditor({
       {role === "teacher" && (
         <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2">
           <p className="mb-1 text-xs font-medium">Assigned clubs <span className="font-normal text-muted-foreground">(optional)</span></p>
-          {clubs.map((club) => (
+          {assignableClubs.map((club) => (
             <label key={club.id} className="flex items-center gap-2 text-xs">
               <input
                 type="checkbox"
@@ -133,6 +145,11 @@ export function UserRoleEditor({
               {club.name}
             </label>
           ))}
+          {assignableClubs.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No published, active clubs are available in this teacher&apos;s school.
+            </p>
+          )}
         </div>
       )}
 

@@ -7,7 +7,8 @@ import { Link as LinkIcon } from "lucide-react";
 import { StatusBadge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/utils";
 import { ArchiveContentButton } from "@/components/manage/archive-content-button";
-import { canApproveClubContent } from "@/lib/permissions";
+import { canApproveClubContent, canManageClubCoursework } from "@/lib/permissions";
+import { ClubCreateNavigation } from "@/components/manage/club-create-navigation";
 import type { ClubResource } from "@/types/database";
 
 interface PageProps { params: Promise<{ slug: string }> }
@@ -19,9 +20,11 @@ export default async function ManageResourcesPage({ params }: PageProps) {
   const auth = await requireClubManager(club);
   const resources = (await getClubManagedContent(club.id, "resource")) as ClubResource[];
   const canDelete = canApproveClubContent(auth.profile, club, auth.membership);
+  const courseworkEnabled = canManageClubCoursework(auth.profile, club, auth.membership);
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <PageHeader title="Create resource" description={`Share links and materials with ${club.name} members.`} />
+      <ClubCreateNavigation clubSlug={slug} activeType="resource" courseworkEnabled={courseworkEnabled} />
       <ContentForm type="resource" clubSlug={slug} />
       <section className="mt-8 rounded-xl border bg-card p-5 shadow-sm">
         <h2 className="font-semibold text-storm-navy">Previous resources</h2>

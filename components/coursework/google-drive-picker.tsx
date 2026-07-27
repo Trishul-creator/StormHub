@@ -32,16 +32,19 @@ interface GooglePickerBuilder {
   setDeveloperKey(key: string): GooglePickerBuilder;
   setAppId(appId: string): GooglePickerBuilder;
   setOrigin(origin: string): GooglePickerBuilder;
+  setSize(width: number, height: number): GooglePickerBuilder;
   setCallback(callback: (data: PickerCallbackData) => void): GooglePickerBuilder;
   build(): { setVisible(value: boolean): void };
 }
 
 interface GooglePickerApi {
-  Action: { PICKED: string };
+  Action: { PICKED: string; ERROR: string };
+  DocsViewMode: { LIST: string };
   Feature: { MULTISELECT_ENABLED: string };
   ViewId: { DOCS: string };
   DocsView: new (viewId: string) => {
     setIncludeFolders(value: boolean): unknown;
+    setMode(mode: string): unknown;
     setSelectFolderEnabled(value: boolean): unknown;
   };
   PickerBuilder: new () => GooglePickerBuilder;
@@ -133,14 +136,29 @@ export function GoogleDrivePicker({
       const view = new pickerApi.DocsView(pickerApi.ViewId.DOCS);
       view.setIncludeFolders(false);
       view.setSelectFolderEnabled(false);
+      // drive.file does not grant thumbnail access. Google's recommended list
+      // mode keeps the file catalog usable with this privacy-limited scope.
+      view.setMode(pickerApi.DocsViewMode.LIST);
+      const pickerWidth = Math.max(566, Math.min(1051, window.innerWidth - 32));
+      const pickerHeight = Math.max(350, Math.min(650, window.innerHeight - 32));
+      let picker: { setVisible(value: boolean): void } | null = null;
       let builder = new pickerApi.PickerBuilder()
         .addView(view)
         .setOAuthToken(tokenPayload.accessToken)
         .setDeveloperKey(apiKey)
         .setAppId(appId)
         .setOrigin(window.location.origin)
+        .setSize(pickerWidth, pickerHeight)
         .setCallback((data) => {
+          if (data.action === pickerApi.Action.ERROR) {
+            picker?.setVisible(false);
+            setError(
+              "Google Drive could not load your files. Reconnect Drive; if this continues, verify the Picker API key and project number."
+            );
+            return;
+          }
           if (data.action !== pickerApi.Action.PICKED || !data.docs) return;
+          setError(null);
           void onPicked(data.docs.map((file) => ({
             id: file.id,
             name: file.name,
@@ -150,7 +168,8 @@ export function GoogleDrivePicker({
           })));
         });
       if (multiple) builder = builder.enableFeature(pickerApi.Feature.MULTISELECT_ENABLED);
-      builder.build().setVisible(true);
+      picker = builder.build();
+      picker.setVisible(true);
     } catch (pickerError) {
       setError(pickerError instanceof Error ? pickerError.message : "Could not open Google Drive.");
     } finally {

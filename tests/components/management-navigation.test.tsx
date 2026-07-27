@@ -49,13 +49,15 @@ describe("ClubManagementNavigation", () => {
       <ClubManagementNavigation
         clubName="Science Bowl"
         slug="science-bowl"
-        canManageCoursework
         canManageRoster
       />
     );
 
     expect(screen.getByRole("navigation", { name: "Science Bowl management" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Coursework" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Create" })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: "Coursework" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Events" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Resources" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Members" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /member view/i })).toHaveAttribute("href", "/clubs/science-bowl/member");
   });
@@ -66,12 +68,11 @@ describe("ClubManagementNavigation", () => {
       <ClubManagementNavigation
         clubName="Science Bowl"
         slug="science-bowl"
-        canManageCoursework={false}
         canManageRoster={false}
       />
     );
 
-    expect(screen.queryByRole("link", { name: "Coursework" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Members" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Create" })).toBeInTheDocument();
   });
 });
