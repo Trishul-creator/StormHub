@@ -17,7 +17,9 @@ test.describe("teacher opportunity access", () => {
     await opportunityLink.click();
 
     await expect(page).toHaveURL(/\/s\/[^/]+\/opportunities/);
-    await expect(page.getByRole("heading", { name: /opportunities/i })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: /opportunities/i })
+    ).toBeVisible();
     await expect(page.getByText(/read-only mode/i)).toBeVisible();
     await expect(page.getByRole("link", { name: /create opportunity/i })).toHaveCount(0);
     await expect(
