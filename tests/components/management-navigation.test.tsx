@@ -10,13 +10,13 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("ManagementNavigation", () => {
-  it("shows school administration tools to admins", () => {
+  it("keeps workflow tools in the contextual management menu", () => {
     navigationState.pathname = "/manage";
-    render(<ManagementNavigation role="admin" canApprove canAdminister />);
+    render(<ManagementNavigation role="admin" canApprove />);
 
     expect(screen.getByRole("navigation", { name: "Management" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Approvals" })).toHaveAttribute("href", "/manage/approvals");
-    expect(screen.getByRole("link", { name: "Administration" })).toHaveAttribute("href", "/admin");
+    expect(screen.queryByRole("link", { name: "Administration" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Overview" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Clubs" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Opportunities" })).not.toBeInTheDocument();
@@ -24,7 +24,7 @@ describe("ManagementNavigation", () => {
 
   it("does not render a redundant sub-menu for club officers", () => {
     navigationState.pathname = "/manage";
-    render(<ManagementNavigation role="student" canApprove={false} canAdminister={false} />);
+    render(<ManagementNavigation role="student" canApprove={false} />);
 
     expect(screen.queryByRole("navigation", { name: "Management" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Approvals" })).not.toBeInTheDocument();
@@ -33,11 +33,11 @@ describe("ManagementNavigation", () => {
 
   it("does not stack the school-management menu inside primary product sections", () => {
     navigationState.pathname = "/manage/clubs";
-    const { rerender } = render(<ManagementNavigation role="admin" canApprove canAdminister />);
+    const { rerender } = render(<ManagementNavigation role="admin" canApprove />);
     expect(screen.queryByRole("navigation", { name: "Management" })).not.toBeInTheDocument();
 
     navigationState.pathname = "/manage/opportunities";
-    rerender(<ManagementNavigation role="admin" canApprove canAdminister />);
+    rerender(<ManagementNavigation role="admin" canApprove />);
     expect(screen.queryByRole("navigation", { name: "Management" })).not.toBeInTheDocument();
   });
 });

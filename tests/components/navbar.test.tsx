@@ -37,10 +37,18 @@ describe("Navbar", () => {
     expect(screen.getByRole("link", { name: "Opportunities" })).toHaveAttribute("href", "/opportunities");
   });
 
-  it("routes administrator product sections directly to their management workspaces", () => {
-    render(<Navbar isLoggedIn role="admin" />);
+  it("keeps administrator discovery catalogs in the top menu and adds administration", () => {
+    render(<Navbar isLoggedIn role="admin" schoolSlug="elkhorn-south" />);
 
-    expect(screen.getByRole("link", { name: "Clubs" })).toHaveAttribute("href", "/manage/clubs");
-    expect(screen.getByRole("link", { name: "Opportunities" })).toHaveAttribute("href", "/manage/opportunities");
+    expect(screen.getByRole("link", { name: "Clubs" })).toHaveAttribute("href", "/s/elkhorn-south/clubs");
+    expect(screen.getByRole("link", { name: "Opportunities" })).toHaveAttribute("href", "/s/elkhorn-south/opportunities");
+    expect(screen.getByRole("link", { name: "Administration" })).toHaveAttribute("href", "/admin");
+  });
+
+  it("does not expose school administration to teachers", () => {
+    render(<Navbar isLoggedIn role="teacher" schoolSlug="elkhorn-south" />);
+
+    expect(screen.getByRole("link", { name: "Clubs" })).toHaveAttribute("href", "/s/elkhorn-south/clubs");
+    expect(screen.queryByRole("link", { name: "Administration" })).not.toBeInTheDocument();
   });
 });
