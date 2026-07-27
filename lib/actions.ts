@@ -9,7 +9,7 @@ import { isDemoMode } from "@/lib/supabase/mode";
 import { createProfileIfMissing, defaultPathForProfile, getAuthUserId, getCurrentProfile } from "@/lib/auth";
 import { demoState } from "@/lib/data/demo-data";
 import { getClubBySlug, getManagedClubBySlug } from "@/lib/data";
-import { friendlyAuthEmailError, friendlyError } from "@/lib/errors";
+import { friendlyAuthEmailError, friendlyError, friendlySignInError } from "@/lib/errors";
 import {
   canApproveContent,
   canApproveClubContent,
@@ -2571,7 +2571,11 @@ export async function deleteServiceHour(id: string): Promise<{ success: boolean;
   return { success: false, error: "Service-hour tracking is handled through the school’s separate system." };
 }
 
-export async function demoSignIn(email: string, password: string, captchaToken?: string | null): Promise<{ success: boolean; error?: string; redirectTo?: string }> {
+export async function demoSignIn(
+  email: string,
+  password: string,
+  captchaToken?: string | null
+): Promise<{ success: boolean; error?: string; errorTitle?: string; redirectTo?: string }> {
   if (!isDemoMode()) {
     return supabaseSignIn(email, password, captchaToken);
   }
@@ -2600,10 +2604,20 @@ export async function supabaseSignIn(email: string, password: string, captchaTok
     password,
     options: captchaToken ? { captchaToken } : undefined,
   });
-  if (error) return { success: false, error: friendlyError(error, "Sign in failed.") };
+  if (error) {
+    const signInError = friendlySignInError(error);
+    return {
+      success: false,
+      errorTitle: signInError.title,
+      error: signInError.message,
+    };
+  }
   if (data.user) {
     const profile = await createProfileIfMissing(data.user.id, data.user.email ?? "", data.user.user_metadata?.full_name as string);
-    return { success: true, redirectTo: defaultPathForProfile(profile) };
+    const redirectTo = profile?.account_status && profile.account_status !== "active"
+      ? "/account-status"
+      : defaultPathForProfile(profile);
+    return { success: true, redirectTo };
   }
   return { success: true };
 }

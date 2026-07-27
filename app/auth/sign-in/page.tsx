@@ -18,7 +18,9 @@ export default function SignInPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaAttempt, setCaptchaAttempt] = useState(0);
   const googleAuthEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
+  const captchaRequired = Boolean(process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim());
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -49,6 +51,16 @@ export default function SignInPage() {
     const email = form.get("email") as string;
     const password = form.get("password") as string;
 
+    if (captchaRequired && !captchaToken) {
+      setLoading(false);
+      toast({
+        title: "CAPTCHA required",
+        description: "Complete the CAPTCHA before signing in.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const result = await demoSignIn(email, password, captchaToken);
 
     setLoading(false);
@@ -59,7 +71,13 @@ export default function SignInPage() {
       router.push(params.get("redirect") || redirectTo || "/dashboard");
       router.refresh();
     } else {
-      toast({ title: "Sign in failed", description: result.error, variant: "destructive" });
+      setCaptchaToken(null);
+      setCaptchaAttempt((attempt) => attempt + 1);
+      toast({
+        title: result.errorTitle || "Couldn’t sign in",
+        description: result.error,
+        variant: "destructive",
+      });
     }
   }
 
@@ -104,7 +122,7 @@ export default function SignInPage() {
                 </Link>
               </div>
             </div>
-            <Captcha onToken={setCaptchaToken} />
+            <Captcha key={captchaAttempt} onToken={setCaptchaToken} />
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Signing in..." : "Sign in"}
             </Button>
