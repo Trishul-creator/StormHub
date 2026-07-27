@@ -31,7 +31,7 @@ export default async function ManagePage() {
     <div className="container mx-auto px-4 py-8">
       <PageHeader
         title="Management"
-        description="Your operational overview. Use the top menu for Clubs, Calendar, and Opportunities; use the management tools above for approvals, the weekly digest, and administration."
+        description="Your operational overview. Use the top menu for Clubs, Calendar, Opportunities, and Administration; use the management tools above for approvals and the weekly digest."
       />
       <div className="mb-6">
         <RoleChecklist

@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ClubCard } from "@/components/clubs/club-card";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchBar } from "@/components/layout/search-bar";
 import { FilterSidebar, MobileFilterDrawer } from "@/components/layout/filter-sidebar";
 import { EmptyState } from "@/components/layout/empty-state";
+import { Button } from "@/components/ui/button";
 import { getClubs } from "@/lib/data";
 import { checkMembership } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
@@ -48,7 +50,28 @@ export default async function SchoolClubsPage({ params, searchParams }: SchoolCl
       <PageHeader
         title={`${school.short_name || school.name} Clubs`}
         description="Discover clubs in this school workspace."
-      />
+      >
+        {auth.profile?.role === "teacher" && auth.profile.school_id === school.id && (
+          <>
+            <Button variant="outline" asChild>
+              <Link href="/manage/clubs/drafts">Club drafts</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/manage/clubs/new">Propose club</Link>
+            </Button>
+          </>
+        )}
+        {(auth.profile?.role === "super_admin" || (auth.profile?.role === "admin" && auth.profile.school_id === school.id)) && (
+          <>
+            <Button variant="outline" asChild>
+              <Link href="/manage/clubs/drafts">Draft clubs</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/manage/clubs/new">Create club</Link>
+            </Button>
+          </>
+        )}
+      </PageHeader>
       <div className="mb-6">
         <SearchBar placeholder="Search clubs..." defaultValue={query.q} />
       </div>

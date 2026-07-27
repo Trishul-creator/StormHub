@@ -44,7 +44,7 @@ export function FilterSidebar({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <h3 className="font-semibold text-storm-navy text-sm">{title}</h3>
+      <h2 className="font-semibold text-storm-navy text-sm">{title}</h2>
       <div className="flex flex-col gap-1">
         <a
           href={hrefFor()}
@@ -89,10 +89,10 @@ export function MobileFilterDrawer({
       </Button>
       {open && (
         <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setOpen(false)}>
-          <div className="absolute bottom-0 left-0 right-0 max-h-[70vh] overflow-y-auto rounded-t-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute bottom-0 left-0 right-0 max-h-[70vh] overflow-y-auto rounded-t-2xl bg-background p-6" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-semibold">{title}</h3>
-              <button onClick={() => setOpen(false)}><X className="h-5 w-5" /></button>
+              <h2 className="font-semibold">{title}</h2>
+              <button aria-label="Close filters" onClick={() => setOpen(false)}><X className="h-5 w-5" /></button>
             </div>
             <FilterSidebar
               options={options}
