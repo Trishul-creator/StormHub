@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(90);
+SELECT plan(93);
 
 SELECT is(
   (SELECT public FROM storage.buckets WHERE id = 'coursework-private'),
@@ -25,6 +25,43 @@ INSERT INTO public.schools (
   TRUE,
   TRUE,
   ARRAY['*']
+);
+
+SELECT ok(
+  (SELECT count(*) FROM public.clubs WHERE school_id = 'b0000000-0000-4000-8000-000000000002') >= 60,
+  'new schools automatically receive the shared draft club catalog'
+);
+
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.clubs
+    WHERE school_id = 'b0000000-0000-4000-8000-000000000002'
+      AND (
+        status <> 'draft'
+        OR is_listed
+        OR is_featured
+        OR is_active
+        OR visibility <> 'unlisted'
+      )
+  ),
+  0::BIGINT,
+  'catalog templates stay inactive and hidden until an administrator publishes them'
+);
+
+SELECT public.seed_default_club_catalog('b0000000-0000-4000-8000-000000000002');
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.clubs
+    WHERE school_id = 'b0000000-0000-4000-8000-000000000002'
+  ),
+  (
+    SELECT count(DISTINCT LOWER(BTRIM(name)))
+    FROM public.clubs
+    WHERE school_id = 'b0000000-0000-4000-8000-000000000002'
+  ),
+  'rerunning the catalog seed does not duplicate a school club'
 );
 
 INSERT INTO auth.users (
@@ -596,7 +633,11 @@ SELECT is(
 );
 SELECT is(
   (public.get_admin_statistics(NULL)->>'totalClubs')::INTEGER,
-  1,
+  (
+    SELECT count(*)::INTEGER
+    FROM public.clubs
+    WHERE school_id = 'a0000000-0000-4000-8000-000000000001'
+  ),
   'school admin statistics exclude clubs from other schools'
 );
 SELECT throws_ok(
@@ -789,12 +830,16 @@ SET LOCAL ROLE authenticated;
 SELECT is((SELECT count(*) FROM public.profiles), 5::BIGINT, 'confirmed-email super admins can read profiles across schools');
 SELECT is(
   (public.get_admin_statistics(NULL)->>'totalClubs')::INTEGER,
-  2,
+  (SELECT count(*)::INTEGER FROM public.clubs),
   'super admin platform statistics include clubs across schools'
 );
 SELECT is(
   (public.get_admin_statistics('b0000000-0000-4000-8000-000000000002')->>'totalClubs')::INTEGER,
-  1,
+  (
+    SELECT count(*)::INTEGER
+    FROM public.clubs
+    WHERE school_id = 'b0000000-0000-4000-8000-000000000002'
+  ),
   'super admins can explicitly scope statistics to one school'
 );
 SELECT lives_ok(

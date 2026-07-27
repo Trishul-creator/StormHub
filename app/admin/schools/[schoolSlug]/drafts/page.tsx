@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { FilePenLine, Rocket, Settings } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/layout/empty-state";
-import { CategoryBadge } from "@/components/ui/badge";
+import { DraftClubCatalog } from "@/components/manage/draft-club-catalog";
 import { requireAdmin } from "@/lib/auth";
 import { getManageableClubs } from "@/lib/data";
 import { getSchoolBySlug } from "@/lib/schools";
@@ -25,7 +23,7 @@ export default async function SchoolDraftsPage({ params }: SchoolDraftsPageProps
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+      <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-100">
         <strong>Platform Admin Mode</strong> — draft club catalog for {school.name}.
       </div>
       <PageHeader
@@ -37,47 +35,7 @@ export default async function SchoolDraftsPage({ params }: SchoolDraftsPageProps
         </Button>
       </PageHeader>
 
-      <div className="space-y-3">
-        {clubs.map((club) => (
-          <div key={club.id} className="flex items-center justify-between rounded-xl border bg-white p-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <FilePenLine className="h-4 w-4 text-storm-electric" />
-                <p className="font-medium text-storm-navy">{club.name}</p>
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                {club.category && <CategoryBadge category={club.category} />}
-                <span className="text-xs text-muted-foreground">
-                  Draft · hidden from students
-                </span>
-              </div>
-              {club.short_description && (
-                <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{club.short_description}</p>
-              )}
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/manage/clubs/${club.slug}`}>
-                  <Settings className="mr-1 h-4 w-4" />
-                  Dashboard
-                </Link>
-              </Button>
-              <Button size="sm" asChild>
-                <Link href={`/manage/clubs/${club.slug}/edit?publish=1`}>
-                  <Rocket className="mr-1 h-4 w-4" />
-                  Publish
-                </Link>
-              </Button>
-            </div>
-          </div>
-        ))}
-        {clubs.length === 0 && (
-          <EmptyState
-            title="No draft clubs"
-            description="Run the Elkhorn South draft catalog reset script, or create draft clubs manually."
-          />
-        )}
-      </div>
+      <DraftClubCatalog clubs={clubs} mode="platform-admin" />
     </div>
   );
 }

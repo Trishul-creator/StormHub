@@ -11,6 +11,7 @@ import { supabaseResendConfirmation, supabaseSignUp } from "@/lib/actions";
 import { toast } from "@/hooks/use-toast";
 import { MailCheck, Zap } from "lucide-react";
 import { Captcha } from "@/components/auth/captcha";
+import { PasswordInput } from "@/components/auth/password-input";
 import { createClient } from "@/lib/supabase/client";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 
@@ -44,6 +45,7 @@ export function SignUpForm({
     const form = new FormData(e.currentTarget);
     const email = form.get("email") as string;
     const password = form.get("password") as string;
+    const confirmPassword = form.get("confirmPassword") as string;
     const fullName = form.get("fullName") as string;
     const gradeLevelRaw = String(form.get("gradeLevel") ?? "");
     const accessCode = String(form.get("accessCode") ?? "");
@@ -66,9 +68,15 @@ export function SignUpForm({
       toast({ title: "Sign up failed", description: "Choose your school.", variant: "destructive" });
       return;
     }
+    if (password !== confirmPassword) {
+      setLoading(false);
+      toast({ title: "Sign up failed", description: "Passwords do not match.", variant: "destructive" });
+      return;
+    }
     const result = await supabaseSignUp(
       email,
       password,
+      confirmPassword,
       fullName,
       gradeLevelRaw ? Number(gradeLevelRaw) : null,
       accessCode,
@@ -159,7 +167,26 @@ export function SignUpForm({
           </div>
           <div>
             <Label htmlFor="password">Password</Label>
-            <Input id="password" name="password" type="password" required minLength={12} className="mt-1" />
+            <PasswordInput
+              id="password"
+              name="password"
+              required
+              minLength={12}
+              autoComplete="new-password"
+              className="mt-1"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">Use at least 12 characters.</p>
+          </div>
+          <div>
+            <Label htmlFor="confirmPassword">Confirm password</Label>
+            <PasswordInput
+              id="confirmPassword"
+              name="confirmPassword"
+              required
+              minLength={12}
+              autoComplete="new-password"
+              className="mt-1"
+            />
           </div>
           {requiresAccessCode && (
             <div>

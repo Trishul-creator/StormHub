@@ -239,6 +239,30 @@ AI_DATA_SHARING_APPROVED=false
 The service-role key, CAPTCHA secret, SMTP/API keys, and rate-limit secrets must never use a
 `NEXT_PUBLIC_` name.
 
+### Shared club catalog and password recovery
+
+Apply the normal migration chain, including:
+
+```text
+supabase/migrations/20260727160000_shared_draft_club_catalog.sql
+```
+
+This adds missing private, inactive draft templates to every existing school and
+automatically initializes new schools. It does not edit, publish, or replace an
+existing club with the same name.
+
+Password recovery uses the existing production Auth callback:
+
+```text
+https://stormhubapp.com/auth/callback
+```
+
+In Supabase, keep **Authentication > Email Templates > Reset Password** enabled.
+If the template was customized, its button must use Supabase's generated
+`{{ .ConfirmationURL }}` value. No additional Vercel environment variable is
+required. After deployment, request one reset from a non-team mailbox, change
+the password, and confirm the old password no longer signs in.
+
 ## 7. Verify Scheduled Digest
 
 1. In Vercel, open **Settings > Cron Jobs** after deployment.
