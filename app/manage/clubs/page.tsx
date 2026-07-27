@@ -4,7 +4,7 @@ import { CategoryBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getManageableClubs } from "@/lib/data";
 import { requireManager } from "@/lib/auth";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, FilePenLine } from "lucide-react";
 import { EmptyState } from "@/components/layout/empty-state";
 import { isAdminRole } from "@/lib/permissions";
 
@@ -17,6 +17,11 @@ export default async function ManageClubsPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <PageHeader title="Manage Clubs" description="Published clubs you can manage as an officer, sponsor, or administrator.">
+        {(profile.role === "teacher" || isAdminRole(profile.role)) && (
+          <Button variant="outline" asChild>
+            <Link href="/manage/clubs/drafts"><FilePenLine className="h-4 w-4" /> Draft clubs</Link>
+          </Button>
+        )}
         {(profile.role === "teacher" || isAdminRole(profile.role)) && (
           <Button asChild>
             <Link href="/manage/clubs/new">{isAdminRole(profile.role) ? "Create draft club" : "Propose club"}</Link>
