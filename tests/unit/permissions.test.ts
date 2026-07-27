@@ -12,6 +12,7 @@ import {
   canManageSchool,
   canUseStudentFeatures,
   canViewMemberContent,
+  getSponsorAssignableClubs,
   isPlatformAdmin,
   isSchoolAdmin,
   isStudent,
@@ -140,6 +141,22 @@ describe("school admin permissions", () => {
     const superAdmin = profile("super_admin");
     expect(canEditRole(superAdmin, profile("admin", { school_id: schoolB }), "teacher")).toBe(true);
     expect(canDeleteUser(superAdmin, profile("teacher", { school_id: schoolB }))).toBe(true);
+  });
+
+  it("offers sponsors one copy of each published, active club in their school", () => {
+    const publishedClub = club();
+    const choices = getSponsorAssignableClubs([
+      publishedClub,
+      { ...publishedClub },
+      club({ id: "other-school", slug: "other-school", school_id: schoolB }),
+      club({ id: "draft", slug: "draft", status: "draft", is_active: false, is_listed: false }),
+      club({ id: "paused", slug: "paused", status: "paused", is_active: false }),
+      club({ id: "private", slug: "private", visibility: "private" }),
+      club({ id: "unlisted", slug: "unlisted", is_listed: false }),
+    ], schoolA);
+
+    expect(choices.map((choice) => choice.id)).toEqual([publishedClub.id]);
+    expect(getSponsorAssignableClubs([publishedClub], null)).toEqual([]);
   });
 });
 

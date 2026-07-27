@@ -3,8 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import { Eye } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { ClubPostComposer } from "@/components/manage/club-post-composer";
+import { ClubCreateNavigation } from "@/components/manage/club-create-navigation";
 import { AssignmentCard } from "@/components/coursework/assignment-card";
+import { AssignmentForm } from "@/components/coursework/assignment-form";
 import { AssignmentStatusActions } from "@/components/coursework/assignment-status-actions";
 import {
   getClubAssignments,
@@ -50,7 +51,8 @@ export default async function ManageCourseworkPage({ params }: CourseworkPagePro
         </Button>
       </PageHeader>
 
-      <ClubPostComposer clubSlug={slug} defaultType="assignment" />
+      <ClubCreateNavigation clubSlug={slug} activeType="assignment" />
+      <AssignmentForm clubSlug={slug} />
 
       <section className="mt-10">
         <div className="mb-4 flex items-end justify-between gap-4">
@@ -66,7 +68,7 @@ export default async function ManageCourseworkPage({ params }: CourseworkPagePro
           <div className="rounded-2xl border border-dashed bg-white p-10 text-center">
             <p className="font-medium text-storm-navy">No assignments yet</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Use the Assignment tab above to publish the first piece of classwork.
+              Use the assignment form above to publish the first piece of classwork.
             </p>
           </div>
         ) : (

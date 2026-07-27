@@ -2022,10 +2022,39 @@ export async function updateUserRoleAndClubs(data: {
   if (!canEditRole(actor, target, data.role)) {
     return { success: false, error: "You do not have permission to make this role change." };
   }
+  const assignedClubIds = data.role === "teacher"
+    ? [...new Set(data.clubIds.filter(Boolean))]
+    : [];
+  if (assignedClubIds.length > 0) {
+    const { data: clubRows, error: clubsError } = await supabase
+      .from("clubs")
+      .select("id,school_id,status,is_active,is_listed,visibility")
+      .in("id", assignedClubIds);
+    if (clubsError) {
+      return { success: false, error: friendlyError(clubsError, "Could not verify these club assignments.") };
+    }
+    const eligibleClubIds = new Set(
+      (clubRows ?? [])
+        .filter((club) =>
+          club.school_id === target.school_id
+          && club.is_active === true
+          && club.is_listed === true
+          && club.visibility === "public"
+          && ["interest_open", "active"].includes(club.status)
+        )
+        .map((club) => club.id)
+    );
+    if (eligibleClubIds.size !== assignedClubIds.length) {
+      return {
+        success: false,
+        error: "Sponsors can only be assigned to published, active clubs in their school.",
+      };
+    }
+  }
   const { error } = await supabase.rpc("admin_set_user_role_and_clubs", {
     target_user_id: data.targetUserId,
     new_role: data.role,
-    assigned_club_ids: data.role === "teacher" ? data.clubIds : [],
+    assigned_club_ids: assignedClubIds,
   });
   if (error) return { success: false, error: friendlyError(error, "Could not update this user.") };
 

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AssignmentForm } from "@/components/coursework/assignment-form";
-import { ClubPostComposer } from "@/components/manage/club-post-composer";
+import { ClubCreateNavigation } from "@/components/manage/club-create-navigation";
 import { SubmissionForm } from "@/components/coursework/submission-form";
 import { GradeSubmissionForm } from "@/components/coursework/grade-submission-form";
 import { ContentForm } from "@/components/forms/content-form";
@@ -93,14 +93,16 @@ describe("club coursework controls", () => {
     expect(refresh).toHaveBeenCalled();
   });
 
-  it("switches the unified publishing surface from announcements to assignments", () => {
-    render(<ClubPostComposer clubSlug="science-bowl" />);
+  it("keeps creation types in one contextual menu without duplicating their forms", () => {
+    render(<ClubCreateNavigation clubSlug="science-bowl" activeType="announcement" />);
 
     expect(screen.getByText("Share an update with every club member.")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Assignment" }));
-
-    expect(screen.getByText("Collect work, return feedback, and grade.")).toBeVisible();
-    expect(screen.getByLabelText("Assignment title")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Announcement" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Assignment" })).toHaveAttribute(
+      "href",
+      "/manage/clubs/science-bowl/coursework"
+    );
+    expect(screen.queryByLabelText("Assignment title")).not.toBeInTheDocument();
   });
 
   it("saves an assignment as a scheduled private draft", async () => {

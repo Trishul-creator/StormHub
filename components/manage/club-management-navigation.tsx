@@ -3,12 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  CalendarDays,
-  ClipboardList,
   Eye,
   LayoutDashboard,
-  Megaphone,
-  Paperclip,
+  PlusCircle,
   Settings,
   Users,
 } from "lucide-react";
@@ -17,35 +14,35 @@ import { cn } from "@/lib/cn";
 interface ClubManagementNavigationProps {
   clubName: string;
   slug: string;
-  canManageCoursework: boolean;
   canManageRoster: boolean;
 }
 
 export function ClubManagementNavigation({
   clubName,
   slug,
-  canManageCoursework,
   canManageRoster,
 }: ClubManagementNavigationProps) {
   const pathname = usePathname();
   const baseHref = `/manage/clubs/${slug}`;
   const links = [
     { href: baseHref, label: "Overview", icon: LayoutDashboard },
-    { href: `${baseHref}/announcements`, label: "Posts", icon: Megaphone },
-    ...(canManageCoursework
-      ? [{ href: `${baseHref}/coursework`, label: "Coursework", icon: ClipboardList }]
-      : []),
-    { href: `${baseHref}/events`, label: "Events", icon: CalendarDays },
-    { href: `${baseHref}/resources`, label: "Resources", icon: Paperclip },
+    { href: `${baseHref}/announcements`, label: "Create", icon: PlusCircle, contentHub: true },
     ...(canManageRoster
       ? [{ href: `${baseHref}/members`, label: "Members", icon: Users }]
       : []),
     { href: `${baseHref}/edit`, label: "Settings", icon: Settings },
   ];
-  const isActive = (href: string) => (
-    href === baseHref
-      ? pathname === href
-      : pathname === href || pathname.startsWith(`${href}/`)
+  const isActive = (href: string, contentHub?: boolean) => (
+    contentHub
+      ? [
+          `${baseHref}/announcements`,
+          `${baseHref}/coursework`,
+          `${baseHref}/events`,
+          `${baseHref}/resources`,
+        ].some((path) => pathname === path || pathname.startsWith(`${path}/`))
+      : href === baseHref
+        ? pathname === href
+        : pathname === href || pathname.startsWith(`${href}/`)
   );
 
   return (
@@ -70,8 +67,8 @@ export function ClubManagementNavigation({
           aria-label={`${clubName} management`}
           className="flex gap-1 overflow-x-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          {links.map(({ href, label, icon: Icon }) => {
-            const active = isActive(href);
+          {links.map(({ href, label, icon: Icon, contentHub }) => {
+            const active = isActive(href, contentHub);
             return (
               <Link
                 key={href}
