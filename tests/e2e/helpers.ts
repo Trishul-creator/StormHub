@@ -46,7 +46,9 @@ export async function signIn(page: Page, role: E2ERole) {
   await page.getByRole("button", { name: /sign in/i }).click();
 
   const signInError = page
-    .getByText(/sign in failed|invalid login|invalid credentials|email not confirmed|database not configured/i)
+    .getByText(
+      /incorrect email or password|email confirmation required|captcha (verification failed|required)|too many sign-in attempts|account suspended|sign-in service unavailable|couldn.t sign in|database not configured/i
+    )
     .first();
 
   const result = await Promise.race([

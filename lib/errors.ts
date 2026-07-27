@@ -54,6 +54,115 @@ export function friendlyAuthEmailError(
   return friendlyError(error, fallback);
 }
 
+export type FriendlySignInError = {
+  kind:
+    | "captcha"
+    | "credentials"
+    | "email_confirmation"
+    | "invalid_email"
+    | "rate_limit"
+    | "suspended"
+    | "temporary"
+    | "unknown";
+  title: string;
+  message: string;
+};
+
+/**
+ * Translate Supabase Auth failures without exposing whether an arbitrary
+ * email address belongs to an account.
+ */
+export function friendlySignInError(error: unknown): FriendlySignInError {
+  const message = errorMessage(error).toLowerCase();
+  const code = errorProperty(error, "code").toLowerCase();
+  const name = errorProperty(error, "name");
+  const status = Number(errorProperty(error, "status"));
+
+  if (code === "captcha_failed" || message.includes("captcha")) {
+    return {
+      kind: "captcha",
+      title: "CAPTCHA verification failed",
+      message: "The CAPTCHA could not be verified. Complete it again and retry.",
+    };
+  }
+
+  if (code === "email_not_confirmed" || message.includes("email not confirmed")) {
+    return {
+      kind: "email_confirmation",
+      title: "Email confirmation required",
+      message: "Confirm your email address using the message StormHub sent you, then sign in again.",
+    };
+  }
+
+  if (code === "user_banned" || message.includes("user is banned") || message.includes("account is banned")) {
+    return {
+      kind: "suspended",
+      title: "Account suspended",
+      message: "This account has been suspended. Contact your school administrator if you think this is a mistake.",
+    };
+  }
+
+  if (
+    code === "invalid_credentials"
+    || code === "user_not_found"
+    || message.includes("invalid login credentials")
+    || message.includes("invalid credentials")
+    || message.includes("invalid password")
+  ) {
+    return {
+      kind: "credentials",
+      title: "Incorrect email or password",
+      message: "The email or password you entered is incorrect. Try again or reset your password.",
+    };
+  }
+
+  if (code === "email_address_invalid" || message.includes("invalid email")) {
+    return {
+      kind: "invalid_email",
+      title: "Check your email address",
+      message: "Enter a valid email address and try again.",
+    };
+  }
+
+  if (
+    status === 429
+    || code === "over_request_rate_limit"
+    || code === "over_email_send_rate_limit"
+    || message.includes("rate limit")
+    || message.includes("too many requests")
+  ) {
+    return {
+      kind: "rate_limit",
+      title: "Too many sign-in attempts",
+      message: "Wait a few minutes before trying to sign in again.",
+    };
+  }
+
+  if (
+    name === "AuthRetryableFetchError"
+    || status >= 500
+    || code === "request_timeout"
+    || code === "unexpected_failure"
+    || message.includes("failed to fetch")
+    || message.includes("network request failed")
+  ) {
+    return {
+      kind: "temporary",
+      title: "Sign-in service unavailable",
+      message: "StormHub could not reach the sign-in service. Check your connection and try again shortly.",
+    };
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    console.error("[StormHub sign-in]", error);
+  }
+  return {
+    kind: "unknown",
+    title: "Couldn’t sign in",
+    message: "Something unexpected happened. Try again, or contact support if the problem continues.",
+  };
+}
+
 export class SetupRequiredError extends Error {
   constructor() {
     super("SETUP_REQUIRED");
