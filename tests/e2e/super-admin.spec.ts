@@ -13,6 +13,7 @@ test.describe("super admin school chooser", () => {
     await expect(page.getByRole("heading", { name: /platform admin/i })).toBeVisible();
     await expect(page.getByText(/School 1/i).first()).toBeVisible();
     await expect(page.getByText(/School 2/i).first()).toBeVisible();
+    await page.locator("summary").filter({ hasText: "Create school" }).click();
     await expect(page.getByText(/Workspace URL name/i)).toBeVisible();
     await expect(page.getByText(/^Slug$/)).toHaveCount(0);
     const adminNavigation = page.getByRole("navigation", { name: "Administration" });

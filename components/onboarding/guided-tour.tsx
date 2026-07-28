@@ -87,9 +87,28 @@ function buildTourSteps(role: UserRole, canManage: boolean): TourStep[] {
       description: primaryDescription,
     },
     {
+      selector: '[data-tour="dashboard-priorities"]',
+      title: "Start with what needs attention",
+      description:
+        role === "student"
+          ? "This short queue combines your closest assignment, opportunity, and event deadlines. It never shows more than four items."
+          : role === "super_admin"
+            ? "This short queue flags school workspaces that need setup or publishing attention."
+            : role === "teacher"
+              ? "This short queue combines submissions to grade, approaching coursework, and club events."
+              : "This short queue combines pending approvals and upcoming school activity.",
+      optional: true,
+    },
+    {
+      selector: '[data-tour="dashboard-summary"]',
+      title: "Use the quick summary",
+      description: "These three numbers are shortcuts. Click one whenever you want the complete view behind it.",
+      optional: true,
+    },
+    {
       selector: '[data-tour="role-checklist"]',
-      title: "Your launch checklist",
-      description: "These role-specific tasks help you finish setup and learn the most useful first actions.",
+      title: "Open setup only when needed",
+      description: "The optional checklist is collapsed to keep your dashboard focused. Expand it whenever you want setup guidance.",
       optional: true,
     },
     ...(role === "student"
@@ -100,12 +119,16 @@ function buildTourSteps(role: UserRole, canManage: boolean): TourStep[] {
             description: "Joined clubs appear here. Open one to reach its stream, assignments, people, events, and resources.",
             optional: true,
           },
-          {
-            selector: '[data-tour="student-classwork"]',
-            title: "Your upcoming classwork",
-            description: "Assignments appear here for Members, Vice Presidents, and Presidents. You can submit work and review your own grades and feedback.",
-            optional: true,
-          },
+          ...(canManage
+            ? [
+                {
+                  selector: '[data-tour="leadership-overview"]',
+                  title: "Your leadership shortcut",
+                  description: "Presidents and Vice Presidents can jump from the student dashboard into the clubs they help manage.",
+                  optional: true,
+                },
+              ]
+            : []),
         ]
       : role === "super_admin"
         ? [
