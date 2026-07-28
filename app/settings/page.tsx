@@ -43,7 +43,7 @@ export default async function SettingsPage() {
       <div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8">
         <SettingsNavigation />
 
-        <div className="motion-stagger min-w-0 space-y-6">
+        <div data-tour="settings-content" className="motion-stagger min-w-0 space-y-6">
           <section id="profile" className="scroll-mt-24" aria-labelledby="profile-heading">
             <Card>
               <CardHeader className="border-b bg-storm-light/20">

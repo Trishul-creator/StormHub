@@ -12,6 +12,7 @@ import { buildEmptyStateActions } from "@/lib/product";
 import { isAdminRole } from "@/lib/permissions";
 import { SchoolFilter } from "@/components/layout/school-filter";
 import { getSchoolFilterContext } from "@/lib/schools";
+import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
 
 interface ClubsPageProps {
   searchParams: Promise<{ q?: string; category?: string; featured?: string; filter?: string; school?: string }>;
@@ -58,12 +59,13 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {!isLoggedIn && <div className="mb-6"><PublicDemoNotice /></div>}
       <PageHeader
         title="Club Directory"
         description={`Discover clubs and activities at ${school?.name ?? "your school"}. Join to access member resources, announcements, and events.`}
       />
 
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
+      <div data-tour="club-directory-tools" className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
         <SearchBar placeholder="Search clubs..." defaultValue={params.q} className="flex-1" />
         <SchoolFilter schools={schools} activeSlug={school?.slug} />
       </div>
@@ -86,7 +88,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
           </div>
         </aside>
 
-        <div className="flex-1">
+        <div data-tour="club-directory-results" className="flex-1">
           <MobileFilterDrawer
             title="Filter clubs"
             options={filterOptions}

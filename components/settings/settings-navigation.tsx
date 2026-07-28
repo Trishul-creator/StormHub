@@ -72,7 +72,7 @@ export function SettingsNavigation() {
   }, []);
 
   return (
-    <aside className="min-w-0 max-w-full lg:sticky lg:top-24 lg:self-start">
+    <aside data-tour="settings-navigation" className="min-w-0 max-w-full lg:sticky lg:top-24 lg:self-start">
       <div className="max-w-full overflow-hidden rounded-2xl border bg-card/85 p-2 shadow-sm backdrop-blur">
         <div className="hidden border-b px-3 pb-4 pt-2 lg:block">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-storm-electric">

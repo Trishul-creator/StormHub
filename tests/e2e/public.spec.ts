@@ -26,6 +26,15 @@ test.describe("public platform surfaces", () => {
     await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible();
   });
 
+  test("signed-out visitors see only the fictional showcase catalog", async ({ page }) => {
+    await page.goto("/clubs");
+    await expect(page.getByText("You’re viewing fictional sample data")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Club Directory" })).toBeVisible();
+    await expect(page.getByText("Northstar High School (Demo)").first()).toBeVisible();
+    await expect(page.getByText(/Elkhorn South/i)).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Horizon Robotics Collective" })).toBeVisible();
+  });
+
   test("public responses include security headers and hide framework details", async ({ request }) => {
     const response = await request.get("/");
     expect(response.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");

@@ -34,6 +34,7 @@ export function NotificationBell({
   return (
     <div className="relative">
       <Button
+        data-tour="notifications-trigger"
         variant="ghost"
         size="sm"
         onClick={() => setOpen((value) => !value)}
@@ -49,7 +50,7 @@ export function NotificationBell({
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl">
+        <div data-tour="notification-panel" className="absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl">
           <div className="flex items-center justify-between border-b p-3">
             <div>
               <p className="font-semibold text-storm-navy">Notifications</p>

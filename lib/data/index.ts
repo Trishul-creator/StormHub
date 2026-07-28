@@ -40,6 +40,7 @@ import type {
   ApprovalContentType,
 } from "@/types/database";
 import { isAdminRole } from "@/lib/permissions";
+import { shouldServePublicDemoContent } from "@/lib/public-content";
 import { CLUB_FILTER_GROUPS } from "@/lib/utils";
 import { DEFAULT_SCHOOL_ID, getCurrentSchool } from "@/lib/schools";
 
@@ -51,6 +52,11 @@ export async function getCurrentUser(): Promise<Profile | null> {
 
 export async function getSchool(): Promise<School | null> {
   return getCurrentSchool();
+}
+
+async function shouldUseDemoContent(): Promise<boolean> {
+  if (isDemoMode()) return true;
+  return shouldServePublicDemoContent(await getCurrentProfile(), false);
 }
 
 async function resolveSchoolId(explicitSchoolId?: string | null, profile?: Profile | null): Promise<string | null> {
@@ -83,7 +89,7 @@ export async function getClubs(filters?: {
   filterGroup?: string;
   schoolId?: string | null;
 }): Promise<Club[]> {
-  if (isDemoMode()) {
+  if (await shouldUseDemoContent()) {
     let clubs = [...demoClubs];
     if (filters?.featured) clubs = clubs.filter((c) => c.is_featured);
     if (filters?.category) clubs = clubs.filter((c) => c.category === filters.category);
@@ -145,7 +151,7 @@ export async function getFeaturedClubs(schoolId?: string | null): Promise<Club[]
 }
 
 export async function getClubBySlug(slug: string, schoolId?: string | null): Promise<Club | null> {
-  if (isDemoMode()) {
+  if (await shouldUseDemoContent()) {
     return demoClubs.find((c) => c.slug === slug) ?? null;
   }
   const supabase = await createClient();
@@ -176,7 +182,7 @@ export async function getManagedClubBySlug(slug: string): Promise<Club | null> {
 }
 
 export async function getClubMemberCount(clubId: string): Promise<number> {
-  if (isDemoMode()) {
+  if (await shouldUseDemoContent()) {
     const club = demoClubs.find((c) => c.id === clubId);
     return club?.member_count ?? 0;
   }
@@ -245,7 +251,7 @@ export async function getClubAnnouncements(
   clubId: string,
   visibility?: "public" | "members"
 ): Promise<ClubAnnouncement[]> {
-  if (isDemoMode()) {
+  if (await shouldUseDemoContent()) {
     let announcements = demoAnnouncements.filter((a) => a.club_id === clubId && a.status === "approved");
     if (visibility) announcements = announcements.filter((a) => a.visibility === visibility || a.visibility === "public");
     return announcements;
@@ -595,7 +601,7 @@ export async function getRecentAnnouncements(
 }
 
 export async function getClubResources(clubSlug: string): Promise<ClubResource[]> {
-  if (isDemoMode()) {
+  if (await shouldUseDemoContent()) {
     return demoMemberResources[clubSlug] || [];
   }
   const club = await getClubBySlug(clubSlug);
@@ -604,7 +610,7 @@ export async function getClubResources(clubSlug: string): Promise<ClubResource[]
 }
 
 export async function getClubResourcesByClubId(clubId: string): Promise<ClubResource[]> {
-  if (isDemoMode()) {
+  if (await shouldUseDemoContent()) {
     return Object.values(demoMemberResources).flat().filter((resource) => resource.club_id === clubId);
   }
   const supabase = await createClient();
@@ -619,7 +625,7 @@ export async function getClubResourcesByClubId(clubId: string): Promise<ClubReso
 }
 
 export async function getClubEvents(clubId: string, includeMembersOnly = false): Promise<Event[]> {
-  if (isDemoMode()) {
+  if (await shouldUseDemoContent()) {
     let events = demoEvents.filter((e) => e.club_id === clubId && e.status === "approved");
     if (!includeMembersOnly) events = events.filter((e) => e.visibility === "public");
     return events;
@@ -640,7 +646,7 @@ export async function getOpportunities(filters?: {
 }): Promise<Opportunity[]> {
   const profile = await getCurrentProfile();
   const adminView = isAdminRole(profile?.role);
-  if (isDemoMode()) {
+  if (shouldServePublicDemoContent(profile, isDemoMode())) {
     let opps = demoOpportunities.filter(
       (o) =>
         (adminView || (o.status === "approved" && o.visibility === "public")) &&
@@ -691,7 +697,7 @@ export async function getOpportunities(filters?: {
 }
 
 export async function getOpportunityCategories(schoolId?: string | null): Promise<string[]> {
-  if (isDemoMode()) {
+  if (await shouldUseDemoContent()) {
     return [...new Set(demoOpportunities.map((opportunity) => opportunity.category).filter(Boolean) as string[])].sort();
   }
   const opportunities = await getOpportunities({ schoolId });
@@ -701,7 +707,7 @@ export async function getOpportunityCategories(schoolId?: string | null): Promis
 export async function getOpportunityBySlug(slug: string): Promise<Opportunity | null> {
   const profile = await getCurrentProfile();
   const adminView = isAdminRole(profile?.role);
-  if (isDemoMode()) {
+  if (shouldServePublicDemoContent(profile, isDemoMode())) {
     const opp = demoOpportunities.find((o) => o.slug === slug);
     if (
       !opp ||
@@ -735,7 +741,7 @@ export async function getEvents(filters?: {
   upcoming?: boolean;
   schoolId?: string | null;
 }): Promise<Event[]> {
-  if (isDemoMode()) {
+  if (await shouldUseDemoContent()) {
     let events = attachClubToItems(
       demoEvents.filter(
         (e) => e.status === "approved" && e.visibility === "public" && String(e.event_type) !== "volunteer"
@@ -769,7 +775,7 @@ export async function getEvents(filters?: {
 }
 
 export async function getCalendarEvents(userId: string | null, schoolId?: string | null): Promise<Event[]> {
-  if (isDemoMode()) {
+  if (await shouldUseDemoContent()) {
     const joinedClubIds = new Set(
       demoClubs
         .filter((club) => demoState.memberships.has(club.slug))
@@ -818,7 +824,7 @@ export async function getCalendarEvents(userId: string | null, schoolId?: string
 }
 
 export async function getEventById(id: string): Promise<Event | null> {
-  if (isDemoMode()) {
+  if (await shouldUseDemoContent()) {
     const event = demoEvents.find((e) => e.id === id);
     if (!event || String(event.event_type) === "volunteer") return null;
     const club = event.club_id ? demoClubs.find((c) => c.id === event.club_id) : null;

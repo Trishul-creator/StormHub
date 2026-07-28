@@ -77,4 +77,11 @@ export async function signIn(page: Page, role: E2ERole) {
 
   await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
   await expect(page).not.toHaveURL(/\/auth\/sign-in/, { timeout: 10_000 });
+
+  const closeWalkthrough = page.getByRole("button", { name: "Close walkthrough" });
+  const walkthroughStarted = await closeWalkthrough
+    .waitFor({ state: "visible", timeout: 2_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (walkthroughStarted) await closeWalkthrough.click();
 }

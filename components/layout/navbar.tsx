@@ -196,7 +196,7 @@ export function Navbar({
                 <span data-tour="appearance"><ThemeToggle showLabel /></span>
                 <Link href="/search" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Search</Link>
                 {canManage && role !== "super_admin" && primaryHref !== "/manage" && <Link href="/manage" data-tour="manage-nav" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Manage</Link>}
-                <Link href="/notifications" data-tour="notifications" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>
+                <Link href="/notifications" data-tour="notifications-trigger" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>
                   Notifications{unreadNotificationCount > 0 ? ` (${unreadNotificationCount})` : ""}
                 </Link>
                 <Link

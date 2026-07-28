@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { getOpportunities, getOpportunityCategories } from "@/lib/data";
 import { getUserBookmarkIds, getUserOpportunitySignupIds } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
-import { getSchoolBySlug } from "@/lib/schools";
+import { getSchoolBySlugForViewer } from "@/lib/schools";
+import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
 
 interface SchoolOpportunitiesPageProps {
   params: Promise<{ schoolSlug: string }>;
@@ -18,10 +19,10 @@ interface SchoolOpportunitiesPageProps {
 
 export default async function SchoolOpportunitiesPage({ params, searchParams }: SchoolOpportunitiesPageProps) {
   const [{ schoolSlug }, query] = await Promise.all([params, searchParams]);
-  const school = await getSchoolBySlug(schoolSlug);
+  const { userId, isLoggedIn, profile } = await getAuthContext();
+  const school = await getSchoolBySlugForViewer(schoolSlug, profile);
   if (!school) notFound();
 
-  const { userId, isLoggedIn, profile } = await getAuthContext();
   const selectedGrade = query.grade ? Number(query.grade) : undefined;
   const [allOpportunities, categories] = await Promise.all([
     getOpportunities({
@@ -39,7 +40,7 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
         return selectedGrade! >= min && selectedGrade! <= max;
       })
     : allOpportunities;
-  const canParticipate = profile?.role === "student" && profile.school_id === school.id;
+  const canParticipate = !profile || (profile.role === "student" && profile.school_id === school.id);
   const [bookmarkedIds, signedUpIds] = canParticipate
     ? await Promise.all([getUserBookmarkIds(userId), getUserOpportunitySignupIds(userId)])
     : [new Set<string>(), new Set<string>()];
@@ -54,6 +55,7 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {!isLoggedIn && <div className="mb-6"><PublicDemoNotice /></div>}
       <PageHeader
         title={`${school.short_name || school.name} Opportunities`}
         description={
@@ -68,7 +70,7 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
           </Button>
         )}
       </PageHeader>
-      <div className="mb-6">
+      <div data-tour="opportunity-tools" className="mb-6">
         <SearchBar placeholder="Search opportunities..." defaultValue={query.q} />
       </div>
       <div className="flex gap-8">
@@ -115,7 +117,7 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
             })}
           </div>
         </aside>
-        <div className="min-w-0 flex-1">
+        <div data-tour="opportunity-results" className="min-w-0 flex-1">
           <MobileFilterDrawer
             title="Filter opportunities"
             options={filterOptions}

@@ -12,6 +12,7 @@ import { buildEmptyStateActions } from "@/lib/product";
 import { isAdminRole } from "@/lib/permissions";
 import { SchoolFilter } from "@/components/layout/school-filter";
 import { getSchoolFilterContext } from "@/lib/schools";
+import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
 
 interface OpportunitiesPageProps {
   searchParams: Promise<{ q?: string; category?: string; closing?: string; grade?: string; school?: string }>;
@@ -64,6 +65,7 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {!isLoggedIn && <div className="mb-6"><PublicDemoNotice /></div>}
       <PageHeader
         title="Opportunities"
         description={
@@ -81,7 +83,7 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
         )}
       </PageHeader>
 
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
+      <div data-tour="opportunity-tools" className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
         <SearchBar placeholder="Search opportunities..." defaultValue={params.q} className="flex-1" />
         <SchoolFilter schools={schools} activeSlug={selectedSchool?.slug} />
       </div>
@@ -125,7 +127,7 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
           </div>
         </aside>
 
-        <div className="flex-1">
+        <div data-tour="opportunity-results" className="flex-1">
           <MobileFilterDrawer
             title="Filter opportunities"
             options={filterOptions}
