@@ -1,315 +1,298 @@
 import Link from "next/link";
-import { ArrowRight, Bookmark, Calendar, CheckSquare, ClipboardList, Settings, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  ArrowRight,
+  CalendarDays,
+  ClipboardList,
+  Megaphone,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+import { redirect } from "next/navigation";
+import { DashboardPriorityPanel } from "@/components/dashboard/priority-panel";
 import { RoleChecklist } from "@/components/dashboard/role-checklist";
 import { DashboardCard } from "@/components/layout/stat-cards";
-import {
-  getAdminAnalytics,
-  getManageableClubs,
-  getPendingApprovals,
-  getStudentDashboard,
-} from "@/lib/data";
+import { Button } from "@/components/ui/button";
 import { requireAuth } from "@/lib/auth";
-import { formatDate } from "@/lib/utils";
-import { isAdminRole } from "@/lib/permissions";
-import { buildDiscoveryHints, getRoleOnboardingItems } from "@/lib/product";
-import { redirect } from "next/navigation";
+import { getManageableClubs, getStudentDashboard } from "@/lib/data";
+import { buildStudentDashboardPriorities } from "@/lib/dashboard-priorities";
+import { getRoleOnboardingItems } from "@/lib/product";
 
 export default async function DashboardPage() {
   const { userId, profile } = await requireAuth("/dashboard");
-  const manageableClubs = await getManageableClubs(profile);
 
   if (profile.role === "super_admin") redirect("/admin/schools");
-  if (isAdminRole(profile.role)) redirect("/manage");
+  if (profile.role === "admin" || profile.role === "teacher") redirect("/manage");
 
-  if (profile.role === "teacher") {
-    const pending = await getPendingApprovals();
-    const checklist = getRoleOnboardingItems("teacher", {
-      manageableClubs: manageableClubs.length,
-      pendingApprovals: pending.length,
-    });
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div data-tour="role-overview">
-          <h1 className="text-3xl font-bold text-storm-navy">Teacher Dashboard</h1>
-          <p className="mt-1 text-muted-foreground">Manage your assigned clubs, coursework, rosters, events, and announcements.</p>
-        </div>
-        <div className="mt-6" data-tour="role-checklist">
-          <RoleChecklist
-            title="Teacher launch checklist"
-            description="The fastest path to keeping club operations current."
-            items={checklist}
-            progressKey={`role:${profile.role}:${profile.onboarding_reset_at ?? profile.created_at ?? "initial"}`}
-            forceManualProgress={Boolean(profile.onboarding_reset_at)}
-          />
-        </div>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <DashboardMetric label="Assigned clubs" value={manageableClubs.length} icon={Users} />
-          {pending.length > 0 && <DashboardMetric label="Pending approvals" value={pending.length} icon={CheckSquare} />}
-        </div>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-tour="managed-clubs">
-          <DashboardLink
-            href="/manage"
-            title="My clubs command center"
-            description="Review rosters, pending content, quick-post actions, and member status."
-          />
-          <DashboardLink
-            href="/calendar"
-            title="Calendar"
-            description="View school-wide events and events from your assigned clubs."
-          />
-          <DashboardLink
-            href="/opportunities"
-            title="Opportunities"
-            description="Browse school opportunities in read-only mode without student signup actions."
-          />
-          {manageableClubs.map((club) => (
-            <DashboardLink
-              key={club.id}
-              href={`/manage/clubs/${club.slug}`}
-              title={club.name}
-              description="Manage assignments, grades, posts, events, resources, and the club roster."
-            />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  const dashboard = await getStudentDashboard(userId);
+  const [dashboard, manageableClubs] = await Promise.all([
+    getStudentDashboard(userId),
+    getManageableClubs(profile),
+  ]);
   const officerMemberships = dashboard.memberships.filter(
-    (membership) => membership.role === "officer" || membership.role === "president"
+    (membership) =>
+      membership.role === "officer" || membership.role === "president"
   );
+  const priorities = buildStudentDashboardPriorities(dashboard);
+  const openAssignments = dashboard.upcomingAssignments.filter(
+    (assignment) =>
+      !assignment.submission || assignment.submission.status === "draft"
+  ).length;
   const checklist = getRoleOnboardingItems("student", {
     joinedClubs: dashboard.memberships.length,
     savedOpportunities: dashboard.savedOpportunities.length,
     rsvpedEvents: dashboard.upcomingEvents.length,
     officerClubs: officerMemberships.length,
   });
-  const firstCategory = dashboard.memberships.find((membership) => membership.club?.category)?.club?.category;
-  const discoveryHints = buildDiscoveryHints({
-    joinedCategory: firstCategory,
-    hasJoinedClubs: dashboard.memberships.length > 0,
-    hasSavedOpportunities: dashboard.savedOpportunities.length > 0,
-  });
+  const progressKey = `role:${profile.role}:${
+    profile.onboarding_reset_at ?? profile.created_at ?? "initial"
+  }:${officerMemberships
+    .map((membership) => `${membership.club_id}:${membership.role}`)
+    .sort()
+    .join(",")}`;
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8" data-tour="role-overview">
-        <h1 className="text-3xl font-bold text-storm-navy">
-          {manageableClubs.length ? "Student Leader Dashboard" : "Your Dashboard"}
+    <main className="container mx-auto px-4 py-8">
+      <header className="mb-6" data-tour="role-overview">
+        <p className="text-sm font-medium text-storm-electric">
+          {manageableClubs.length > 0 ? "Student leader" : "Student"}
+        </p>
+        <h1 className="mt-1 text-3xl font-bold text-storm-navy">
+          {manageableClubs.length > 0 ? "Leadership dashboard" : "Your dashboard"}
         </h1>
-        <p className="mt-1 text-muted-foreground">Your clubs, events, and opportunities at a glance.</p>
-      </div>
+        <p className="mt-1 text-muted-foreground">
+          Welcome back
+          {profile.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}.
+          Start with what needs attention, then open a section for more detail.
+        </p>
+      </header>
 
-      <div className="mb-8" data-tour="role-checklist">
-        <RoleChecklist
-          title={officerMemberships.length ? "New club leader checklist" : "Student launch checklist"}
-          description={
-            officerMemberships.length
-              ? "Your responsibilities changed, so this checklist starts fresh with your club-leadership tools."
-              : "Set up your club feed, saved deadlines, and event plan."
-          }
-          items={checklist}
-          progressKey={`role:${profile.role}:${profile.onboarding_reset_at ?? profile.created_at ?? "initial"}:${officerMemberships
-            .map((membership) => `${membership.club_id}:${membership.role}`)
-            .sort()
-            .join(",")}`}
-          forceManualProgress={Boolean(profile.onboarding_reset_at) || officerMemberships.length > 0}
+      <DashboardPriorityPanel
+        items={priorities}
+        allHref="/calendar"
+        allLabel="Open calendar"
+        description="Your closest assignment, opportunity, and event deadlines."
+      />
+
+      <section
+        className="my-6 grid gap-3 sm:grid-cols-3"
+        aria-label="Dashboard summary"
+        data-tour="dashboard-summary"
+      >
+        <SummaryMetric
+          label="Joined clubs"
+          value={dashboard.memberships.length}
+          icon={Users}
+          href="/my-clubs"
         />
-      </div>
+        <SummaryMetric
+          label="Open assignments"
+          value={openAssignments}
+          icon={ClipboardList}
+          href="/my-clubs"
+        />
+        <SummaryMetric
+          label="Upcoming events"
+          value={dashboard.upcomingEvents.length}
+          icon={CalendarDays}
+          href="/calendar"
+        />
+      </section>
 
       {manageableClubs.length > 0 && (
-        <div className="mb-8 rounded-xl border bg-storm-light/20 p-5">
-          <div className="flex items-center justify-between gap-4">
+        <section
+          className="mb-6 rounded-2xl border bg-card p-5 shadow-sm"
+          data-tour="leadership-overview"
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="font-semibold text-storm-navy">Clubs you manage</h2>
-              <p className="text-sm text-muted-foreground">Create club content; teacher or admin review may be required.</p>
+              <h2 className="font-semibold text-storm-navy">Leadership tools</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Manage the clubs you lead without leaving your student dashboard.
+              </p>
             </div>
-            <Button size="sm" asChild><Link href="/manage/clubs">Manage</Link></Button>
+            <Button size="sm" asChild>
+              <Link href="/manage/clubs">
+                Manage clubs <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
           </div>
-        </div>
+        </section>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-3 mb-8">
-        <div className="accent-surface-mint rounded-xl border p-4 flex items-center gap-3">
-          <Users className="h-8 w-8 text-storm-electric" />
-          <div>
-            <p className="text-2xl font-bold">{dashboard.memberships.length}</p>
-            <p className="text-sm text-muted-foreground">Joined clubs</p>
-          </div>
-        </div>
-        <div className="accent-surface-violet rounded-xl border p-4 flex items-center gap-3">
-          <Calendar className="h-8 w-8 text-storm-electric" />
-          <div>
-            <p className="text-2xl font-bold">{dashboard.upcomingEvents.length}</p>
-            <p className="text-sm text-muted-foreground">Upcoming events</p>
-          </div>
-        </div>
-        <div className="accent-surface-amber rounded-xl border p-4 flex items-center gap-3">
-          <Bookmark className="h-8 w-8 text-storm-electric" />
-          <div>
-            <p className="text-2xl font-bold">{dashboard.savedOpportunities.length}</p>
-            <p className="text-sm text-muted-foreground">Saved opportunities</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         <div data-tour="student-clubs">
           <DashboardCard
             title="Your clubs"
-            action={dashboard.memberships.length > 0
-              ? <Button variant="ghost" size="sm" asChild><Link href="/my-clubs">View all</Link></Button>
-              : undefined}
+            action={
+              <Button variant="ghost" size="sm" asChild>
+                <Link href={dashboard.memberships.length > 0 ? "/my-clubs" : "/clubs"}>
+                  {dashboard.memberships.length > 0 ? "View all" : "Browse"}
+                </Link>
+              </Button>
+            }
           >
-          {dashboard.memberships.length === 0 ? (
-            <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed bg-storm-light/20 p-5">
-              <div>
-                <p className="font-medium text-storm-navy">No clubs yet</p>
-                <p className="mt-1 text-sm text-muted-foreground">Browse the club directory and join one to build your dashboard.</p>
+            {dashboard.memberships.length === 0 ? (
+              <EmptyState
+                title="Find your first club"
+                description="Browse the school directory to start building your dashboard."
+                href="/clubs"
+                action="Browse clubs"
+              />
+            ) : (
+              <div className="space-y-2">
+                {dashboard.memberships.slice(0, 3).map(
+                  (membership) =>
+                    membership.club && (
+                      <Link
+                        key={membership.id}
+                        href={`/clubs/${membership.club.slug}/member`}
+                        className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">
+                            {membership.club.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {membership.club.category}
+                          </p>
+                        </div>
+                        <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      </Link>
+                    )
+                )}
               </div>
-              <Button size="sm" asChild><Link href="/clubs">Browse clubs</Link></Button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {dashboard.memberships.slice(0, 3).map((m) => m.club && (
-                <Link key={m.id} href={`/clubs/${m.club.slug}/member`} className="flex items-center justify-between rounded-lg border p-3 hover:bg-storm-light/30 transition-colors">
-                  <div>
-                    <p className="font-medium">{m.club.name}</p>
-                    <p className="text-xs text-muted-foreground">{m.club.category}</p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                </Link>
-              ))}
-            </div>
-          )}
+            )}
           </DashboardCard>
         </div>
-
-        <div data-tour="student-classwork">
-          <DashboardCard title="Upcoming classwork">
-          {dashboard.upcomingAssignments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No current assignments from your clubs.</p>
-          ) : (
-            <div className="space-y-3">
-              {dashboard.upcomingAssignments.slice(0, 4).map((assignment) => (
-                <Link
-                  key={assignment.id}
-                  href={assignment.club
-                    ? `/clubs/${assignment.club.slug}/member/assignments/${assignment.id}`
-                    : "/dashboard"}
-                  className="flex items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-storm-light/30"
-                >
-                  <ClipboardList className="mt-0.5 h-4 w-4 shrink-0 text-storm-electric" />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{assignment.title}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {assignment.club?.name ?? "Club"} · {assignment.submission ? "Turned in" : assignment.due_at ? `Due ${formatDate(assignment.due_at)}` : "No due date"}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-          </DashboardCard>
-        </div>
-
-        <DashboardCard title="Recent announcements">
-          {dashboard.recentAnnouncements.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Join clubs to see announcements here.</p>
-          ) : (
-            <div className="space-y-3">
-              {dashboard.recentAnnouncements.map((a) => (
-                <div key={a.id} className="rounded-lg border p-3">
-                  <p className="text-xs text-storm-electric">{a.club?.name}</p>
-                  <p className="font-medium text-sm mt-0.5">{a.title}</p>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{a.body}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </DashboardCard>
-
-        <DashboardCard title="Upcoming events">
-          {dashboard.upcomingEvents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No upcoming events from your clubs.</p>
-          ) : (
-            <div className="space-y-3">
-              {dashboard.upcomingEvents.slice(0, 3).map((e) => (
-                <div key={e.id} className="flex items-center justify-between rounded-lg border p-3">
-                  <div>
-                    <p className="font-medium text-sm">{e.title}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(e.starts_at)}</p>
-                  </div>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/events/${e.id}`}>View</Link>
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </DashboardCard>
 
         <DashboardCard
-          title="Recommended for you"
-          action={<Button variant="ghost" size="sm" asChild><Link href="/opportunities">Explore</Link></Button>}
+          title="Latest updates"
+          action={
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/notifications">Notifications</Link>
+            </Button>
+          }
         >
-          {dashboard.recommendedOpportunities.length === 0 ? (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">Join clubs and save opportunities to get stronger recommendations.</p>
-              {discoveryHints.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {discoveryHints.map((hint) => (
-                    <Button key={hint.href} variant="outline" size="sm" asChild>
-                      <Link href={hint.href}>{hint.label}</Link>
-                    </Button>
-                  ))}
-                </div>
-              )}
+          {dashboard.recentAnnouncements.length === 0 ? (
+            <div className="flex items-start gap-3 rounded-xl border border-dashed p-4">
+              <Megaphone className="mt-0.5 h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="font-medium text-storm-navy">No new announcements</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Updates from your clubs will appear here.
+                </p>
+              </div>
             </div>
           ) : (
-            <div className="space-y-3">
-              {dashboard.recommendedOpportunities.map((o) => (
-                <Link key={o.id} href={`/opportunities/${o.slug}`} className="block rounded-lg border p-3 hover:bg-storm-light/30">
-                  <p className="font-medium text-sm">{o.title}</p>
-                  <p className="text-xs text-muted-foreground">{o.category}</p>
-                </Link>
+            <div className="space-y-2">
+              {dashboard.recentAnnouncements.slice(0, 3).map((announcement) => (
+                <div key={announcement.id} className="rounded-lg border p-3">
+                  <p className="text-xs font-medium text-storm-electric">
+                    {announcement.club?.name ?? "Club update"}
+                  </p>
+                  <p className="mt-0.5 truncate text-sm font-medium">
+                    {announcement.title}
+                  </p>
+                  <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                    {announcement.body}
+                  </p>
+                </div>
               ))}
             </div>
           )}
         </DashboardCard>
       </div>
 
-    </div>
+      <details
+        className="group mt-6 overflow-hidden rounded-2xl border bg-card"
+        open={dashboard.memberships.length === 0}
+        data-tour="role-checklist"
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
+          <div>
+            <h2 className="font-semibold text-storm-navy">Getting started</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Optional setup steps and a quick tour of your tools.
+            </p>
+          </div>
+          <span className="text-sm font-medium text-storm-electric group-open:hidden">
+            Show
+          </span>
+          <span className="hidden text-sm font-medium text-storm-electric group-open:inline">
+            Hide
+          </span>
+        </summary>
+        <div className="border-t p-3 [&>section]:border-0 [&>section]:shadow-none">
+          <RoleChecklist
+            title={
+              officerMemberships.length
+                ? "New club leader checklist"
+                : "Student launch checklist"
+            }
+            description={
+              officerMemberships.length
+                ? "Learn the club-leadership tools that are now available to you."
+                : "Set up your club feed, saved deadlines, and event plan."
+            }
+            items={checklist}
+            progressKey={progressKey}
+            forceManualProgress={
+              Boolean(profile.onboarding_reset_at) || officerMemberships.length > 0
+            }
+          />
+        </div>
+      </details>
+    </main>
   );
 }
 
-function DashboardMetric({
+function SummaryMetric({
   label,
   value,
   icon: Icon,
+  href,
 }: {
   label: string;
   value: number;
-  icon: typeof Users;
+  icon: LucideIcon;
+  href: string;
 }) {
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm flex items-center gap-3">
-      <Icon className="h-8 w-8 text-storm-electric" />
-      <div><p className="text-2xl font-bold">{value}</p><p className="text-sm text-muted-foreground">{label}</p></div>
-    </div>
+    <Link
+      href={href}
+      className="group flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm transition-colors hover:border-storm-electric/40 hover:bg-muted/30"
+    >
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-storm-electric/10 text-storm-electric">
+        <Icon className="h-5 w-5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xl font-bold text-storm-navy">{value}</p>
+        <p className="text-sm text-muted-foreground">{label}</p>
+      </div>
+      <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+    </Link>
   );
 }
 
-function DashboardLink({ href, title, description }: { href: string; title: string; description: string }) {
+function EmptyState({
+  title,
+  description,
+  href,
+  action,
+}: {
+  title: string;
+  description: string;
+  href: string;
+  action: string;
+}) {
   return (
-    <Link href={href} className="rounded-xl border bg-card p-5 shadow-sm transition-shadow hover:border-storm-electric/30 hover:shadow-md">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-storm-navy">{title}</h2>
-        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+    <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed p-4">
+      <div>
+        <p className="font-medium text-storm-navy">{title}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       </div>
-      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-    </Link>
+      <Button size="sm" variant="outline" asChild>
+        <Link href={href}>{action}</Link>
+      </Button>
+    </div>
   );
 }

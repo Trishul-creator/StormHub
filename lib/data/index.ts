@@ -43,6 +43,7 @@ import { isAdminRole } from "@/lib/permissions";
 import { shouldServePublicDemoContent } from "@/lib/public-content";
 import { CLUB_FILTER_GROUPS } from "@/lib/utils";
 import { DEFAULT_SCHOOL_ID, getCurrentSchool } from "@/lib/schools";
+import type { ManagementDashboardAttention } from "@/lib/dashboard-priorities";
 
 export { isDemoMode } from "@/lib/supabase/mode";
 
@@ -1337,6 +1338,128 @@ export async function getManageableClubs(profile: Profile, schoolId?: string | n
   return ((data ?? []) as { club: Club | Club[] | null }[])
     .map((row) => Array.isArray(row.club) ? row.club[0] : row.club)
     .filter(Boolean) as Club[];
+}
+
+export async function getManagementDashboardAttention(
+  clubs: Club[]
+): Promise<ManagementDashboardAttention> {
+  if (clubs.length === 0) {
+    return {
+      upcomingEvents: [],
+      upcomingAssignments: [],
+      grading: [],
+    };
+  }
+
+  const clubIds = clubs.map((club) => club.id);
+  const clubMap = new Map(clubs.map((club) => [club.id, club]));
+  const now = new Date().toISOString();
+
+  if (isDemoMode()) {
+    const upcomingEvents = demoEvents
+      .filter(
+        (event) =>
+          Boolean(event.club_id && clubIds.includes(event.club_id)) &&
+          event.status === "approved" &&
+          event.starts_at >= now
+      )
+      .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+      .slice(0, 8)
+      .map((event) => ({
+        ...event,
+        club: event.club_id ? clubMap.get(event.club_id) ?? null : null,
+      }));
+
+    const upcomingAssignments = demoAssignments
+      .filter(
+        (assignment) =>
+          clubIds.includes(assignment.club_id) &&
+          assignment.status === "published"
+      )
+      .sort((a, b) =>
+        (a.due_at ?? "9999").localeCompare(b.due_at ?? "9999")
+      )
+      .slice(0, 12)
+      .map((assignment) => ({
+        ...normalizeAssignment(assignment),
+        club: clubMap.get(assignment.club_id) ?? null,
+      }));
+
+    return {
+      upcomingEvents,
+      upcomingAssignments,
+      grading: [],
+    };
+  }
+
+  const supabase = await createClient();
+  if (!supabase) {
+    return {
+      upcomingEvents: [],
+      upcomingAssignments: [],
+      grading: [],
+    };
+  }
+
+  const [{ data: assignmentRows }, { data: eventRows }] = await Promise.all([
+    supabase
+      .from("club_assignments")
+      .select("*, club:clubs(*)")
+      .in("club_id", clubIds)
+      .eq("status", "published")
+      .order("due_at", { ascending: true, nullsFirst: false })
+      .limit(12),
+    supabase
+      .from("events")
+      .select("*, club:clubs(*)")
+      .in("club_id", clubIds)
+      .eq("status", "approved")
+      .gte("starts_at", now)
+      .order("starts_at", { ascending: true })
+      .limit(8),
+  ]);
+
+  const upcomingAssignments = (
+    (assignmentRows ?? []) as (ClubAssignment & {
+      club?: Club | null;
+    })[]
+  ).map((assignment) => normalizeAssignment(assignment));
+
+  const assignmentIds = upcomingAssignments.map((assignment) => assignment.id);
+  let grading: ManagementDashboardAttention["grading"] = [];
+
+  if (assignmentIds.length > 0) {
+    const { data: submissionRows } = await supabase
+      .from("club_assignment_submissions")
+      .select("assignment_id")
+      .in("assignment_id", assignmentIds)
+      .eq("status", "submitted");
+
+    const submittedCounts = new Map<string, number>();
+    for (const submission of (submissionRows ?? []) as {
+      assignment_id: string;
+    }[]) {
+      submittedCounts.set(
+        submission.assignment_id,
+        (submittedCounts.get(submission.assignment_id) ?? 0) + 1
+      );
+    }
+
+    grading = upcomingAssignments
+      .map((assignment) => ({
+        assignment,
+        submittedCount: submittedCounts.get(assignment.id) ?? 0,
+      }))
+      .filter((item) => item.submittedCount > 0);
+  }
+
+  return {
+    upcomingAssignments,
+    upcomingEvents: (eventRows ?? []) as (Event & {
+      club?: Club | null;
+    })[],
+    grading,
+  };
 }
 
 export async function getSchoolTeachers(schoolId: string | null | undefined): Promise<Profile[]> {

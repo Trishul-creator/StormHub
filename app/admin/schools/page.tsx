@@ -1,7 +1,16 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { ArrowRight, Building2, Calendar, GraduationCap, Users } from "lucide-react";
+import {
+  ArrowRight,
+  Building2,
+  Calendar,
+  GraduationCap,
+  Plus,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+import { DashboardPriorityPanel } from "@/components/dashboard/priority-panel";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +21,7 @@ import { getAllSchools, getSchoolManageUrl, getSchoolPublicUrl } from "@/lib/sch
 import { parseSignupDomainInput } from "@/lib/signup-security";
 import { slugify } from "@/lib/utils";
 import type { School } from "@/types/database";
+import type { DashboardPriorityItem } from "@/lib/dashboard-priorities";
 
 async function createSchoolAction(formData: FormData) {
   "use server";
@@ -87,77 +97,125 @@ export default async function AdminSchoolsPage() {
 
   const schools = await getAllSchools();
   const stats = await getSchoolStats(schools.map((school) => school.id));
+  const totals = Object.values(stats).reduce(
+    (current, schoolStats) => ({
+      clubs: current.clubs + schoolStats.visibleClubs,
+      students: current.students + schoolStats.students,
+      events: current.events + schoolStats.events,
+    }),
+    { clubs: 0, students: 0, events: 0 }
+  );
+  const priorities = buildSchoolPriorities(schools, stats);
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <main className="container mx-auto px-4 py-8">
       <div data-tour="role-overview">
         <PageHeader
           title="Platform Admin"
-          description="Choose a school workspace before viewing or managing school-specific content."
+          description="Platform health at a glance. Open a school only when you need its detailed workspace."
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        <div className="space-y-4" data-tour="school-workspaces">
-          {schools.map((school) => {
-            const schoolStats = stats[school.id] ?? emptySchoolStats;
-            return (
-              <SchoolWorkspaceCard key={school.id} school={school} stats={schoolStats} />
-            );
-          })}
-          {schools.length === 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>No schools found</CardTitle>
-                <CardDescription>Create the first school workspace to continue.</CardDescription>
-              </CardHeader>
-            </Card>
-          )}
-        </div>
+      <DashboardPriorityPanel
+        items={priorities}
+        title="Platform attention"
+        description="Schools that may need setup or publishing work."
+      />
 
-        <form action={createSchoolAction} className="rounded-xl border bg-white p-5">
-          <h2 className="font-semibold text-storm-navy">Create school workspace</h2>
-          <div className="mt-4 space-y-3">
+      <section
+        className="my-6 grid gap-3 sm:grid-cols-3"
+        aria-label="Platform summary"
+        data-tour="dashboard-summary"
+      >
+        <PlatformMetric icon={Building2} label="School workspaces" value={schools.length} />
+        <PlatformMetric icon={Users} label="Published clubs" value={totals.clubs} />
+        <PlatformMetric icon={GraduationCap} label="Students" value={totals.students} />
+      </section>
+
+      <section data-tour="school-workspaces">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-storm-navy">School workspaces</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Open a school for its clubs, people, and scoped statistics.
+            </p>
+          </div>
+          <details className="group relative">
+            <summary className="inline-flex h-9 cursor-pointer list-none items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
+              <Plus className="h-4 w-4" />
+              Create school
+            </summary>
+            <form
+              action={createSchoolAction}
+              className="mt-3 rounded-2xl border bg-card p-5 shadow-lg sm:absolute sm:right-0 sm:z-20 sm:w-[380px]"
+            >
+              <h3 className="font-semibold text-storm-navy">Create school workspace</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Add the required information now; details can be refined later.
+              </p>
+              <div className="mt-4 space-y-3">
             <label className="block text-sm">
               <span className="text-muted-foreground">School name</span>
-              <input name="name" required className="mt-1 w-full rounded-md border px-3 py-2" placeholder="Example High School" />
+              <input name="name" required className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" placeholder="Example High School" />
             </label>
             <label className="block text-sm">
               <span className="text-muted-foreground">Approved email domains</span>
-              <input name="allowed_email_domains" required className="mt-1 w-full rounded-md border px-3 py-2" placeholder="* or students.example.edu, staff.example.edu" />
+              <input name="allowed_email_domains" required className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" placeholder="* or students.example.edu, staff.example.edu" />
               <span className="mt-1 block text-xs text-muted-foreground">Use * for every verified email domain, or enter a comma-separated restriction list.</span>
             </label>
             <label className="block text-sm">
               <span className="text-muted-foreground">Workspace URL name (optional)</span>
-              <input name="slug" className="mt-1 w-full rounded-md border px-3 py-2" placeholder="example-high" />
+              <input name="slug" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" placeholder="example-high" />
               <span className="mt-1 block text-xs text-muted-foreground">
                 This becomes the school link, such as /s/example-high. Leave it blank to generate it from the school name.
               </span>
             </label>
             <label className="block text-sm">
               <span className="text-muted-foreground">Short name</span>
-              <input name="short_name" className="mt-1 w-full rounded-md border px-3 py-2" placeholder="EHS" />
+              <input name="short_name" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" placeholder="EHS" />
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-sm">
                 <span className="text-muted-foreground">City</span>
-                <input name="city" className="mt-1 w-full rounded-md border px-3 py-2" />
+                <input name="city" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" />
               </label>
               <label className="block text-sm">
                 <span className="text-muted-foreground">State</span>
-                <input name="state" className="mt-1 w-full rounded-md border px-3 py-2" maxLength={2} />
+                <input name="state" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" maxLength={2} />
               </label>
             </div>
             <label className="block text-sm">
               <span className="text-muted-foreground">Mascot</span>
-              <input name="mascot" className="mt-1 w-full rounded-md border px-3 py-2" placeholder="Storm" />
+              <input name="mascot" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" placeholder="Storm" />
               <span className="mt-1 block text-xs text-muted-foreground">Shown on the public school workspace.</span>
             </label>
             <Button type="submit" className="w-full">Create school</Button>
-          </div>
-        </form>
-      </div>
-    </div>
+              </div>
+            </form>
+          </details>
+        </div>
+
+        <div className="space-y-4">
+          {schools.map((school) => (
+            <SchoolWorkspaceCard
+              key={school.id}
+              school={school}
+              stats={stats[school.id] ?? emptySchoolStats}
+            />
+          ))}
+          {schools.length === 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>No schools found</CardTitle>
+                <CardDescription>
+                  Create the first school workspace to continue.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          )}
+        </div>
+      </section>
+    </main>
   );
 }
 
@@ -218,6 +276,11 @@ function SchoolWorkspaceCard({ school, stats }: { school: School; stats: SchoolS
               {school.mascot ? `Home of the ${school.mascot} · ` : ""}/{school.slug} · {[school.city, school.state].filter(Boolean).join(", ") || "Location not set"} ·{" "}
               {school.is_active === false ? "Inactive" : "Active"} · {school.is_public === false ? "Private" : "Public"}
             </CardDescription>
+            {stats.draftClubs > 0 && (
+              <span className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
+                {stats.draftClubs} draft club{stats.draftClubs === 1 ? "" : "s"}
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" asChild>
@@ -230,11 +293,9 @@ function SchoolWorkspaceCard({ school, stats }: { school: School; stats: SchoolS
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-3">
           <SmallStat icon={Users} label="Published clubs" value={stats.visibleClubs} />
-          <SmallStat icon={Users} label="Draft clubs" value={stats.draftClubs} />
           <SmallStat icon={GraduationCap} label="Students" value={stats.students} />
-          <SmallStat icon={Building2} label="Opportunities" value={stats.opportunities} />
           <SmallStat icon={Calendar} label="Upcoming events" value={stats.events} />
         </div>
       </CardContent>
@@ -250,4 +311,74 @@ function SmallStat({ icon: Icon, label, value }: { icon: typeof Users; label: st
       <p className="text-xs text-muted-foreground">{label}</p>
     </div>
   );
+}
+
+function PlatformMetric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm">
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-storm-electric/10 text-storm-electric">
+        <Icon className="h-5 w-5" />
+      </span>
+      <div>
+        <p className="text-xl font-bold text-storm-navy">{value}</p>
+        <p className="text-sm text-muted-foreground">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function buildSchoolPriorities(
+  schools: School[],
+  stats: Record<string, SchoolStats>
+): DashboardPriorityItem[] {
+  return schools
+    .flatMap((school): DashboardPriorityItem[] => {
+      const schoolStats = stats[school.id] ?? emptySchoolStats;
+      if (school.is_active === false) {
+        return [
+          {
+            id: `school-inactive:${school.id}`,
+            kind: "school",
+            urgency: "urgent",
+            title: `${school.name} is inactive`,
+            detail: "Registration and school access may be unavailable.",
+            timing: "Needs review",
+            href: getSchoolManageUrl(school),
+            actionLabel: "Open school",
+            score: 0,
+          },
+        ];
+      }
+      if (schoolStats.visibleClubs === 0) {
+        return [
+          {
+            id: `school-empty:${school.id}`,
+            kind: "school",
+            urgency: "soon",
+            title: `${school.name} has no published clubs`,
+            detail:
+              schoolStats.draftClubs > 0
+                ? `${schoolStats.draftClubs} draft club${
+                    schoolStats.draftClubs === 1 ? "" : "s"
+                  } can be reviewed.`
+                : "Add or publish clubs before inviting students.",
+            timing: "Setup incomplete",
+            href: getSchoolManageUrl(school),
+            actionLabel: "Open school",
+            score: 5,
+          },
+        ];
+      }
+      return [];
+    })
+    .sort((left, right) => left.score - right.score)
+    .slice(0, 4);
 }

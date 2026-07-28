@@ -30,9 +30,10 @@ function InteractiveTourTargets() {
       {page === "dashboard" ? (
         <>
           <main data-tour="role-overview">Dashboard overview</main>
+          <section data-tour="dashboard-priorities">Priority queue</section>
+          <section data-tour="dashboard-summary">Quick summary</section>
           <section data-tour="role-checklist">Launch checklist</section>
           <section data-tour="student-clubs">Joined clubs</section>
-          <section data-tour="student-classwork">Classwork</section>
         </>
       ) : (
         <>
@@ -136,9 +137,10 @@ describe("guided walkthrough", () => {
     expect(await screen.findByRole("heading", { name: "Welcome to StormHub" })).toBeVisible();
     for (const heading of [
       "Your dashboard",
-      "Your launch checklist",
+      "Start with what needs attention",
+      "Use the quick summary",
+      "Open setup only when needed",
       "Your club workspaces",
-      "Your upcoming classwork",
     ]) {
       fireEvent.click(screen.getByRole("button", { name: /next/i }));
       expect(await screen.findByRole("heading", { name: heading })).toBeVisible();
