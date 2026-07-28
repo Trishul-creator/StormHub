@@ -54,7 +54,7 @@ export function ClubCard({ club, isMember, isLoggedIn, canJoin, canManage, schoo
       </CardContent>
       <CardFooter className="gap-2 pt-0">
         <Button variant="outline" size="sm" asChild className="flex-1">
-          <Link href={clubHref}>View</Link>
+          <Link href={clubHref} data-tour="club-card-link">View</Link>
         </Button>
         <JoinClubButton
           clubSlug={club.slug}

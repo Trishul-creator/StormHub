@@ -3,13 +3,17 @@ import { ArrowRight, Bell, Calendar, GraduationCap, Shield, Users, Zap } from "l
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { defaultPathForProfile, getAuthContext } from "@/lib/auth";
-import { getSchoolBySlug, getSchoolPublicUrl, getDefaultSchoolSlug } from "@/lib/schools";
+import {
+  getSchoolPublicUrl,
+  getPublicDemoSchool,
+  getSchoolForProfile,
+} from "@/lib/schools";
 
 export default async function HomePage() {
-  const [pilotSchool, auth] = await Promise.all([
-    getSchoolBySlug(getDefaultSchoolSlug()),
-    getAuthContext(),
-  ]);
+  const auth = await getAuthContext();
+  const pilotSchool = auth.isLoggedIn
+    ? await getSchoolForProfile(auth.profile)
+    : await getPublicDemoSchool();
   const accountPath = defaultPathForProfile(auth.profile);
 
   return (
@@ -31,7 +35,7 @@ export default async function HomePage() {
               {pilotSchool && (
                 <Button size="lg" variant="secondary" asChild>
                   <Link href={getSchoolPublicUrl(pilotSchool)}>
-                    Explore {pilotSchool.name} <ArrowRight className="h-4 w-4" />
+                    {auth.isLoggedIn ? `Explore ${pilotSchool.name}` : "Explore the demo school"} <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
               )}
@@ -48,7 +52,7 @@ export default async function HomePage() {
             </div>
             {pilotSchool && (
               <p className="mt-4 text-sm text-storm-silver">
-                Current pilot workspace · Need help?{" "}
+                {auth.isLoggedIn ? "Current pilot workspace" : "Fictional public showcase"} · Need help?{" "}
                 <Link href="/contact" className="underline underline-offset-4">Contact us</Link>
               </p>
             )}

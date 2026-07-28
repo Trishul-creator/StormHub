@@ -1,10 +1,12 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { Shield, Users, Zap, Heart } from "lucide-react";
 import { APP_NAME } from "@/lib/utils";
-import { getCurrentSchool } from "@/lib/schools";
+import { getCurrentSchool, getPublicDemoSchool } from "@/lib/schools";
+import { getAuthContext } from "@/lib/auth";
 
 export default async function AboutPage() {
-  const school = await getCurrentSchool();
+  const { profile } = await getAuthContext();
+  const school = profile ? await getCurrentSchool(profile) : await getPublicDemoSchool();
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <PageHeader

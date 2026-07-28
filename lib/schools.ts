@@ -87,6 +87,27 @@ export async function getDefaultSchool(): Promise<School | null> {
   return getSchoolBySlug(DEFAULT_SCHOOL_SLUG);
 }
 
+export async function getPublicDemoSchool(): Promise<School> {
+  const { demoSchool } = await import("@/lib/data/demo-data");
+  return demoSchool;
+}
+
+export async function getSchoolBySlugForViewer(
+  slug: string,
+  profile?: Profile | null
+): Promise<School | null> {
+  if (!profile) return getPublicDemoSchool();
+  return getSchoolBySlug(slug);
+}
+
+export async function getSchoolByIdForViewer(
+  schoolId: string | null | undefined,
+  profile?: Profile | null
+): Promise<School | null> {
+  if (!profile) return getPublicDemoSchool();
+  return getSchoolById(schoolId);
+}
+
 export async function getSchoolForProfile(profile?: Profile | null): Promise<School | null> {
   if (!profile) return null;
   if (profile.role === "super_admin") return null;
@@ -199,6 +220,10 @@ export async function getSchoolFilterContext(
   profile?: Profile | null,
   requestedSlug?: string | null
 ): Promise<{ schools: School[]; selectedSchool: School | null }> {
+  if (!profile) {
+    const demoSchool = await getPublicDemoSchool();
+    return { schools: [demoSchool], selectedSchool: demoSchool };
+  }
   const schools = getFilterableSchools(await getAllSchools(), profile);
   return { schools, selectedSchool: selectSchoolFilter(schools, requestedSlug) };
 }

@@ -18,6 +18,7 @@ interface WorkspaceNavigationProps {
   icon: LucideIcon;
   links: WorkspaceNavigationLink[];
   sticky?: boolean;
+  tourId?: string;
 }
 
 export function WorkspaceNavigation({
@@ -27,6 +28,7 @@ export function WorkspaceNavigation({
   icon: ScopeIcon,
   links,
   sticky = true,
+  tourId,
 }: WorkspaceNavigationProps) {
   const pathname = usePathname();
   const isActive = (href: string) => (
@@ -37,6 +39,7 @@ export function WorkspaceNavigation({
 
   return (
     <div
+      data-tour={tourId}
       className={cn(
         "z-40 border-b border-border bg-card/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/85",
         sticky && "sticky top-16"

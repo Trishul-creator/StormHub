@@ -9,6 +9,7 @@ import { getOpportunityBySlug } from "@/lib/data";
 import { getUserBookmarkIds, getUserOpportunitySignupIds } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
 import { formatDate, isDeadlineSoon, opportunityActionLabel } from "@/lib/utils";
+import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
 
 interface OpportunityPageProps {
   params: Promise<{ slug: string }>;
@@ -30,6 +31,7 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
+      {!isLoggedIn && <div className="mb-6"><PublicDemoNotice compact /></div>}
       <Button variant="ghost" size="sm" asChild className="mb-4">
         <Link href="/opportunities"><ArrowLeft className="h-4 w-4 mr-1" /> All opportunities</Link>
       </Button>
@@ -52,7 +54,7 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
         )}
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-3">
+      <div data-tour="opportunity-detail" className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           {isSignedUp && (
             <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/35 dark:text-emerald-200">

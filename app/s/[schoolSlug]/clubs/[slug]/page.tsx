@@ -16,7 +16,8 @@ import { getAuthContext } from "@/lib/auth";
 import { formatDateTime } from "@/lib/utils";
 import { canManageClub } from "@/lib/permissions";
 import { getUserRsvpIds } from "@/lib/actions";
-import { getSchoolBySlug } from "@/lib/schools";
+import { getSchoolBySlugForViewer } from "@/lib/schools";
+import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
 
 interface SchoolClubPageProps {
   params: Promise<{ schoolSlug: string; slug: string }>;
@@ -24,13 +25,13 @@ interface SchoolClubPageProps {
 
 export default async function SchoolClubPage({ params }: SchoolClubPageProps) {
   const { schoolSlug, slug } = await params;
-  const school = await getSchoolBySlug(schoolSlug);
+  const { isLoggedIn, profile, userId } = await getAuthContext();
+  const school = await getSchoolBySlugForViewer(schoolSlug, profile);
   if (!school) notFound();
 
   const club = await getClubBySlug(slug, school.id);
   if (!club) notFound();
 
-  const { isLoggedIn, profile, userId } = await getAuthContext();
   const [announcements, events, memberCount, membership] = await Promise.all([
     getClubAnnouncements(club.id, "public"),
     getClubEvents(club.id),
@@ -44,6 +45,7 @@ export default async function SchoolClubPage({ params }: SchoolClubPageProps) {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {!isLoggedIn && <div className="mb-6"><PublicDemoNotice compact /></div>}
       <Button variant="ghost" size="sm" asChild className="mb-4">
         <Link href={`/s/${school.slug}/clubs`}>
           <ArrowLeft className="mr-1 h-4 w-4" /> {school.short_name || school.name} clubs
@@ -52,7 +54,7 @@ export default async function SchoolClubPage({ params }: SchoolClubPageProps) {
 
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="space-y-8 lg:col-span-2">
-          <div>
+          <div data-tour="club-detail-overview">
             <div className="mb-2 flex flex-wrap items-center gap-3">
               {club.category && <CategoryBadge category={club.category} />}
               {club.is_featured && (
@@ -112,7 +114,7 @@ export default async function SchoolClubPage({ params }: SchoolClubPageProps) {
         </div>
 
         <div className="space-y-4">
-          <div className="sticky top-20 rounded-xl border bg-white p-6">
+          <div data-tour="club-detail-action" className="sticky top-20 rounded-xl border bg-white p-6">
             <JoinClubButton
               clubSlug={slug}
               isMember={isMember}

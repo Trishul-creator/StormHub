@@ -7,7 +7,7 @@ import { JoinClubButton } from "@/components/clubs/join-club-button";
 import { EventCard } from "@/components/events/event-card";
 import { PageHeader } from "@/components/layout/page-header";
 import {
-  getManagedClubBySlug,
+  getClubBySlug,
   getClubAnnouncements,
   getClubEvents,
   getClubMemberCount,
@@ -17,7 +17,8 @@ import { getAuthContext } from "@/lib/auth";
 import { formatDateTime } from "@/lib/utils";
 import { canManageClub } from "@/lib/permissions";
 import { getUserRsvpIds } from "@/lib/actions";
-import { getSchoolById } from "@/lib/schools";
+import { getSchoolByIdForViewer } from "@/lib/schools";
+import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
 
 interface ClubPageProps {
   params: Promise<{ slug: string }>;
@@ -25,7 +26,7 @@ interface ClubPageProps {
 
 export default async function ClubPage({ params }: ClubPageProps) {
   const { slug } = await params;
-  const club = await getManagedClubBySlug(slug);
+  const club = await getClubBySlug(slug);
   if (!club) notFound();
 
   const { isLoggedIn, profile, userId } = await getAuthContext();
@@ -37,7 +38,7 @@ export default async function ClubPage({ params }: ClubPageProps) {
     ["interest_open", "active"].includes(club.status);
   if (!isPubliclyVisible && !canManage) notFound();
 
-  const school = await getSchoolById(club.school_id);
+  const school = await getSchoolByIdForViewer(club.school_id, profile);
   const schoolClubsHref = school ? `/s/${school.slug}/clubs` : "/clubs";
   const clubHref = school ? `/s/${school.slug}/clubs/${club.slug}` : `/clubs/${club.slug}`;
   const [announcements, events, memberCount] = await Promise.all([
@@ -50,13 +51,14 @@ export default async function ClubPage({ params }: ClubPageProps) {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {!isLoggedIn && <div className="mb-6"><PublicDemoNotice compact /></div>}
       <Button variant="ghost" size="sm" asChild className="mb-4">
         <Link href={schoolClubsHref}><ArrowLeft className="h-4 w-4 mr-1" /> All clubs</Link>
       </Button>
 
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-8">
-          <div>
+          <div data-tour="club-detail-overview">
             <div className="flex flex-wrap items-center gap-3 mb-2">
               {club.category && <CategoryBadge category={club.category} />}
               {club.is_featured && (
@@ -112,7 +114,7 @@ export default async function ClubPage({ params }: ClubPageProps) {
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-xl border bg-white p-6 sticky top-20">
+          <div data-tour="club-detail-action" className="rounded-xl border bg-white p-6 sticky top-20">
             <JoinClubButton
               clubSlug={slug}
               isMember={isMember}

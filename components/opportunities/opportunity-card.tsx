@@ -74,7 +74,7 @@ export function OpportunityCard({
       </CardContent>
       <CardFooter className="gap-2">
         <Button variant="outline" size="sm" asChild className="flex-1">
-          <Link href={`/opportunities/${opportunity.slug}`}>
+          <Link href={`/opportunities/${opportunity.slug}`} data-tour="opportunity-card-link">
             View details
           </Link>
         </Button>

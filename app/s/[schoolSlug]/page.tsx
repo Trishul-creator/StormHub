@@ -8,7 +8,8 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { getClubs, getEvents, getOpportunities } from "@/lib/data";
 import { getAuthContext } from "@/lib/auth";
 import { checkMembership } from "@/lib/actions";
-import { getSchoolBySlug } from "@/lib/schools";
+import { getSchoolBySlugForViewer } from "@/lib/schools";
+import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
 import { canJoinClub, canManageClub } from "@/lib/permissions";
 import { getWorkspaceClubSummary } from "@/lib/product";
 
@@ -18,10 +19,10 @@ interface SchoolWorkspacePageProps {
 
 export default async function SchoolWorkspacePage({ params }: SchoolWorkspacePageProps) {
   const { schoolSlug } = await params;
-  const school = await getSchoolBySlug(schoolSlug);
+  const auth = await getAuthContext();
+  const school = await getSchoolBySlugForViewer(schoolSlug, auth.profile);
   if (!school) notFound();
 
-  const auth = await getAuthContext();
   const [clubs, events, opportunities] = await Promise.all([
     getClubs({ schoolId: school.id }),
     getEvents({ schoolId: school.id, upcoming: true }),
@@ -38,6 +39,11 @@ export default async function SchoolWorkspacePage({ params }: SchoolWorkspacePag
 
   return (
     <div>
+      {!auth.isLoggedIn && (
+        <div className="container mx-auto px-4 pt-6">
+          <PublicDemoNotice />
+        </div>
+      )}
       <section className="bg-storm-gradient text-white">
         <div className="container mx-auto px-4 py-16 md:py-20">
           <div className="max-w-3xl">

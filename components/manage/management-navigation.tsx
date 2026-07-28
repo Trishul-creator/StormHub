@@ -40,6 +40,7 @@ export function ManagementNavigation({
       title="Management tools"
       icon={Building2}
       links={links}
+      tourId="management-tools"
     />
   );
 }
