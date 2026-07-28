@@ -10,7 +10,8 @@ import { getUserRsvpIds } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
 import { formatEventDate, formatDateTime } from "@/lib/utils";
 import { canApproveClubContent } from "@/lib/permissions";
-import { getSchoolById } from "@/lib/schools";
+import { getSchoolByIdForViewer } from "@/lib/schools";
+import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
 
 interface EventPageProps {
   params: Promise<{ id: string }>;
@@ -23,7 +24,7 @@ export default async function EventPage({ params }: EventPageProps) {
 
   const { userId, isLoggedIn, profile } = await getAuthContext();
   const [school, membership] = await Promise.all([
-    getSchoolById(event.school_id),
+    getSchoolByIdForViewer(event.school_id, profile),
     event.club_id ? getUserClubMembership(userId, event.club_id) : Promise.resolve(null),
   ]);
   const canDelete = event.club ? canApproveClubContent(profile, event.club, membership) : false;
@@ -34,6 +35,7 @@ export default async function EventPage({ params }: EventPageProps) {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-3xl">
+      {!isLoggedIn && <div className="mb-6"><PublicDemoNotice compact /></div>}
       <Button variant="ghost" size="sm" asChild className="mb-4">
         <Link href={calendarHref}><ArrowLeft className="h-4 w-4 mr-1" /> Back to calendar</Link>
       </Button>

@@ -5,6 +5,7 @@ import { getUserRsvpIds } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
 import { SchoolFilter } from "@/components/layout/school-filter";
 import { getSchoolFilterContext } from "@/lib/schools";
+import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
 
 interface CalendarPageProps {
   searchParams: Promise<{ school?: string }>;
@@ -23,6 +24,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {!isLoggedIn && <div className="mb-6"><PublicDemoNotice /></div>}
       <PageHeader
         title="Calendar"
         description={

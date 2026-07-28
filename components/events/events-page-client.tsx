@@ -199,7 +199,7 @@ export function EventsPageClient({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
+      <div data-tour="calendar-toolbar" className="rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -307,7 +307,7 @@ export function EventsPageClient({
 
       {view === "calendar" ? (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+          <div data-tour="calendar-grid" className="overflow-hidden rounded-2xl border bg-card shadow-sm">
             <div className="grid grid-cols-7 border-b bg-storm-navy">
               {weekdayLabels.map((day) => (
                 <div

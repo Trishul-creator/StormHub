@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { getClubs } from "@/lib/data";
 import { checkMembership } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
-import { getSchoolBySlug } from "@/lib/schools";
+import { getSchoolBySlugForViewer } from "@/lib/schools";
 import { canJoinClub, canManageClub } from "@/lib/permissions";
 import { CLUB_FILTER_GROUPS } from "@/lib/utils";
+import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
 
 interface SchoolClubsPageProps {
   params: Promise<{ schoolSlug: string }>;
@@ -20,10 +21,10 @@ interface SchoolClubsPageProps {
 
 export default async function SchoolClubsPage({ params, searchParams }: SchoolClubsPageProps) {
   const [{ schoolSlug }, query] = await Promise.all([params, searchParams]);
-  const school = await getSchoolBySlug(schoolSlug);
+  const auth = await getAuthContext();
+  const school = await getSchoolBySlugForViewer(schoolSlug, auth.profile);
   if (!school) notFound();
 
-  const auth = await getAuthContext();
   const featuredOnly = query.featured === "true" || query.filter === "featured";
   const clubs = await getClubs({
     schoolId: school.id,
@@ -47,6 +48,7 @@ export default async function SchoolClubsPage({ params, searchParams }: SchoolCl
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {!auth.isLoggedIn && <div className="mb-6"><PublicDemoNotice /></div>}
       <PageHeader
         title={`${school.short_name || school.name} Clubs`}
         description="Discover clubs in this school workspace."
@@ -72,7 +74,7 @@ export default async function SchoolClubsPage({ params, searchParams }: SchoolCl
           </>
         )}
       </PageHeader>
-      <div className="mb-6">
+      <div data-tour="club-directory-tools" className="mb-6">
         <SearchBar placeholder="Search clubs..." defaultValue={query.q} />
       </div>
       <div className="flex gap-8">
@@ -94,7 +96,7 @@ export default async function SchoolClubsPage({ params, searchParams }: SchoolCl
             ⭐ Featured clubs
           </a>
         </aside>
-        <div className="min-w-0 flex-1">
+        <div data-tour="club-directory-results" className="min-w-0 flex-1">
           <MobileFilterDrawer
             title="Filter clubs"
             options={filterOptions}

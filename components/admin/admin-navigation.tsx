@@ -42,6 +42,7 @@ export function AdminNavigation({ isSuperAdmin }: AdminNavigationProps) {
       title="Administration"
       icon={ShieldCheck}
       links={links}
+      tourId="admin-tools"
     />
   );
 }

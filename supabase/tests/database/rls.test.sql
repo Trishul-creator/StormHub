@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(98);
+SELECT plan(106);
 
 SELECT is(
   (SELECT public FROM storage.buckets WHERE id = 'coursework-private'),
@@ -212,7 +212,9 @@ INSERT INTO public.opportunities (
   );
 
 SET LOCAL ROLE anon;
-SELECT is((SELECT count(*) FROM public.clubs), 2::BIGINT, 'anonymous users can read listed public clubs');
+SELECT is((SELECT count(*) FROM public.clubs), 0::BIGINT, 'anonymous users cannot read real school clubs');
+SELECT is((SELECT count(*) FROM public.events), 0::BIGINT, 'anonymous users cannot read real school events');
+SELECT is((SELECT count(*) FROM public.opportunities), 0::BIGINT, 'anonymous users cannot read real school opportunities');
 SELECT is((SELECT count(*) FROM public.profiles), 0::BIGINT, 'anonymous users cannot read profiles');
 RESET ROLE;
 
@@ -224,6 +226,9 @@ SELECT set_config(
 SET LOCAL ROLE authenticated;
 SELECT is((SELECT count(*) FROM public.profiles), 1::BIGINT, 'students can read only their own profile');
 SELECT is((SELECT count(*) FROM public.club_memberships), 0::BIGINT, 'students cannot read another user membership');
+SELECT is((SELECT count(*) FROM public.clubs), 1::BIGINT, 'students can read public clubs only in their assigned school');
+SELECT is((SELECT count(*) FROM public.events), 1::BIGINT, 'students can read public events only in their assigned school');
+SELECT is((SELECT count(*) FROM public.opportunities), 1::BIGINT, 'students can read public opportunities only in their assigned school');
 SELECT throws_ok(
   $$UPDATE public.profiles SET role = 'admin' WHERE id = '10000000-0000-4000-8000-000000000001'$$,
   'P0001',
@@ -286,6 +291,9 @@ SELECT set_config(
 );
 SET LOCAL ROLE authenticated;
 SELECT is((SELECT count(*) FROM public.club_memberships), 1::BIGINT, 'teacher sponsors can read their managed roster');
+SELECT is((SELECT count(*) FROM public.clubs), 1::BIGINT, 'teachers can read public clubs only in their assigned school');
+SELECT is((SELECT count(*) FROM public.events), 1::BIGINT, 'teachers can read public events only in their assigned school');
+SELECT is((SELECT count(*) FROM public.opportunities), 1::BIGINT, 'teachers can read public opportunities in read-only school scope');
 SELECT is(
   (SELECT count(*) FROM public.profiles WHERE id = '10000000-0000-4000-8000-000000000001'),
   0::BIGINT,

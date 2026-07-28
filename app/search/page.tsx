@@ -9,6 +9,7 @@ import { getAuthContext } from "@/lib/auth";
 import { isAdminRole } from "@/lib/permissions";
 import { buildEmptyStateActions, buildGlobalSearchResults } from "@/lib/product";
 import { humanizeLabel } from "@/lib/utils";
+import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
 
 interface SearchPageProps {
   searchParams: Promise<{ q?: string }>;
@@ -17,7 +18,7 @@ interface SearchPageProps {
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams;
   const query = params.q?.trim() ?? "";
-  const { profile } = await getAuthContext();
+  const { profile, isLoggedIn } = await getAuthContext();
   const canSearchPeople = isAdminRole(profile?.role);
 
   const [clubs, events, opportunities, people] = query.length >= 2
@@ -34,6 +35,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
+      {!isLoggedIn && <div className="mb-6"><PublicDemoNotice /></div>}
       <PageHeader
         title="Search StormHub"
         description="Find clubs, calendar events, opportunities, and admin-visible user records from one place."
