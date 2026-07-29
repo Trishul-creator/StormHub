@@ -127,7 +127,7 @@ export function SubmissionAttachments({
                 <a
                   href={attachment.source_type === "upload"
                     ? `/api/coursework/files/submission/${attachment.id}`
-                    : attachment.external_url ?? "#"}
+                    : `/api/coursework/google/submission-attachments/${attachment.id}/open`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

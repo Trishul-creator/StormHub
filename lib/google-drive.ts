@@ -16,6 +16,7 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
 const DRIVE_FILES_URL = "https://www.googleapis.com/drive/v3/files";
+const MAX_READ_ONLY_FILE_BYTES = 25 * 1024 * 1024;
 
 interface StoredGoogleConnection {
   user_id: string;
@@ -366,6 +367,46 @@ export async function ensureGoogleDrivePermission(input: {
       }),
     }
   );
+}
+
+export async function createReadOnlyGoogleDriveFileResponse(input: {
+  ownerUserId: string;
+  fileId: string;
+}): Promise<Response> {
+  const file = await getGoogleDriveFile(input.ownerUserId, input.fileId);
+  const accessToken = await getGoogleDriveAccessToken(input.ownerUserId);
+  const isWorkspaceFile = isGoogleWorkspaceFile(file.mimeType);
+  const downloadMimeType = isWorkspaceFile ? "application/pdf" : file.mimeType || "application/octet-stream";
+  const url = isWorkspaceFile
+    ? `${DRIVE_FILES_URL}/${encodeURIComponent(input.fileId)}/export?mimeType=${encodeURIComponent(downloadMimeType)}`
+    : `${DRIVE_FILES_URL}/${encodeURIComponent(input.fileId)}?alt=media&supportsAllDrives=true`;
+  const response = await fetch(url, {
+    headers: { authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(
+      isWorkspaceFile
+        ? "This Google Workspace file cannot be opened in a read-only support preview."
+        : "Google Drive could not prepare this file for read-only support."
+    );
+  }
+  const body = await response.arrayBuffer();
+  if (body.byteLength > MAX_READ_ONLY_FILE_BYTES) {
+    throw new Error("This file is too large for the read-only support preview.");
+  }
+  const baseName = file.name.replace(/[\r\n]/g, " ").trim() || "Google Drive file";
+  const fileName = isWorkspaceFile && !baseName.toLowerCase().endsWith(".pdf")
+    ? `${baseName}.pdf`
+    : baseName;
+  return new Response(body, {
+    headers: {
+      "cache-control": "private, no-store",
+      "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+      "content-type": downloadMimeType,
+      "x-content-type-options": "nosniff",
+    },
+  });
 }
 
 export async function copyGoogleDriveFileForStudent(input: {

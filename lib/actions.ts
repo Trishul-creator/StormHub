@@ -75,7 +75,11 @@ import {
   generateSchoolSignupAccessCode,
   verifySchoolSignupAccessCode,
 } from "@/lib/school-access";
-import { getActivePlatformSupportSession } from "@/lib/support-access";
+import {
+  getActivePlatformSupportSession,
+  isPlatformSupportSchemaMissing,
+  type PlatformSupportSession,
+} from "@/lib/support-access";
 import {
   copyGoogleDriveFileForStudent,
   disconnectGoogleDrive,
@@ -1308,6 +1312,9 @@ async function getCourseworkManagerContext(clubSlug: string) {
   const supabase = await createClient();
   const profile = await getCurrentProfile();
   if (!supabase || !profile) return { error: "Please sign in." } as const;
+  if (profile.role === "super_admin") {
+    return { error: "Platform support access is read-only." } as const;
+  }
   const club = await getManagedClubBySlug(clubSlug);
   if (!club) return { error: "Club not found." } as const;
   const { data: membership } = await supabase
@@ -3216,7 +3223,12 @@ export async function startPlatformSupportSession(input: {
   schoolId: string;
   reason: string;
   durationMinutes: number;
-}): Promise<{ success: boolean; expiresAt?: string; error?: string }> {
+}): Promise<{
+  success: boolean;
+  expiresAt?: string;
+  session?: PlatformSupportSession;
+  error?: string;
+}> {
   if (isDemoMode()) return { success: false, error: "Support access is unavailable in demo mode." };
   const actor = await getCurrentProfile();
   const admin = createAdminClient();
@@ -3232,7 +3244,7 @@ export async function startPlatformSupportSession(input: {
     : 30;
   const { data: school } = await admin
     .from("schools")
-    .select("id,name")
+    .select("id,name,slug")
     .eq("id", input.schoolId)
     .maybeSingle();
   if (!school) return { success: false, error: "School not found." };
@@ -3253,15 +3265,15 @@ export async function startPlatformSupportSession(input: {
       reason,
       expires_at: expiresAt,
     })
-    .select("id")
+    .select("*")
     .single();
   if (error || !session) {
-    if (error?.code === "42P01") {
+    if (isPlatformSupportSchemaMissing(error)) {
       return { success: false, error: "Apply the latest database migration before using support access." };
     }
     return { success: false, error: friendlyError(error, "Could not start the support session.") };
   }
-  await admin.from("platform_support_access_log").insert({
+  const { error: auditError } = await admin.from("platform_support_access_log").insert({
     session_id: session.id,
     actor_user_id: actor.id,
     school_id: school.id,
@@ -3269,6 +3281,17 @@ export async function startPlatformSupportSession(input: {
     resource_type: "school_support_session",
     resource_id: school.id,
   });
+  if (auditError) {
+    await admin
+      .from("platform_support_sessions")
+      .update({ ended_at: new Date().toISOString() })
+      .eq("id", session.id);
+    console.error("[startPlatformSupportSession audit]", auditError.message);
+    return {
+      success: false,
+      error: "Support access stayed locked because its audit record could not be created.",
+    };
+  }
 
   const { data: schoolAdmins } = await admin
     .from("profiles")
@@ -3286,8 +3309,14 @@ export async function startPlatformSupportSession(input: {
     sendEmail: false,
   })));
 
-  revalidatePath(`/admin/schools`);
-  return { success: true, expiresAt };
+  revalidatePath("/", "layout");
+  revalidatePath(`/admin/schools/${school.slug}`);
+  revalidatePath(`/admin/schools/${school.slug}/support`);
+  return {
+    success: true,
+    expiresAt,
+    session: session as PlatformSupportSession,
+  };
 }
 
 export async function endPlatformSupportSession(
@@ -3301,6 +3330,11 @@ export async function endPlatformSupportSession(
   }
   const active = await getActivePlatformSupportSession(actor, schoolId);
   if (!active) return { success: true };
+  const { data: school } = await admin
+    .from("schools")
+    .select("slug")
+    .eq("id", schoolId)
+    .maybeSingle();
   const endedAt = new Date().toISOString();
   const { error } = await admin
     .from("platform_support_sessions")
@@ -3316,7 +3350,12 @@ export async function endPlatformSupportSession(
     resource_type: "school_support_session",
     resource_id: schoolId,
   });
+  revalidatePath("/", "layout");
   revalidatePath("/admin/schools");
+  if (school?.slug) {
+    revalidatePath(`/admin/schools/${school.slug}`);
+    revalidatePath(`/admin/schools/${school.slug}/support`);
+  }
   return { success: true };
 }
 

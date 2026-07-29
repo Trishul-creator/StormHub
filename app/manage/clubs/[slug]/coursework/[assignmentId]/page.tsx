@@ -33,6 +33,8 @@ import {
 } from "@/lib/permissions";
 import { formatDateTime } from "@/lib/utils";
 import { getActivePlatformSupportSession, recordPlatformSupportAccess } from "@/lib/support-access";
+import { getSchoolById } from "@/lib/schools";
+import { PlatformSupportExpiryGuard } from "@/components/admin/platform-support-expiry-guard";
 
 interface AssignmentReviewPageProps {
   params: Promise<{ slug: string; assignmentId: string }>;
@@ -51,25 +53,35 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
   const supportSession = profile.role === "super_admin"
     ? await getActivePlatformSupportSession(profile, club.school_id)
     : null;
-  const canInspect = canInspectClubCoursework(profile, club, membership, Boolean(supportSession));
+  const supportSchool = profile.role === "super_admin"
+    ? await getSchoolById(club.school_id)
+    : null;
 
-  const [assignment, submissionStatuses, submissions, directory] = await Promise.all([
-    getClubAssignment(assignmentId),
-    getClubAssignmentSubmissionStatuses(assignmentId),
-    canInspect ? getClubAssignmentSubmissions(assignmentId) : Promise.resolve([]),
-    getClubMemberDirectory(club.id),
-  ]);
+  const assignment = await getClubAssignment(assignmentId);
   if (!assignment || assignment.club_id !== club.id) notFound();
-  if (supportSession) {
-    await recordPlatformSupportAccess({
+  const supportAccessRecorded = supportSession
+    ? await recordPlatformSupportAccess({
       actor: profile,
       schoolId: club.school_id,
       action: "view",
       resourceType: "coursework_assignment",
       resourceId: assignmentId,
-    });
-  }
-
+    })
+    : false;
+  const canInspect = canInspectClubCoursework(
+    profile,
+    club,
+    membership,
+    supportAccessRecorded
+  );
+  const canViewSubmissionActivity = profile.role !== "super_admin" || supportAccessRecorded;
+  const [submissionStatuses, submissions, directory] = canViewSubmissionActivity
+    ? await Promise.all([
+      getClubAssignmentSubmissionStatuses(assignmentId),
+      canInspect ? getClubAssignmentSubmissions(assignmentId) : Promise.resolve([]),
+      getClubMemberDirectory(club.id),
+    ])
+    : [[], [], []];
   const studentMembers = directory.filter((member) => member.membership_role !== "sponsor");
   const submittedIds = new Set(
     submissionStatuses
@@ -82,6 +94,12 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-8">
+      {supportSession && supportSchool && (
+        <PlatformSupportExpiryGuard
+          expiresAt={supportSession.expires_at}
+          returnTo={`/admin/schools/${supportSchool.slug}/support`}
+        />
+      )}
       <Button variant="ghost" size="sm" asChild className="mb-5">
         <Link href={`/manage/clubs/${slug}/coursework`}>
           <ArrowLeft className="h-4 w-4" /> Back to coursework
@@ -106,7 +124,7 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
         )}
       </div>
 
-      {supportSession && (
+      {supportSession && supportAccessRecorded && (
         <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
@@ -116,15 +134,44 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
         </div>
       )}
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-3">
-        <SummaryCard icon={Users} label="Assigned" value={studentMembers.length} />
-        <SummaryCard
-          icon={FileCheck2}
-          label={assignment.submission_mode === "completion" ? "Completed" : "Turned in"}
-          value={submittedCount}
-        />
-        <SummaryCard icon={CheckCircle2} label="Graded" value={returnedCount} />
-      </div>
+      {profile.role === "super_admin" && !canViewSubmissionActivity && (
+        <div className="mb-6 flex flex-col gap-4 rounded-xl border border-amber-300 bg-amber-50 p-5 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">
+                {supportSession
+                  ? "Student activity stayed locked because access could not be recorded"
+                  : "Student activity is private"}
+              </p>
+              <p className="mt-1">
+                {supportSession
+                  ? "Private information is never shown when the required support audit entry cannot be created. Return to school support and try again."
+                  : "Counts, names, submissions, grades, and feedback stay hidden until a temporary support session is started for this school."}
+              </p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" asChild className="shrink-0">
+            <Link href={supportSchool
+              ? `/admin/schools/${supportSchool.slug}#support-access`
+              : "/admin/schools"}>
+              Open school support
+            </Link>
+          </Button>
+        </div>
+      )}
+
+      {canViewSubmissionActivity && (
+        <div className="mb-8 grid gap-4 sm:grid-cols-3">
+          <SummaryCard icon={Users} label="Assigned" value={studentMembers.length} />
+          <SummaryCard
+            icon={FileCheck2}
+            label={assignment.submission_mode === "completion" ? "Completed" : "Turned in"}
+            value={submittedCount}
+          />
+          <SummaryCard icon={CheckCircle2} label="Graded" value={returnedCount} />
+        </div>
+      )}
 
       <Card className="mb-8">
         <CardHeader>
@@ -153,11 +200,21 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
             clubSlug={slug}
             assignmentId={assignment.id}
             attachments={assignment.attachments ?? []}
+            readOnly={profile.role === "super_admin"}
           />
         </CardContent>
       </Card>
 
-      {canInspect ? (
+      {!canViewSubmissionActivity ? (
+        <section className="rounded-xl border border-dashed bg-card p-8 text-center">
+          <ShieldAlert className="mx-auto h-6 w-6 text-amber-600 dark:text-amber-300" />
+          <h2 className="mt-3 font-semibold text-foreground">Student work is locked</h2>
+          <p className="mx-auto mt-1 max-w-xl text-sm text-muted-foreground">
+            Start a recorded, time-limited support session for this school only when a reported
+            issue requires private coursework inspection.
+          </p>
+        </section>
+      ) : canInspect ? (
       <section>
         <div className="mb-4">
           <h2 className="text-xl font-semibold text-storm-navy">Student work</h2>
@@ -226,7 +283,7 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
                             <a
                               href={attachment.source_type === "upload"
                                 ? `/api/coursework/files/submission/${attachment.id}`
-                                : attachment.external_url ?? "#"}
+                                : `/api/coursework/google/submission-attachments/${attachment.id}/open`}
                               target="_blank"
                               rel="noopener noreferrer"
                             >
@@ -291,7 +348,7 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
         </section>
       )}
 
-      {missingMembers.length > 0 && (
+      {canViewSubmissionActivity && missingMembers.length > 0 && (
         <section className="mt-8 rounded-2xl border bg-card p-5">
           <h2 className="font-semibold text-storm-navy">
             {assignment.submission_mode === "completion" ? "Not completed" : "Not turned in"}

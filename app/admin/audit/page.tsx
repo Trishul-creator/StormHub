@@ -4,6 +4,8 @@ import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDateTime } from "@/lib/utils";
+import { DatabaseZap } from "lucide-react";
+import { getPlatformSupportAvailability } from "@/lib/support-access";
 
 type AuditRow = {
   id: string;
@@ -30,6 +32,7 @@ export default async function AuditPage() {
   const { profile } = await requireAdmin();
   const supabase = await createClient();
   const admin = createAdminClient();
+  const supportAvailability = await getPlatformSupportAvailability();
   const normalAuditPromise = supabase
     ? supabase
         .from("admin_audit_log")
@@ -37,7 +40,7 @@ export default async function AuditPage() {
         .order("occurred_at", { ascending: false })
         .limit(200)
     : Promise.resolve({ data: [] });
-  let supportAuditQuery = admin
+  let supportAuditQuery = admin && supportAvailability.available
     ? admin
         .from("platform_support_access_log")
         .select("*, actor:profiles!actor_user_id(full_name,email), session:platform_support_sessions!session_id(reason,expires_at)")
@@ -78,6 +81,16 @@ export default async function AuditPage() {
         title="Administrative audit log"
         description="History for account, roster, approval, school, content, and temporary platform-support access."
       />
+      {!supportAvailability.available && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          <DatabaseZap className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            <strong>Support audit history is unavailable:</strong> the privacy and support
+            database update has not been applied in this environment. Standard administrative
+            history below is still current.
+          </p>
+        </div>
+      )}
       {rows.length === 0 ? (
         <EmptyState title="No administrative changes yet" description="New privileged changes will appear here." />
       ) : (

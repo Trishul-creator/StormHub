@@ -212,6 +212,7 @@ describe("club permissions", () => {
     expect(canManageClubCoursework(profile("student"), club(), membership("officer"))).toBe(true);
     expect(canPublishClubCoursework(profile("student"), club(), membership("president"))).toBe(true);
     expect(canPublishClubCoursework(profile("student"), club(), membership("officer"))).toBe(false);
+    expect(canPublishClubCoursework(profile("super_admin"), club())).toBe(false);
     expect(canGradeClubCoursework(profile("student"), club(), membership("president"))).toBe(false);
     expect(canGradeClubCoursework(profile("teacher"), club(), membership("sponsor"))).toBe(true);
     expect(canGradeClubCoursework(profile("super_admin"), club())).toBe(false);

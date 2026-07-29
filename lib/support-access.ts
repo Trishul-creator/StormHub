@@ -13,6 +13,52 @@ export interface PlatformSupportSession {
   ended_at: string | null;
 }
 
+export interface PlatformSupportAvailability {
+  available: boolean;
+  error?: string;
+}
+
+export function isPlatformSupportSchemaMissing(
+  error: { code?: string | null; message?: string | null } | null | undefined
+): boolean {
+  if (!error) return false;
+  const message = error.message?.toLowerCase() ?? "";
+  return (
+    error.code === "42P01"
+    || error.code === "PGRST205"
+    || message.includes("platform_support_sessions")
+      && (
+        message.includes("does not exist")
+        || message.includes("schema cache")
+        || message.includes("could not find")
+      )
+  );
+}
+
+export async function getPlatformSupportAvailability(): Promise<PlatformSupportAvailability> {
+  const admin = createAdminClient();
+  if (!admin) {
+    return {
+      available: false,
+      error: "Server-side database access is not configured.",
+    };
+  }
+  const { error } = await admin
+    .from("platform_support_sessions")
+    .select("id")
+    .limit(1);
+  if (!error) return { available: true };
+  if (!isPlatformSupportSchemaMissing(error)) {
+    console.error("[getPlatformSupportAvailability]", error.message);
+  }
+  return {
+    available: false,
+    error: isPlatformSupportSchemaMissing(error)
+      ? "The privacy and support database update has not been applied yet."
+      : "The support service could not be reached.",
+  };
+}
+
 export async function getActivePlatformSupportSession(
   actor: Profile,
   schoolId: string
@@ -31,7 +77,9 @@ export async function getActivePlatformSupportSession(
     .limit(1)
     .maybeSingle();
   if (error) {
-    if (error.code !== "42P01") console.error("[getActivePlatformSupportSession]", error.message);
+    if (!isPlatformSupportSchemaMissing(error)) {
+      console.error("[getActivePlatformSupportSession]", error.message);
+    }
     return null;
   }
   return data as PlatformSupportSession | null;

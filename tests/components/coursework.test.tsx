@@ -5,6 +5,7 @@ import { ClubCreateNavigation } from "@/components/manage/club-create-navigation
 import { SubmissionForm } from "@/components/coursework/submission-form";
 import { GradeSubmissionForm } from "@/components/coursework/grade-submission-form";
 import { ContentForm } from "@/components/forms/content-form";
+import { AssignmentAttachmentsManager } from "@/components/coursework/assignment-attachments-manager";
 import {
   createClubAssignment,
   gradeClubAssignmentSubmission,
@@ -103,6 +104,35 @@ describe("club coursework controls", () => {
       "/manage/clubs/science-bowl/coursework"
     );
     expect(screen.queryByLabelText("Assignment title")).not.toBeInTheDocument();
+  });
+
+  it("keeps assignment materials view-only during platform support", () => {
+    render(
+      <AssignmentAttachmentsManager
+        clubSlug="science-bowl"
+        assignmentId="assignment-1"
+        readOnly
+        attachments={[{
+          id: "attachment-1",
+          assignment_id: "assignment-1",
+          uploaded_by: "teacher-1",
+          source_type: "google_drive",
+          copy_mode: "reference",
+          file_name: "Practice guide",
+          external_url: "https://drive.google.com/example",
+          created_at: "2026-07-28T12:00:00.000Z",
+        }]}
+      />
+    );
+
+    expect(screen.getByRole("link", { name: "Open Practice guide" })).toHaveAttribute(
+      "href",
+      "/api/coursework/google/assignment-attachments/attachment-1/open"
+    );
+    expect(screen.getByText(/Read-only support/i)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Remove Practice guide" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Upload files")).not.toBeInTheDocument();
+    expect(screen.queryByText("Add Drive references")).not.toBeInTheDocument();
   });
 
   it("saves an assignment as a scheduled private draft", async () => {

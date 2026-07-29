@@ -11,7 +11,10 @@ import { requireAdmin } from "@/lib/auth";
 import { getClubs, getEvents, getOpportunities } from "@/lib/data";
 import { getSchoolBySlug, getSchoolPublicUrl } from "@/lib/schools";
 import { getSchoolSignupAccess } from "@/lib/school-access";
-import { getActivePlatformSupportSession } from "@/lib/support-access";
+import {
+  getActivePlatformSupportSession,
+  getPlatformSupportAvailability,
+} from "@/lib/support-access";
 
 interface AdminSchoolPageProps {
   params: Promise<{ schoolSlug: string }>;
@@ -25,12 +28,13 @@ export default async function AdminSchoolPage({ params }: AdminSchoolPageProps) 
   const school = await getSchoolBySlug(schoolSlug);
   if (!school) notFound();
 
-  const [clubs, opportunities, events, signupAccess, supportSession] = await Promise.all([
+  const [clubs, opportunities, events, signupAccess, supportSession, supportAvailability] = await Promise.all([
     getClubs({ schoolId: school.id }),
     getOpportunities({ schoolId: school.id }),
     getEvents({ schoolId: school.id, upcoming: true }),
     getSchoolSignupAccess(profile, school.id),
     getActivePlatformSupportSession(profile, school.id),
+    getPlatformSupportAvailability(),
   ]);
 
   return (
@@ -100,7 +104,9 @@ export default async function AdminSchoolPage({ params }: AdminSchoolPageProps) 
         <PlatformSupportAccess
           schoolId={school.id}
           schoolName={school.name}
+          schoolSlug={school.slug}
           initialSession={supportSession}
+          supportAvailable={supportAvailability.available}
         />
       </div>
     </div>
