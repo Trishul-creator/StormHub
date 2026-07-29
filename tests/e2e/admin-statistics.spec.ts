@@ -31,11 +31,30 @@ test.describe("scoped admin statistics", () => {
     await expect(page.getByRole("heading", { name: "Statistics", exact: true })).toBeVisible();
     await expect(page.getByLabel("View scope")).toBeVisible();
     await expect(page.getByText(/Platform totals combine every school workspace/i)).toBeVisible();
+    await expect(page.locator("[data-statistics-scope]")).toHaveAttribute(
+      "data-statistics-scope",
+      "platform"
+    );
 
     await page.getByLabel("View scope").selectOption("school1");
-    await page.getByRole("button", { name: "Apply" }).click();
 
     await expect(page).toHaveURL(/\/admin\/statistics\?school=school1/);
+    await expect(page.getByLabel("View scope")).toHaveValue("school1");
+    await expect(page.locator("[data-statistics-scope]")).toHaveAttribute(
+      "data-statistics-scope",
+      "b0000000-0000-4000-8000-000000000001"
+    );
     await expect(page.getByText(/intentionally filtered to one school/i)).toBeVisible();
+    await expect(page.getByText("Science Bowl", { exact: true })).toBeVisible();
+
+    await page.getByLabel("View scope").selectOption("school2");
+    await expect(page).toHaveURL(/\/admin\/statistics\?school=school2/);
+    await expect(page.getByLabel("View scope")).toHaveValue("school2");
+    await expect(page.locator("[data-statistics-scope]")).toHaveAttribute(
+      "data-statistics-scope",
+      "b0000000-0000-4000-8000-000000000002"
+    );
+    await expect(page.getByText("Science Bowl", { exact: true })).toHaveCount(0);
+    await expect(page.getByText(/Active clubs will appear here/i)).toBeVisible();
   });
 });
