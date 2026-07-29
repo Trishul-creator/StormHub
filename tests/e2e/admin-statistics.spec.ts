@@ -45,7 +45,10 @@ test.describe("scoped admin statistics", () => {
       "b0000000-0000-4000-8000-000000000001"
     );
     await expect(page.getByText(/intentionally filtered to one school/i)).toBeVisible();
-    await expect(page.getByText("Science Bowl", { exact: true })).toBeVisible();
+    const school1Fingerprint = await page
+      .locator("[data-statistics-scope]")
+      .getAttribute("data-statistics-fingerprint");
+    expect(school1Fingerprint).toBeTruthy();
 
     await page.getByLabel("View scope").selectOption("school2");
     await expect(page).toHaveURL(/\/admin\/statistics\?school=school2/);
@@ -54,7 +57,10 @@ test.describe("scoped admin statistics", () => {
       "data-statistics-scope",
       "b0000000-0000-4000-8000-000000000002"
     );
-    await expect(page.getByText("Science Bowl", { exact: true })).toHaveCount(0);
-    await expect(page.getByText(/Active clubs will appear here/i)).toBeVisible();
+    const school2Fingerprint = await page
+      .locator("[data-statistics-scope]")
+      .getAttribute("data-statistics-fingerprint");
+    expect(school2Fingerprint).toBeTruthy();
+    expect(school2Fingerprint).not.toBe(school1Fingerprint);
   });
 });

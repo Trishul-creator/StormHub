@@ -75,7 +75,16 @@ export default async function AdminStatisticsPage({ searchParams }: AdminStatist
       </div>
 
       {scopedStatistics ? (
-        <div data-statistics-scope={scopedStatistics.scopeSchoolId ?? "platform"}>
+        <div
+          data-statistics-scope={scopedStatistics.scopeSchoolId ?? "platform"}
+          data-statistics-fingerprint={[
+            scopedStatistics.totalPeople,
+            scopedStatistics.totalClubs,
+            scopedStatistics.activeMemberships,
+            scopedStatistics.upcomingEvents,
+            scopedStatistics.engagementEvents30d,
+          ].join(":")}
+        >
           <StatisticsDashboard
             key={scopedStatistics.scopeSchoolId ?? "platform"}
             statistics={scopedStatistics}
