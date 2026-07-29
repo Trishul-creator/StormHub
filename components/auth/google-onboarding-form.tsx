@@ -19,13 +19,11 @@ export function GoogleOnboardingForm({
   email,
   suggestedName,
   next,
-  requiresAccessCode,
 }: {
   schools: OnboardingSchool[];
   email: string;
   suggestedName: string;
   next: string;
-  requiresAccessCode: boolean;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -108,18 +106,35 @@ export function GoogleOnboardingForm({
               ))}
             </select>
           </div>
-          {requiresAccessCode && (
-            <div>
-              <Label htmlFor="google-accessCode">School signup code</Label>
-              <Input id="google-accessCode" name="accessCode" required autoComplete="one-time-code" className="mt-1" />
-            </div>
-          )}
+          <div>
+            <Label htmlFor="google-accessCode">School access code</Label>
+            <Input
+              id="google-accessCode"
+              name="accessCode"
+              required
+              autoComplete="one-time-code"
+              className="mt-1 font-mono uppercase"
+              placeholder="SH-1234-ABCD-5678"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Ask a school administrator or Advisor for the current code.
+            </p>
+          </div>
+          <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+            <input type="checkbox" required className="mt-1 h-4 w-4 rounded border-input" />
+            <span>
+              I will use StormHub for school purposes and agree to the{" "}
+              <a href="/acceptable-use" className="text-storm-electric hover:underline">Acceptable Use Policy</a>,{" "}
+              <a href="/terms" className="text-storm-electric hover:underline">Terms</a>, and{" "}
+              <a href="/privacy" className="text-storm-electric hover:underline">Privacy Notice</a>.
+            </span>
+          </label>
           <Button type="submit" className="w-full" disabled={loading || schools.length === 0}>
             {loading ? "Finishing setup..." : "Continue to StormHub"}
           </Button>
         </form>
         <p className="mt-4 text-center text-xs text-muted-foreground">
-          Your verified Google email must match the accepted-email settings for the school you choose.
+          Your verified Google email and school access code must match the school you choose.
         </p>
       </CardContent>
     </Card>

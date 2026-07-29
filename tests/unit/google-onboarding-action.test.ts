@@ -27,17 +27,14 @@ import { completeGoogleOnboarding } from "@/lib/actions";
 
 describe("completeGoogleOnboarding", () => {
   const originalBlockedDomains = process.env.BLOCKED_SIGNUP_EMAIL_DOMAINS;
-  const originalAccessCode = process.env.SIGNUP_ACCESS_CODE;
 
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.BLOCKED_SIGNUP_EMAIL_DOMAINS;
-    delete process.env.SIGNUP_ACCESS_CODE;
   });
 
   afterEach(() => {
     restoreEnvironment("BLOCKED_SIGNUP_EMAIL_DOMAINS", originalBlockedDomains);
-    restoreEnvironment("SIGNUP_ACCESS_CODE", originalAccessCode);
   });
 
   it("assigns a verified Google user only after the selected school allows the email", async () => {
@@ -50,6 +47,7 @@ describe("completeGoogleOnboarding", () => {
       schoolId: "school-1",
       fullName: "Google Student",
       gradeLevel: "10",
+      accessCode: "SH-1234-ABCD-5678",
       next: "/opportunities",
     });
 
@@ -74,6 +72,7 @@ describe("completeGoogleOnboarding", () => {
       schoolId: "school-1",
       fullName: "Google Student",
       gradeLevel: "",
+      accessCode: "SH-1234-ABCD-5678",
       next: "/dashboard",
     });
 
@@ -83,14 +82,38 @@ describe("completeGoogleOnboarding", () => {
     });
     expect(update).not.toHaveBeenCalled();
   });
+
+  it("does not assign a Google user with the wrong school access code", async () => {
+    const { update } = setupClients({
+      email: "student@gmail.com",
+      allowedDomains: ["*"],
+      accessCodeValid: false,
+    });
+
+    const result = await completeGoogleOnboarding({
+      schoolId: "school-1",
+      fullName: "Google Student",
+      gradeLevel: "10",
+      accessCode: "SH-WRNG-CODE-0000",
+      next: "/dashboard",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Enter the correct school access code.",
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
 });
 
 function setupClients({
   email,
   allowedDomains,
+  accessCodeValid = true,
 }: {
   email: string;
   allowedDomains: string[];
+  accessCodeValid?: boolean;
 }) {
   const getUser = vi.fn().mockResolvedValue({
     data: {
@@ -155,6 +178,7 @@ function setupClients({
     })),
   };
   mocks.createAdminClient.mockReturnValue({
+    rpc: vi.fn().mockResolvedValue({ data: accessCodeValid, error: null }),
     from: vi.fn((table: string) => {
       if (table === "profiles") return profiles;
       if (table === "schools") return schools;

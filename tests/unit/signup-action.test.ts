@@ -98,6 +98,18 @@ describe("supabaseSignUp", () => {
     }));
   });
 
+  it("rejects an incorrect school access code before creating an auth account", async () => {
+    const { signUp } = setupClients({ accessCodeValid: false });
+
+    const result = await submitSignup();
+
+    expect(result).toEqual({
+      success: false,
+      error: "Enter the correct school access code.",
+    });
+    expect(signUp).not.toHaveBeenCalled();
+  });
+
   it("rejects and rolls back a signup if Supabase unexpectedly auto-confirms it", async () => {
     const { deleteUser, signOut } = setupClients({
       signup: {
@@ -177,6 +189,7 @@ type QueryResult = {
 function setupClients(input: {
   school?: QueryResult;
   signupConfig?: QueryResult;
+  accessCodeValid?: boolean;
   signup?: {
     data: {
       user: { id: string } | null;
@@ -206,12 +219,17 @@ function setupClients(input: {
     };
   });
   const deleteUser = vi.fn().mockResolvedValue({ error: null });
+  const updateUserById = vi.fn().mockResolvedValue({ error: null });
   const admin = {
+    rpc: vi.fn().mockResolvedValue({
+      data: input.accessCodeValid ?? true,
+      error: null,
+    }),
     from: vi.fn((table: string) => {
       if (table !== "schools") throw new Error(`Unexpected admin table: ${table}`);
       return { select: schoolSelect };
     }),
-    auth: { admin: { deleteUser } },
+    auth: { admin: { deleteUser, updateUserById } },
   };
 
   const signUp = vi.fn().mockResolvedValue(input.signup ?? {
@@ -244,7 +262,7 @@ function submitSignup(email = "Student@Example.edu", confirmPassword = "StrongPa
     confirmPassword,
     "Test Student",
     10,
-    "",
+    "SH-1234-ABCD-5678",
     "school-1",
     { website: "", loadedAt: Date.now() - 2_000, captchaToken: null }
   );

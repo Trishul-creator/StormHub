@@ -9,6 +9,7 @@ import {
   ExternalLink,
   FileCheck2,
   Paperclip,
+  ShieldAlert,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,10 +27,12 @@ import {
 import { requireClubManager } from "@/lib/auth";
 import {
   canGradeClubCoursework,
+  canInspectClubCoursework,
   canManageClubCoursework,
   canPublishClubCoursework,
 } from "@/lib/permissions";
 import { formatDateTime } from "@/lib/utils";
+import { getActivePlatformSupportSession, recordPlatformSupportAccess } from "@/lib/support-access";
 
 interface AssignmentReviewPageProps {
   params: Promise<{ slug: string; assignmentId: string }>;
@@ -45,14 +48,27 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
   }
   const canPublish = canPublishClubCoursework(profile, club, membership);
   const canGrade = canGradeClubCoursework(profile, club, membership);
+  const supportSession = profile.role === "super_admin"
+    ? await getActivePlatformSupportSession(profile, club.school_id)
+    : null;
+  const canInspect = canInspectClubCoursework(profile, club, membership, Boolean(supportSession));
 
   const [assignment, submissionStatuses, submissions, directory] = await Promise.all([
     getClubAssignment(assignmentId),
     getClubAssignmentSubmissionStatuses(assignmentId),
-    canGrade ? getClubAssignmentSubmissions(assignmentId) : Promise.resolve([]),
+    canInspect ? getClubAssignmentSubmissions(assignmentId) : Promise.resolve([]),
     getClubMemberDirectory(club.id),
   ]);
   if (!assignment || assignment.club_id !== club.id) notFound();
+  if (supportSession) {
+    await recordPlatformSupportAccess({
+      actor: profile,
+      schoolId: club.school_id,
+      action: "view",
+      resourceType: "coursework_assignment",
+      resourceId: assignmentId,
+    });
+  }
 
   const studentMembers = directory.filter((member) => member.membership_role !== "sponsor");
   const submittedIds = new Set(
@@ -89,6 +105,16 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
           <AssignmentStatusActions clubSlug={slug} assignmentId={assignment.id} status={assignment.status} />
         )}
       </div>
+
+      {supportSession && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            <strong>Read-only support session:</strong> viewing this assignment is recorded.
+            Grading and private-content changes remain disabled for platform administrators.
+          </p>
+        </div>
+      )}
 
       <div className="mb-8 grid gap-4 sm:grid-cols-3">
         <SummaryCard icon={Users} label="Assigned" value={studentMembers.length} />
@@ -131,7 +157,7 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
         </CardContent>
       </Card>
 
-      {canGrade ? (
+      {canInspect ? (
       <section>
         <div className="mb-4">
           <h2 className="text-xl font-semibold text-storm-navy">Student work</h2>
@@ -186,7 +212,11 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
                       <div className="mt-3 flex flex-wrap gap-2">
                         {(submission.student_copies ?? []).map((copy) => (
                           <Button key={copy.id} variant="outline" size="sm" asChild>
-                            <a href={copy.web_url} target="_blank" rel="noopener noreferrer">
+                            <a
+                              href={`/api/coursework/google/student-copies/${copy.id}/open`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
                               <Cloud className="h-4 w-4" /> {copy.file_name}
                             </a>
                           </Button>
@@ -211,12 +241,14 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
                     </div>
                   )}
                 </div>
-                <GradeSubmissionForm
-                  clubSlug={slug}
-                  assignmentId={assignment.id}
-                  submission={submission}
-                  pointsPossible={assignment.points_possible}
-                />
+                {canGrade && (
+                  <GradeSubmissionForm
+                    clubSlug={slug}
+                    assignmentId={assignment.id}
+                    submission={submission}
+                    pointsPossible={assignment.points_possible}
+                  />
+                )}
               </article>
             ))}
           </div>

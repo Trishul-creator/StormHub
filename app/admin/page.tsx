@@ -11,6 +11,7 @@ import { redirect } from "next/navigation";
 import { DashboardPriorityPanel } from "@/components/dashboard/priority-panel";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { SchoolAccessCodeSettings } from "@/components/admin/school-access-code-settings";
 import { requireAdmin } from "@/lib/auth";
 import {
   getAdminAnalytics,
@@ -19,6 +20,8 @@ import {
   getPendingApprovals,
 } from "@/lib/data";
 import { buildManagementDashboardPriorities } from "@/lib/dashboard-priorities";
+import { getSchoolForProfile } from "@/lib/schools";
+import { getSchoolSignupAccess } from "@/lib/school-access";
 
 export default async function AdminPage() {
   const { profile } = await requireAdmin();
@@ -29,6 +32,10 @@ export default async function AdminPage() {
     getPendingApprovals(),
     getManageableClubs(profile),
   ]);
+  const school = await getSchoolForProfile(profile);
+  const signupAccess = school
+    ? await getSchoolSignupAccess(profile, school.id)
+    : null;
   const attention = await getManagementDashboardAttention(manageableClubs);
   const priorities = buildManagementDashboardPriorities({
     attention,
@@ -101,6 +108,17 @@ export default async function AdminPage() {
           action="View statistics"
         />
       </section>
+
+      {school && (
+        <section className="mt-6" aria-label="School account access">
+          <SchoolAccessCodeSettings
+            schoolId={school.id}
+            schoolName={school.name}
+            initialCode={signupAccess?.access_code ?? null}
+            initialRotatedAt={signupAccess?.rotated_at ?? null}
+          />
+        </section>
+      )}
     </main>
   );
 }

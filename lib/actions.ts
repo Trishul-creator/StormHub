@@ -71,6 +71,12 @@ import { checkDurableRateLimit, markRateLimitAttemptSuccessful } from "@/lib/req
 import { getAuthCallbackUrl } from "@/lib/env";
 import { safeAuthRedirectPath } from "@/lib/auth-redirect";
 import {
+  canManageSchoolAccess,
+  generateSchoolSignupAccessCode,
+  verifySchoolSignupAccessCode,
+} from "@/lib/school-access";
+import { getActivePlatformSupportSession } from "@/lib/support-access";
+import {
   copyGoogleDriveFileForStudent,
   disconnectGoogleDrive,
   ensureGoogleDrivePermission,
@@ -2541,6 +2547,9 @@ export async function setClubEventAttendance(data: {
       .maybeSingle(),
   ]);
   if (!event || event.club_id !== club.id) return { success: false, error: "Club event not found." };
+  if (actor.role === "super_admin") {
+    return { success: false, error: "Platform support access is read-only." };
+  }
   if (!canManageClubRoster(actor, club, membership as ClubMembership | null)) {
     return { success: false, error: "Only the club Vice President, Advisor, or an administrator can record attendance." };
   }
@@ -2817,11 +2826,6 @@ export async function completeGoogleOnboarding(input: {
     return { success: false, error: "Finish this account using Google sign-in." };
   }
 
-  const requiredAccessCode = process.env.SIGNUP_ACCESS_CODE?.trim();
-  if (requiredAccessCode && input.accessCode?.trim() !== requiredAccessCode) {
-    return { success: false, error: "Enter the correct school signup code." };
-  }
-
   const normalizedFullName = input.fullName.trim().replace(/\s+/g, " ");
   if (normalizedFullName.length < 3 || normalizedFullName.length > 120) {
     return { success: false, error: "Enter your full name." };
@@ -2855,6 +2859,20 @@ export async function completeGoogleOnboarding(input: {
   }
   if (!school || school.is_active === false || school.is_public === false) {
     return { success: false, error: "Choose an active school." };
+  }
+
+  const accessCheck = await verifySchoolSignupAccessCode(
+    school.id,
+    input.accessCode?.trim() ?? ""
+  );
+  if (!accessCheck.configured) {
+    return {
+      success: false,
+      error: "School access codes are not configured yet. Apply the latest database migration.",
+    };
+  }
+  if (!accessCheck.valid) {
+    return { success: false, error: "Enter the correct school access code." };
   }
 
   const allowedDomains = getAllowedSignupDomains(
@@ -2918,7 +2936,6 @@ export async function supabaseSignUp(
 ) {
   const normalizedEmail = email.trim().toLowerCase();
   const normalizedFullName = fullName.trim().replace(/\s+/g, " ");
-  const requiredAccessCode = process.env.SIGNUP_ACCESS_CODE?.trim();
   const botProofError = validateSignupBotProof(botProof);
   if (botProofError) return { success: false, error: botProofError };
   if (normalizedFullName.length < 3 || normalizedFullName.length > 120) {
@@ -2929,9 +2946,6 @@ export async function supabaseSignUp(
   }
   if (password !== confirmPassword) {
     return { success: false, error: "Passwords do not match." };
-  }
-  if (requiredAccessCode && accessCode?.trim() !== requiredAccessCode) {
-    return { success: false, error: "Enter the correct school signup code." };
   }
   if (!schoolId) {
     return { success: false, error: "Choose your school." };
@@ -2992,6 +3006,20 @@ export async function supabaseSignUp(
     return { success: false, error: "Choose an active school." };
   }
 
+  const accessCheck = await verifySchoolSignupAccessCode(
+    school.id,
+    accessCode?.trim() ?? ""
+  );
+  if (!accessCheck.configured) {
+    return {
+      success: false,
+      error: "School access codes are not configured yet. Apply the latest database migration.",
+    };
+  }
+  if (!accessCheck.valid) {
+    return { success: false, error: "Enter the correct school access code." };
+  }
+
   const { data: schoolSignupConfig, error: signupConfigError } = await db
     .from("schools")
     .select("allowed_email_domains")
@@ -3029,7 +3057,12 @@ export async function supabaseSignUp(
     email: normalizedEmail,
     password,
     options: {
-      data: { full_name: normalizedFullName, grade_level: normalizedGrade, school_id: schoolId },
+      data: {
+        full_name: normalizedFullName,
+        grade_level: normalizedGrade,
+        school_id: schoolId,
+        school_access_code: accessCode?.trim().toUpperCase(),
+      },
       emailRedirectTo: getAuthCallbackUrl(),
       ...(botProof?.captchaToken ? { captchaToken: botProof.captchaToken } : {}),
     },
@@ -3055,6 +3088,18 @@ export async function supabaseSignUp(
       success: false,
       error: "Email verification is temporarily unavailable. Please contact support before trying again.",
     };
+  }
+  if (admin && data.user) {
+    const { error: scrubError } = await admin.auth.admin.updateUserById(data.user.id, {
+      user_metadata: {
+        full_name: normalizedFullName,
+        grade_level: normalizedGrade,
+        school_id: schoolId,
+      },
+    });
+    if (scrubError) {
+      console.warn("[supabaseSignUp] Could not remove the one-time school code from auth metadata.");
+    }
   }
   if (admin && signupAttemptId) {
     await admin.from("signup_attempts").update({ was_successful: true }).eq("id", signupAttemptId);
@@ -3133,6 +3178,146 @@ export async function updateSchoolSignupDomains(input: {
   revalidatePath("/manage");
   revalidatePath("/admin/schools");
   return { success: true, domains: Array.isArray(data) ? data : domains };
+}
+
+export async function rotateSchoolSignupAccessCode(
+  schoolId: string
+): Promise<{ success: boolean; accessCode?: string; rotatedAt?: string; error?: string }> {
+  if (isDemoMode()) {
+    return { success: false, error: "School access codes are unavailable in demo mode." };
+  }
+  const actor = await getCurrentProfile();
+  const admin = createAdminClient();
+  if (!actor || !admin || !canManageSchoolAccess(actor, schoolId)) {
+    return { success: false, error: "Administrator access required." };
+  }
+
+  const accessCode = generateSchoolSignupAccessCode();
+  const rotatedAt = new Date().toISOString();
+  const { error } = await admin.from("school_signup_access").upsert({
+    school_id: schoolId,
+    access_code: accessCode,
+    rotated_by: actor.id,
+    rotated_at: rotatedAt,
+  }, { onConflict: "school_id" });
+  if (error) {
+    if (error.code === "42P01") {
+      return { success: false, error: "Apply the latest database migration before managing school access codes." };
+    }
+    return { success: false, error: friendlyError(error, "Could not rotate the school access code.") };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/schools");
+  return { success: true, accessCode, rotatedAt };
+}
+
+export async function startPlatformSupportSession(input: {
+  schoolId: string;
+  reason: string;
+  durationMinutes: number;
+}): Promise<{ success: boolean; expiresAt?: string; error?: string }> {
+  if (isDemoMode()) return { success: false, error: "Support access is unavailable in demo mode." };
+  const actor = await getCurrentProfile();
+  const admin = createAdminClient();
+  if (!actor || actor.role !== "super_admin" || !admin) {
+    return { success: false, error: "Platform administrator access required." };
+  }
+  const reason = input.reason.trim().replace(/\s+/g, " ");
+  if (reason.length < 10 || reason.length > 500) {
+    return { success: false, error: "Enter a support reason between 10 and 500 characters." };
+  }
+  const durationMinutes = [15, 30, 60].includes(input.durationMinutes)
+    ? input.durationMinutes
+    : 30;
+  const { data: school } = await admin
+    .from("schools")
+    .select("id,name")
+    .eq("id", input.schoolId)
+    .maybeSingle();
+  if (!school) return { success: false, error: "School not found." };
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + durationMinutes * 60_000).toISOString();
+  await admin
+    .from("platform_support_sessions")
+    .update({ ended_at: now.toISOString() })
+    .eq("actor_user_id", actor.id)
+    .eq("school_id", school.id)
+    .is("ended_at", null);
+  const { data: session, error } = await admin
+    .from("platform_support_sessions")
+    .insert({
+      actor_user_id: actor.id,
+      school_id: school.id,
+      reason,
+      expires_at: expiresAt,
+    })
+    .select("id")
+    .single();
+  if (error || !session) {
+    if (error?.code === "42P01") {
+      return { success: false, error: "Apply the latest database migration before using support access." };
+    }
+    return { success: false, error: friendlyError(error, "Could not start the support session.") };
+  }
+  await admin.from("platform_support_access_log").insert({
+    session_id: session.id,
+    actor_user_id: actor.id,
+    school_id: school.id,
+    action: "start",
+    resource_type: "school_support_session",
+    resource_id: school.id,
+  });
+
+  const { data: schoolAdmins } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("school_id", school.id)
+    .eq("role", "admin")
+    .eq("account_status", "active");
+  await Promise.all((schoolAdmins ?? []).map((schoolAdmin) => createNotification({
+    recipientUserId: schoolAdmin.id,
+    type: "system_message",
+    importance: "important",
+    title: "Platform support session started",
+    message: `A platform administrator opened read-only support access for ${school.name} until ${new Date(expiresAt).toLocaleTimeString()}. Reason: ${reason}`,
+    link: "/admin/audit",
+    sendEmail: false,
+  })));
+
+  revalidatePath(`/admin/schools`);
+  return { success: true, expiresAt };
+}
+
+export async function endPlatformSupportSession(
+  schoolId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: false, error: "Support access is unavailable in demo mode." };
+  const actor = await getCurrentProfile();
+  const admin = createAdminClient();
+  if (!actor || actor.role !== "super_admin" || !admin) {
+    return { success: false, error: "Platform administrator access required." };
+  }
+  const active = await getActivePlatformSupportSession(actor, schoolId);
+  if (!active) return { success: true };
+  const endedAt = new Date().toISOString();
+  const { error } = await admin
+    .from("platform_support_sessions")
+    .update({ ended_at: endedAt })
+    .eq("id", active.id)
+    .eq("actor_user_id", actor.id);
+  if (error) return { success: false, error: friendlyError(error, "Could not end the support session.") };
+  await admin.from("platform_support_access_log").insert({
+    session_id: active.id,
+    actor_user_id: actor.id,
+    school_id: schoolId,
+    action: "end",
+    resource_type: "school_support_session",
+    resource_id: schoolId,
+  });
+  revalidatePath("/admin/schools");
+  return { success: true };
 }
 
 export async function updateProfileSettings(data: {

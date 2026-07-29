@@ -31,7 +31,9 @@ export function Footer() {
             <p className="mb-3 font-semibold text-white">Info</p>
             <ul className="space-y-2 text-sm">
               <li><Link href="/about" className="hover:text-white transition-colors">About</Link></li>
-              <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link></li>
+              <li><Link href="/privacy" className="hover:text-white transition-colors">Student privacy</Link></li>
+              <li><Link href="/acceptable-use" className="hover:text-white transition-colors">Acceptable use</Link></li>
+              <li><Link href="/terms" className="hover:text-white transition-colors">Terms</Link></li>
               <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
             </ul>
           </div>

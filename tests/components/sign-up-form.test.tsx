@@ -69,6 +69,7 @@ describe("SignUpForm", () => {
     fireEvent.change(screen.getByLabelText("Grade"), { target: { value: "10" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "StrongPassword123" } });
     fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "StrongPassword123" } });
+    fireEvent.change(screen.getByLabelText("School access code"), { target: { value: "SH-1234-ABCD-5678" } });
     const loadedAt = document.querySelector<HTMLInputElement>('input[name="loadedAt"]');
     expect(loadedAt).not.toBeNull();
     fireEvent.change(loadedAt!, { target: { value: String(Date.now() - 2000) } });
@@ -82,7 +83,7 @@ describe("SignUpForm", () => {
         "StrongPassword123",
         "Test Student",
         10,
-        "",
+        "SH-1234-ABCD-5678",
         "school-1",
         expect.objectContaining({ captchaToken: null, website: "", loadedAt: expect.any(Number) })
       );
@@ -96,14 +97,10 @@ describe("SignUpForm", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
-  it("only asks for a school signup code when the deployment requires one", () => {
+  it("always requires the selected school's access code", () => {
     const schools = [{ id: "school-1", name: "Storm High", slug: "storm-high" }];
-    const { rerender } = render(<SignUpForm schools={schools} />);
-
-    expect(screen.queryByLabelText("School signup code")).not.toBeInTheDocument();
-
-    rerender(<SignUpForm schools={schools} requiresAccessCode />);
-    expect(screen.getByLabelText("School signup code")).toBeRequired();
+    render(<SignUpForm schools={schools} />);
+    expect(screen.getByLabelText("School access code")).toBeRequired();
   });
 
   it("keeps Google signup hidden until production configuration is complete", () => {
@@ -146,6 +143,7 @@ describe("SignUpForm", () => {
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "Student@Example.edu" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "StrongPassword123" } });
     fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "StrongPassword123" } });
+    fireEvent.change(screen.getByLabelText("School access code"), { target: { value: "SH-1234-ABCD-5678" } });
     const loadedAt = document.querySelector<HTMLInputElement>('input[name="loadedAt"]')!;
     fireEvent.change(loadedAt, { target: { value: String(Date.now() - 2000) } });
     fireEvent.submit(screen.getByRole("button", { name: "Create account" }).closest("form")!);

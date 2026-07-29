@@ -13,20 +13,28 @@ District policy takes precedence over these pilot defaults. Approve the final sc
 Admins can ban/restore same-school student and teacher accounts. Super admins can act across
 schools. Grade 12 cleanup deactivates active grade 12 students and records the graduation year.
 
-## Proposed Pilot Retention
+## Pilot Retention
 
 | Data | Proposed period |
 | --- | --- |
 | Active account/profile | While enrolled or employed |
-| Deactivated profile, club memberships, event RSVPs, and opportunity sign-ups | 12 months after departure |
+| Deactivated profile and school participation records | School review; normally 12 months after departure unless the school requires the record |
 | Pending deletion request | Resolve within 30 calendar days |
 | Completed/rejected deletion request metadata | 12 months |
 | Administrative audit log | 24 months |
 | Support feedback | 12 months after resolution |
+| In-app notifications | 12 months |
 | Analytics events | 13 months |
 | Email outbox metadata | 90 days |
 | Digest delivery metadata | 90 days |
 | Signup/request attempt hashes | 30 days |
 
-Create a monthly operations ticket to review deletion requests and remove records past retention.
-Before deleting anything, check legal holds, district record rules, and backup-retention effects.
+The daily `/api/cron/data-retention` task automatically deletes expired attempt
+hashes, email/digest records, notifications, resolved support messages, reviewed
+deletion-request metadata, analytics, and old audit/support-session records. Each
+run writes counts and completion status to `data_retention_runs`.
+
+Accounts, coursework, memberships, attendance, and other possible school records
+are not blindly deleted by the cron. They remain in the administrator-reviewed
+account deletion and graduation workflow so legal holds, school record rules, and
+backup-retention effects can be considered.

@@ -148,6 +148,9 @@ async function assertRequiredTablesExist(admin: SupabaseAdmin) {
     { table: "admin_audit_log", columns: "id" },
     { table: "digest_deliveries", columns: "id" },
     { table: "request_attempts", columns: "id" },
+    { table: "school_signup_access", columns: "school_id,access_code" },
+    { table: "platform_support_sessions", columns: "id" },
+    { table: "data_retention_runs", columns: "id" },
   ] as const;
 
   for (const { table, columns } of requiredRelations) {
@@ -340,6 +343,15 @@ async function main() {
 
   await assertRequiredTablesExist(admin);
   const schoolIds = await upsertStagingData(admin);
+  const { data: accessRows, error: accessError } = await admin
+    .from("school_signup_access")
+    .select("school_id,access_code")
+    .in("school_id", [...schoolIds.values()]);
+  if (accessError) throw accessError;
+  const accessCodes = new Map<string, string>(
+    ((accessRows ?? []) as Array<{ school_id: string; access_code: string }>)
+      .map((row) => [row.school_id, row.access_code])
+  );
 
   for (const user of users) {
     const schoolId = user.schoolSlug ? schoolIds.get(user.schoolSlug)! : null;
@@ -347,8 +359,12 @@ async function main() {
     const metadata = {
       full_name: user.fullName,
       school_id: authSchoolId,
+      school_access_code: accessCodes.get(authSchoolId),
       grade_level: user.gradeLevel ? String(user.gradeLevel) : undefined,
     };
+    if (!metadata.school_access_code) {
+      throw new Error(`Staging school access code is missing for ${user.email}.`);
+    }
 
     let userId = await findAuthUserId(admin, user.email);
 

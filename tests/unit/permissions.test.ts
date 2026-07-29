@@ -11,6 +11,7 @@ import {
   canManageClubRoster,
   canAssignClubLeadership,
   canGradeClubCoursework,
+  canInspectClubCoursework,
   canPublishClubCoursework,
   canManageSchool,
   canUseStudentFeatures,
@@ -213,6 +214,9 @@ describe("club permissions", () => {
     expect(canPublishClubCoursework(profile("student"), club(), membership("officer"))).toBe(false);
     expect(canGradeClubCoursework(profile("student"), club(), membership("president"))).toBe(false);
     expect(canGradeClubCoursework(profile("teacher"), club(), membership("sponsor"))).toBe(true);
+    expect(canGradeClubCoursework(profile("super_admin"), club())).toBe(false);
+    expect(canInspectClubCoursework(profile("super_admin"), club(), null, false)).toBe(false);
+    expect(canInspectClubCoursework(profile("super_admin"), club(), null, true)).toBe(true);
   });
 
   it("allows only scoped admins to publish or feature clubs", () => {

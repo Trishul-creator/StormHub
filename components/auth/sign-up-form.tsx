@@ -25,12 +25,10 @@ interface SignUpSchool {
 export function SignUpForm({
   schools,
   preselectedSchoolId,
-  requiresAccessCode = false,
   googleAuthEnabled = false,
 }: {
   schools: SignUpSchool[];
   preselectedSchoolId?: string | null;
-  requiresAccessCode?: boolean;
   googleAuthEnabled?: boolean;
 }) {
   const router = useRouter();
@@ -188,18 +186,35 @@ export function SignUpForm({
               className="mt-1"
             />
           </div>
-          {requiresAccessCode && (
-            <div>
-              <Label htmlFor="accessCode">School signup code</Label>
-              <Input id="accessCode" name="accessCode" required autoComplete="one-time-code" className="mt-1" />
-            </div>
-          )}
+          <div>
+            <Label htmlFor="accessCode">School access code</Label>
+            <Input
+              id="accessCode"
+              name="accessCode"
+              required
+              autoComplete="one-time-code"
+              className="mt-1 font-mono uppercase"
+              placeholder="SH-1234-ABCD-5678"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Ask a school administrator or Advisor for the current code.
+            </p>
+          </div>
           <div className="hidden" aria-hidden="true">
             <Label htmlFor="website">Website</Label>
             <Input id="website" name="website" tabIndex={-1} autoComplete="off" />
           </div>
           <input type="hidden" name="loadedAt" value={loadedAt} />
           <Captcha onToken={setCaptchaToken} />
+          <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+            <input type="checkbox" required className="mt-1 h-4 w-4 rounded border-input" />
+            <span>
+              I will use StormHub for school purposes and agree to the{" "}
+              <Link href="/acceptable-use" className="text-storm-electric hover:underline">Acceptable Use Policy</Link>,{" "}
+              <Link href="/terms" className="text-storm-electric hover:underline">Terms</Link>, and{" "}
+              <Link href="/privacy" className="text-storm-electric hover:underline">Privacy Notice</Link>.
+            </span>
+          </label>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Creating account..." : "Create account"}
           </Button>

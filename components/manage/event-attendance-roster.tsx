@@ -13,10 +13,12 @@ export function EventAttendanceRoster({
   clubSlug,
   eventId,
   entries,
+  readOnly = false,
 }: {
   clubSlug: string;
   eventId: string;
   entries: ClubEventAttendanceEntry[];
+  readOnly?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [statuses, setStatuses] = useState<Record<string, ClubEventAttendanceStatus | "">>(
@@ -56,7 +58,11 @@ export function EventAttendanceRoster({
               RSVP: {entry.rsvp_status ? entry.rsvp_status.replace("_", " ") : "No response"}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          {readOnly ? (
+            <span className="inline-flex w-fit rounded-full bg-muted px-3 py-1 text-xs font-medium capitalize text-foreground">
+              {(statuses[entry.user_id] || "Not marked").replace("_", " ")}
+            </span>
+          ) : <div className="flex items-center gap-2">
             <select
               aria-label={`Attendance for ${entry.full_name}`}
               value={statuses[entry.user_id] ?? ""}
@@ -77,7 +83,7 @@ export function EventAttendanceRoster({
                 ? <Loader2 className="h-4 w-4 animate-spin" />
                 : statuses[entry.user_id] ? <CheckCircle2 className="h-4 w-4" /> : null}
             </span>
-          </div>
+          </div>}
         </div>
       ))}
       {entries.length === 0 && (

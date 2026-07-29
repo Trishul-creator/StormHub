@@ -29,7 +29,6 @@ RESEND_API_KEY=
 EMAIL_FROM="StormHub <noreply@stormhubapp.com>"
 EMAIL_REPLY_TO=stormhubsupport@gmail.com
 SUPABASE_SERVICE_ROLE_KEY=
-SIGNUP_ACCESS_CODE=
 ALLOWED_SIGNUP_EMAIL_DOMAINS=
 NEXT_PUBLIC_HCAPTCHA_SITE_KEY=
 HCAPTCHA_SECRET_KEY=
@@ -105,7 +104,6 @@ Deploy through Vercel from the GitHub repository. Required production env vars:
 
 Optional production env vars:
 
-- `SIGNUP_ACCESS_CODE`
 - `ALLOWED_SIGNUP_EMAIL_DOMAINS`
 - `GROQ_API_KEY`, only after district approval
 - `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET`, and

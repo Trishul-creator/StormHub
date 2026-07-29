@@ -1,11 +1,15 @@
+import Link from "next/link";
+import { ShieldAlert } from "lucide-react";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { getManagedClubBySlug, getClubMemberCount, getClubRoster } from "@/lib/data";
 import { requireClubManager } from "@/lib/auth";
 import { canAssignClubLeadership, canBanClubMember, canManageClubRoster } from "@/lib/permissions";
 import { RoleBadge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { RosterMemberActions } from "@/components/manage/roster-member-actions";
 import { ClubRoleGuide } from "@/components/manage/club-role-guide";
+import { getActivePlatformSupportSession, recordPlatformSupportAccess } from "@/lib/support-access";
 
 interface PageProps { params: Promise<{ slug: string }> }
 
@@ -14,19 +18,61 @@ export default async function ManageMembersPage({ params }: PageProps) {
   const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
   const { profile, membership } = await requireClubManager(club);
+  const supportSession = profile.role === "super_admin"
+    ? await getActivePlatformSupportSession(profile, club.school_id)
+    : null;
+  const canViewRoster = profile.role !== "super_admin" || Boolean(supportSession);
   const [count, roster] = await Promise.all([
     getClubMemberCount(club.id),
-    getClubRoster(club.id),
+    canViewRoster ? getClubRoster(club.id) : Promise.resolve([]),
   ]);
-  const canEditRoster = canManageClubRoster(profile, club, membership);
-  const canAssignLeadership = canAssignClubLeadership(profile, club, membership);
-  const canBan = canBanClubMember(profile, club, membership);
+  if (supportSession) {
+    await recordPlatformSupportAccess({
+      actor: profile,
+      schoolId: club.school_id,
+      action: "view",
+      resourceType: "club_roster",
+      resourceId: club.id,
+    });
+  }
+  const canEditRoster = profile.role !== "super_admin"
+    && canManageClubRoster(profile, club, membership);
+  const canAssignLeadership = profile.role !== "super_admin"
+    && canAssignClubLeadership(profile, club, membership);
+  const canBan = profile.role !== "super_admin"
+    && canBanClubMember(profile, club, membership);
 
   return (
     <div className="container mx-auto px-4 py-8">
       <PageHeader title={`Members — ${club.name}`} description={`${count} people currently joined`} />
+      {profile.role === "super_admin" && !supportSession && (
+        <div className="mb-6 flex flex-col gap-4 rounded-xl border border-amber-300 bg-amber-50 p-5 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">A support session is required to view this roster</p>
+              <p className="mt-1">
+                The aggregate member count remains available. Start a temporary school support
+                session to inspect names and emails; the access will be time-limited and logged.
+              </p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" asChild className="shrink-0">
+            <Link href="/admin/schools">Open school support</Link>
+          </Button>
+        </div>
+      )}
+      {supportSession && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            <strong>Read-only support session:</strong> viewing this roster is recorded.
+            Roster changes remain disabled for platform administrators.
+          </p>
+        </div>
+      )}
       <ClubRoleGuide />
-      <div className="overflow-hidden rounded-xl border">
+      {canViewRoster && <div className="overflow-hidden rounded-xl border">
         <table className="w-full text-sm">
           <thead className="bg-storm-light/50">
             <tr>
@@ -68,7 +114,7 @@ export default async function ManageMembersPage({ params }: PageProps) {
         {roster.length === 0 && (
           <p className="p-6 text-center text-sm text-muted-foreground">No one has joined this club yet.</p>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

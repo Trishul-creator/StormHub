@@ -266,7 +266,24 @@ export function canGradeClubCoursework(
   club: Club | string,
   membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
 ): boolean {
-  return canAssignClubLeadership(user, club, membership);
+  if (!user || user.role === "super_admin") return false;
+  if (user.role === "admin") {
+    return typeof club !== "string" && !!user.school_id && user.school_id === club.school_id;
+  }
+  const membershipRole = typeof membership === "string" ? membership : membership?.role;
+  return user.role === "teacher"
+    && membershipRole === "sponsor"
+    && canManageClub(user, club, membership);
+}
+
+export function canInspectClubCoursework(
+  user: Profile | null,
+  club: Club,
+  membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null,
+  hasActivePlatformSupportAccess = false
+): boolean {
+  return canGradeClubCoursework(user, club, membership)
+    || (user?.role === "super_admin" && hasActivePlatformSupportAccess);
 }
 
 export function canTrackClubSubmissions(

@@ -37,19 +37,19 @@ describe("GoogleOnboardingForm", () => {
         email="student@gmail.com"
         suggestedName="Google Student"
         next="/dashboard"
-        requiresAccessCode={false}
       />
     );
 
     fireEvent.change(screen.getByLabelText("School"), { target: { value: "school-1" } });
     fireEvent.change(screen.getByLabelText("Grade"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("School access code"), { target: { value: "SH-1234-ABCD-5678" } });
     fireEvent.submit(screen.getByRole("button", { name: "Continue to StormHub" }).closest("form")!);
 
     await waitFor(() => expect(completeGoogleOnboarding).toHaveBeenCalledWith({
       schoolId: "school-1",
       fullName: "Google Student",
       gradeLevel: "10",
-      accessCode: "",
+      accessCode: "SH-1234-ABCD-5678",
       next: "/dashboard",
     }));
     expect(replace).toHaveBeenCalledWith("/dashboard");
