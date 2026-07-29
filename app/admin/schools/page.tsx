@@ -151,7 +151,7 @@ export default async function AdminSchoolsPage() {
             >
               <h3 className="font-semibold text-storm-navy">Create school workspace</h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Add the required information now; details can be refined later.
+                A private signup code is generated automatically. Details can be refined later.
               </p>
               <div className="mt-4 space-y-3">
             <label className="block text-sm">
@@ -161,7 +161,10 @@ export default async function AdminSchoolsPage() {
             <label className="block text-sm">
               <span className="text-muted-foreground">Approved email domains</span>
               <input name="allowed_email_domains" required className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" placeholder="* or students.example.edu, staff.example.edu" />
-              <span className="mt-1 block text-xs text-muted-foreground">Use * for every verified email domain, or enter a comma-separated restriction list.</span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Use * for every verified email domain, or enter a comma-separated restriction list.
+                The school access code is still required either way.
+              </span>
             </label>
             <label className="block text-sm">
               <span className="text-muted-foreground">Workspace URL name (optional)</span>

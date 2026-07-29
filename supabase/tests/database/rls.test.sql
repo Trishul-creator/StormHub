@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(106);
+SELECT plan(112);
 
 SELECT is(
   (SELECT public FROM storage.buckets WHERE id = 'coursework-private'),
@@ -25,6 +25,23 @@ INSERT INTO public.schools (
   TRUE,
   TRUE,
   ARRAY['*']
+);
+
+UPDATE public.school_signup_access
+SET access_code = CASE school_id
+  WHEN 'a0000000-0000-4000-8000-000000000001'::UUID THEN 'SH-AAAA-AAAA-AAAA'
+  ELSE 'SH-BBBB-BBBB-BBBB'
+END,
+rotated_at = NOW()
+WHERE school_id IN (
+  'a0000000-0000-4000-8000-000000000001',
+  'b0000000-0000-4000-8000-000000000002'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.school_signup_access),
+  2::BIGINT,
+  'every school receives a private signup access code'
 );
 
 SELECT ok(
@@ -73,7 +90,7 @@ INSERT INTO auth.users (
     '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
     'student-a@school-a.edu', crypt('Password123!', gen_salt('bf')), NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Student A","school_id":"a0000000-0000-4000-8000-000000000001","grade_level":"10"}',
+    '{"full_name":"Student A","school_id":"a0000000-0000-4000-8000-000000000001","grade_level":"10","school_access_code":"SH-AAAA-AAAA-AAAA"}',
     NOW(), NOW()
   ),
   (
@@ -81,7 +98,7 @@ INSERT INTO auth.users (
     '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
     'student-b@school-b.edu', crypt('Password123!', gen_salt('bf')), NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Student B","school_id":"b0000000-0000-4000-8000-000000000002","grade_level":"11"}',
+    '{"full_name":"Student B","school_id":"b0000000-0000-4000-8000-000000000002","grade_level":"11","school_access_code":"SH-BBBB-BBBB-BBBB"}',
     NOW(), NOW()
   ),
   (
@@ -89,7 +106,7 @@ INSERT INTO auth.users (
     '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
     'teacher-a@school-a.edu', crypt('Password123!', gen_salt('bf')), NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Teacher A","school_id":"a0000000-0000-4000-8000-000000000001"}',
+    '{"full_name":"Teacher A","school_id":"a0000000-0000-4000-8000-000000000001","school_access_code":"SH-AAAA-AAAA-AAAA"}',
     NOW(), NOW()
   ),
   (
@@ -97,7 +114,7 @@ INSERT INTO auth.users (
     '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
     'admin-a@school-a.edu', crypt('Password123!', gen_salt('bf')), NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Admin A","school_id":"a0000000-0000-4000-8000-000000000001"}',
+    '{"full_name":"Admin A","school_id":"a0000000-0000-4000-8000-000000000001","school_access_code":"SH-AAAA-AAAA-AAAA"}',
     NOW(), NOW()
   ),
   (
@@ -105,7 +122,7 @@ INSERT INTO auth.users (
     '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
     'super@school-a.edu', crypt('Password123!', gen_salt('bf')), NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Super Admin","school_id":"a0000000-0000-4000-8000-000000000001"}',
+    '{"full_name":"Super Admin","school_id":"a0000000-0000-4000-8000-000000000001","school_access_code":"SH-AAAA-AAAA-AAAA"}',
     NOW(), NOW()
   );
 
@@ -130,6 +147,24 @@ SELECT is(
   (SELECT role FROM public.profiles WHERE id = '50000000-0000-4000-8000-000000000001'),
   'student',
   'new Google users cannot receive an elevated role during onboarding'
+);
+SELECT throws_ok(
+  $$
+    INSERT INTO auth.users (
+      id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+      raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+    ) VALUES (
+      '50000000-0000-4000-8000-000000000003',
+      '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+      'wrong-code@school-a.edu', crypt('Password123!', gen_salt('bf')), NOW(),
+      '{"provider":"email","providers":["email"]}',
+      '{"full_name":"Wrong Code","school_id":"a0000000-0000-4000-8000-000000000001","school_access_code":"SH-WRNG-CODE-0000"}',
+      NOW(), NOW()
+    )
+  $$,
+  'P0001',
+  'Enter the correct school access code',
+  'the auth trigger rejects an incorrect school access code'
 );
 SELECT throws_ok(
   $$
@@ -282,6 +317,7 @@ SELECT is(
   1::BIGINT,
   'students can read their own opportunity participation only'
 );
+
 RESET ROLE;
 
 SELECT set_config(
@@ -913,6 +949,47 @@ SELECT lives_ok(
   $$SELECT public.set_school_signup_domains('b0000000-0000-4000-8000-000000000002', ARRAY['*'])$$,
   'super admins can update accepted email domains for any school'
 );
+SELECT is(
+  (SELECT count(*) FROM public.club_assignment_submissions),
+  0::BIGINT,
+  'platform admins cannot read private coursework without a support session'
+);
+RESET ROLE;
+
+INSERT INTO public.platform_support_sessions (
+  actor_user_id, school_id, reason, expires_at
+) VALUES (
+  '40000000-0000-4000-8000-000000000001',
+  'a0000000-0000-4000-8000-000000000001',
+  'Investigating a private coursework access problem',
+  NOW() + INTERVAL '30 minutes'
+);
+
+SET LOCAL ROLE authenticated;
+SELECT ok(
+  (SELECT count(*) FROM public.club_assignment_submissions) > 0,
+  'platform admins can read school coursework during a temporary support session'
+);
+SELECT throws_ok(
+  $$SELECT public.grade_club_assignment_submission(
+      (SELECT id FROM public.club_assignment_submissions LIMIT 1),
+      10,
+      'Platform support must remain read-only'
+    )$$,
+  'P0001',
+  'Only the club Advisor or an administrator can grade submissions',
+  'platform support sessions cannot grade private coursework'
+);
+SELECT throws_ok(
+  $$SELECT public.set_club_event_attendance(
+      'a2000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+      'present'
+    )$$,
+  'P0001',
+  'Platform support access is read-only',
+  'platform support sessions cannot change student attendance'
+);
 RESET ROLE;
 
 SELECT throws_ok(
@@ -925,7 +1002,7 @@ SELECT throws_ok(
       '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
       'outsider@example.com', crypt('Password123!', gen_salt('bf')),
       '{"provider":"email","providers":["email"]}',
-      '{"full_name":"Outsider","school_id":"a0000000-0000-4000-8000-000000000001"}',
+      '{"full_name":"Outsider","school_id":"a0000000-0000-4000-8000-000000000001","school_access_code":"SH-AAAA-AAAA-AAAA"}',
       NOW(), NOW()
     )
   $$,
@@ -944,7 +1021,7 @@ SELECT lives_ok(
       '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
       'outside-domain@example.com', crypt('Password123!', gen_salt('bf')),
       '{"provider":"email","providers":["email"]}',
-      '{"full_name":"Wildcard Student","school_id":"b0000000-0000-4000-8000-000000000002"}',
+      '{"full_name":"Wildcard Student","school_id":"b0000000-0000-4000-8000-000000000002","school_access_code":"SH-BBBB-BBBB-BBBB"}',
       NOW(), NOW()
     )
   $$,

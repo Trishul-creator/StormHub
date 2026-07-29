@@ -47,7 +47,7 @@ export default async function ManageCourseworkPage({ params }: CourseworkPagePro
         description={
           canGrade
             ? "Create assignments, review student work, and return grades and private feedback."
-            : "Create coursework and track who has submitted. Private work and grades remain visible only to the Advisor."
+            : "Create coursework and track who has submitted. Private work requires the Advisor, a scoped school administrator, or a recorded support session."
         }
       >
         <Button variant="outline" size="sm" asChild>

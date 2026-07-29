@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { recordPlatformSupportAccess } from "@/lib/support-access";
 
 export const runtime = "nodejs";
 
@@ -26,7 +27,7 @@ export async function GET(
   }
   const { data: attachment, error } = await supabase
     .from(table)
-    .select("storage_path,source_type,file_name")
+    .select("assignment_id,storage_path,source_type,file_name")
     .eq("id", attachmentId)
     .maybeSingle();
   if (error || !attachment || attachment.source_type !== "upload" || !attachment.storage_path) {
@@ -39,6 +40,25 @@ export async function GET(
     });
   if (signedError || !signed?.signedUrl) {
     return NextResponse.json({ error: "Could not prepare the private download." }, { status: 500 });
+  }
+  if (auth.profile.role === "super_admin") {
+    const { data: assignment } = await admin
+      .from("club_assignments")
+      .select("club_id")
+      .eq("id", attachment.assignment_id)
+      .maybeSingle();
+    const { data: club } = assignment?.club_id
+      ? await admin.from("clubs").select("school_id").eq("id", assignment.club_id).maybeSingle()
+      : { data: null };
+    if (club?.school_id) {
+      await recordPlatformSupportAccess({
+        actor: auth.profile,
+        schoolId: club.school_id,
+        action: "download",
+        resourceType: `${scope}_attachment`,
+        resourceId: attachmentId,
+      });
+    }
   }
   return NextResponse.redirect(signed.signedUrl, {
     headers: { "cache-control": "private, no-store" },

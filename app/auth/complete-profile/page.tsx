@@ -53,7 +53,6 @@ export default async function CompleteProfilePage({ searchParams }: CompleteProf
         email={user.email}
         suggestedName={suggestedName}
         next={next}
-        requiresAccessCode={Boolean(process.env.SIGNUP_ACCESS_CODE?.trim())}
       />
     </div>
   );

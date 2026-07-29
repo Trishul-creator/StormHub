@@ -16,9 +16,9 @@ Record a result and evidence for every item before inviting pilot users.
 
 On one district-managed Chromebook and one physical phone:
 
-- Create and confirm a student account with hCaptcha and an allowed school domain.
+- Create and confirm a student account with hCaptcha, the selected school access code, and an allowed school domain.
 - Request a password reset, open the emailed link, set matching passwords, and sign in with the new password.
-- Reject a personal-domain signup and a missing CAPTCHA.
+- Reject an incorrect school code, a disallowed-domain signup, and a missing CAPTCHA.
 - Join/leave a club, RSVP/remove RSVP, bookmark/remove bookmark.
 - Open school calendar and opportunity filters.
 - Submit support feedback once; verify spam controls and support inbox receipt.
@@ -31,8 +31,11 @@ On one district-managed Chromebook and one physical phone:
 
 - Unconfirmed accounts cannot sign in; confirmed student, teacher, admin, and super-admin accounts can sign in.
 - No role is asked for a phone number, SMS code, or authenticator code.
+- School admins can view/rotate only their school access code; platform admins can manage any school code.
 - School admin cannot see or modify another school.
-- Super admin can explicitly select a school and can see platform audit/support views.
+- Super admin can manage ordinary school settings without private coursework access.
+- Start a temporary platform support session, confirm the school admin notification, inspect one private test submission, verify the access log, and confirm grading remains disabled.
+- End the support session and confirm the same private submission is no longer visible.
 - Suspend/reactivate a test student and confirm session/access behavior.
 - Run graduation cleanup only against staging test users.
 - Approve/reject content and verify actor, reason, and time in the audit log.
@@ -47,4 +50,5 @@ On one district-managed Chromebook and one physical phone:
 - Incident contacts and privacy escalation route recorded privately.
 - SMTP confirmation/reset delivery tested outside the Supabase team.
 - Cron digest invoked twice with one resulting delivery.
+- Daily data-retention cron invoked once with a completed `data_retention_runs` record.
 - AI flags verified false.

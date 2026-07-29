@@ -3,7 +3,7 @@ import { getPublicSiteUrl } from "@/lib/env";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const siteUrl = getPublicSiteUrl();
-  return ["", "/clubs", "/calendar", "/opportunities", "/about", "/privacy", "/contact"].map((path) => ({
+  return ["", "/clubs", "/calendar", "/opportunities", "/about", "/privacy", "/acceptable-use", "/terms", "/contact"].map((path) => ({
     url: `${siteUrl}${path}`,
     lastModified: new Date(),
     changeFrequency: path === "" ? "weekly" : "daily",

@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDateTime } from "@/lib/utils";
 
 type AuditRow = {
@@ -15,21 +16,68 @@ type AuditRow = {
   actor?: { full_name?: string | null; email?: string | null } | null;
 };
 
+type SupportAuditRow = {
+  id: string;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  occurred_at: string;
+  actor?: { full_name?: string | null; email?: string | null } | null;
+  session?: { reason?: string | null; expires_at?: string | null } | null;
+};
+
 export default async function AuditPage() {
-  await requireAdmin();
+  const { profile } = await requireAdmin();
   const supabase = await createClient();
-  const { data } = supabase
-    ? await supabase
+  const admin = createAdminClient();
+  const normalAuditPromise = supabase
+    ? supabase
         .from("admin_audit_log")
         .select("*, actor:profiles!actor_user_id(full_name,email)")
         .order("occurred_at", { ascending: false })
         .limit(200)
-    : { data: [] };
-  const rows = (data ?? []) as unknown as AuditRow[];
+    : Promise.resolve({ data: [] });
+  let supportAuditQuery = admin
+    ? admin
+        .from("platform_support_access_log")
+        .select("*, actor:profiles!actor_user_id(full_name,email), session:platform_support_sessions!session_id(reason,expires_at)")
+        .order("occurred_at", { ascending: false })
+        .limit(200)
+    : null;
+  if (supportAuditQuery && profile.role !== "super_admin" && profile.school_id) {
+    supportAuditQuery = supportAuditQuery.eq("school_id", profile.school_id);
+  }
+  const [{ data }, supportResult] = await Promise.all([
+    normalAuditPromise,
+    supportAuditQuery ?? Promise.resolve({ data: [] }),
+  ]);
+  const normalRows = (data ?? []) as unknown as AuditRow[];
+  const supportRows = ((supportResult.data ?? []) as unknown as SupportAuditRow[]).map(
+    (row): AuditRow => ({
+      id: `support:${row.id}`,
+      action: row.action,
+      entity_type: `platform_support_${row.resource_type}`,
+      entity_id: row.resource_id,
+      occurred_at: row.occurred_at,
+      old_data: {},
+      new_data: {
+        access: row.action,
+        reason: row.session?.reason ?? "Recorded support access",
+        expires_at: row.session?.expires_at ?? null,
+      },
+      actor: row.actor,
+    })
+  );
+  const rows = [...normalRows, ...supportRows]
+    .sort((left, right) => Date.parse(right.occurred_at) - Date.parse(left.occurred_at))
+    .slice(0, 200);
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <PageHeader title="Administrative audit log" description="Immutable history for account, roster, approval, school, and content changes." />
+      <PageHeader
+        title="Administrative audit log"
+        description="History for account, roster, approval, school, content, and temporary platform-support access."
+      />
       {rows.length === 0 ? (
         <EmptyState title="No administrative changes yet" description="New privileged changes will appear here." />
       ) : (
