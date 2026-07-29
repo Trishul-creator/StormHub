@@ -19,10 +19,12 @@ export function AssignmentAttachmentsManager({
   clubSlug,
   assignmentId,
   attachments,
+  readOnly = false,
 }: {
   clubSlug: string;
   assignmentId: string;
   attachments: ClubAssignmentAttachment[];
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [working, setWorking] = useState(false);
@@ -141,7 +143,7 @@ export function AssignmentAttachmentsManager({
                 <a
                   href={attachment.source_type === "upload"
                     ? `/api/coursework/files/assignment/${attachment.id}`
-                    : attachment.external_url ?? "#"}
+                    : `/api/coursework/google/assignment-attachments/${attachment.id}/open`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -150,56 +152,66 @@ export function AssignmentAttachmentsManager({
                     : <Cloud className="h-4 w-4" />}
                 </a>
               </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                disabled={working || removingId === attachment.id}
-                aria-label={`Remove ${attachment.file_name}`}
-                onClick={() => remove(attachment)}
-              >
-                {removingId === attachment.id
-                  ? <Loader2 className="h-4 w-4 animate-spin" />
-                  : <Trash2 className="h-4 w-4" />}
-              </Button>
+              {!readOnly && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  disabled={working || removingId === attachment.id}
+                  aria-label={`Remove ${attachment.file_name}`}
+                  onClick={() => remove(attachment)}
+                >
+                  {removingId === attachment.id
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <Trash2 className="h-4 w-4" />}
+                </Button>
+              )}
             </div>
           ))}
         </div>
       )}
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button type="button" variant="outline" size="sm" asChild disabled={working}>
-          <label className="cursor-pointer">
-            {working ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-            Upload files
-            <input
-              type="file"
-              multiple
-              className="sr-only"
+      {readOnly ? (
+        <p className="mt-3 text-xs font-medium text-amber-700 dark:text-amber-300">
+          Read-only support: attached materials cannot be added, replaced, or removed.
+        </p>
+      ) : (
+        <>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" asChild disabled={working}>
+              <label className="cursor-pointer">
+                {working ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+                Upload files
+                <input
+                  type="file"
+                  multiple
+                  className="sr-only"
+                  disabled={working}
+                  onChange={(event) => {
+                    void uploadFiles(Array.from(event.target.files ?? []));
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </label>
+            </Button>
+            <GoogleDrivePicker
+              returnTo={`/manage/clubs/${clubSlug}/coursework/${assignmentId}`}
               disabled={working}
-              onChange={(event) => {
-                void uploadFiles(Array.from(event.target.files ?? []));
-                event.currentTarget.value = "";
-              }}
+              label="Add Drive references"
+              onPicked={(files) => addDriveFiles(files, "reference")}
             />
-          </label>
-        </Button>
-        <GoogleDrivePicker
-          returnTo={`/manage/clubs/${clubSlug}/coursework/${assignmentId}`}
-          disabled={working}
-          label="Add Drive references"
-          onPicked={(files) => addDriveFiles(files, "reference")}
-        />
-        <GoogleDrivePicker
-          returnTo={`/manage/clubs/${clubSlug}/coursework/${assignmentId}`}
-          disabled={working}
-          label="Add student-copy templates"
-          showConfigurationHint={false}
-          onPicked={(files) => addDriveFiles(files, "student_copy")}
-        />
-      </div>
-      <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Copy className="h-3.5 w-3.5" /> Student copies support Google Docs, Sheets, Slides, Drawings, and Forms.
-      </p>
+            <GoogleDrivePicker
+              returnTo={`/manage/clubs/${clubSlug}/coursework/${assignmentId}`}
+              disabled={working}
+              label="Add student-copy templates"
+              showConfigurationHint={false}
+              onPicked={(files) => addDriveFiles(files, "student_copy")}
+            />
+          </div>
+          <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Copy className="h-3.5 w-3.5" /> Student copies support Google Docs, Sheets, Slides, Drawings, and Forms.
+          </p>
+        </>
+      )}
     </div>
   );
 }

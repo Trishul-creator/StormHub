@@ -249,7 +249,7 @@ export function canPublishClubCoursework(
   membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
 ): boolean {
   if (!user) return false;
-  if (user.role === "super_admin") return true;
+  if (user.role === "super_admin") return false;
   if (user.role === "admin") {
     return typeof club !== "string" && !!user.school_id && user.school_id === club.school_id;
   }

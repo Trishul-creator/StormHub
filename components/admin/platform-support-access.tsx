@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Clock3, Eye, Loader2, ShieldAlert, X } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
+import { ArrowRight, Clock3, DatabaseZap, Eye, Loader2, ShieldAlert, X } from "lucide-react";
 import {
   endPlatformSupportSession,
   startPlatformSupportSession,
@@ -13,17 +15,46 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import type { PlatformSupportSession } from "@/lib/support-access";
 
+const MAX_BROWSER_TIMEOUT_MS = 2_147_000_000;
+
 export function PlatformSupportAccess({
   schoolId,
   schoolName,
+  schoolSlug,
   initialSession,
+  supportAvailable,
 }: {
   schoolId: string;
   schoolName: string;
+  schoolSlug: string;
   initialSession: PlatformSupportSession | null;
+  supportAvailable: boolean;
 }) {
+  const router = useRouter();
   const [session, setSession] = useState(initialSession);
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setSession(initialSession);
+  }, [initialSession]);
+
+  useEffect(() => {
+    if (!session) return;
+    let timer: number | undefined;
+    const checkExpiry = () => {
+      const remaining = new Date(session.expires_at).getTime() - Date.now();
+      if (remaining <= 0) {
+        setSession(null);
+        router.refresh();
+        return;
+      }
+      timer = window.setTimeout(checkExpiry, Math.min(remaining, MAX_BROWSER_TIMEOUT_MS));
+    };
+    checkExpiry();
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [router, session]);
 
   function start(formData: FormData) {
     startTransition(async () => {
@@ -32,7 +63,7 @@ export function PlatformSupportAccess({
         reason: String(formData.get("reason") ?? ""),
         durationMinutes: Number(formData.get("durationMinutes") ?? 30),
       });
-      if (!result.success || !result.expiresAt) {
+      if (!result.success || !result.session) {
         toast({
           title: "Could not start support access",
           description: result.error,
@@ -40,18 +71,11 @@ export function PlatformSupportAccess({
         });
         return;
       }
-      setSession({
-        id: "active",
-        actor_user_id: "",
-        school_id: schoolId,
-        reason: String(formData.get("reason") ?? ""),
-        started_at: new Date().toISOString(),
-        expires_at: result.expiresAt,
-        ended_at: null,
-      });
+      setSession(result.session);
+      router.refresh();
       toast({
         title: "Read-only support access started",
-        description: `Access ends automatically at ${new Date(result.expiresAt).toLocaleTimeString()}.`,
+        description: `Access ends automatically at ${new Date(result.session.expires_at).toLocaleTimeString()}.`,
       });
     });
   }
@@ -68,12 +92,16 @@ export function PlatformSupportAccess({
         return;
       }
       setSession(null);
+      router.refresh();
       toast({ title: "Support access ended" });
     });
   }
 
   return (
-    <Card className={session ? "border-amber-300 dark:border-amber-800" : undefined}>
+    <Card
+      id="support-access"
+      className={session ? "scroll-mt-24 border-amber-300 dark:border-amber-800" : "scroll-mt-24"}
+    >
       <CardHeader>
         <div className="flex items-center gap-2">
           <ShieldAlert className="h-5 w-5 text-storm-electric" />
@@ -85,7 +113,18 @@ export function PlatformSupportAccess({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {session ? (
+        {!supportAvailable ? (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+            <p className="flex items-center gap-2 font-semibold">
+              <DatabaseZap className="h-4 w-4" />
+              Database update required
+            </p>
+            <p className="mt-2 text-sm leading-relaxed">
+              The privacy and support migration is not available in this environment yet. Support
+              access remains safely disabled; no private school data is being shown.
+            </p>
+          </div>
+        ) : session ? (
           <div className="space-y-4">
             <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
               <p className="flex items-center gap-2 font-semibold">
@@ -97,10 +136,17 @@ export function PlatformSupportAccess({
                 Ends automatically {new Date(session.expires_at).toLocaleString()}
               </p>
             </div>
-            <Button type="button" variant="outline" onClick={end} disabled={pending}>
-              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
-              End access now
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild>
+                <Link href={`/admin/schools/${schoolSlug}/support`}>
+                  Open read-only workspace <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button type="button" variant="outline" onClick={end} disabled={pending}>
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                End access now
+              </Button>
+            </div>
           </div>
         ) : (
           <form action={start} className="space-y-4">

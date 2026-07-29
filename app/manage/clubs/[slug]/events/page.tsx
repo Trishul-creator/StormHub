@@ -13,6 +13,7 @@ import type { Event } from "@/types/database";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ClipboardCheck } from "lucide-react";
+import { getActivePlatformSupportSession } from "@/lib/support-access";
 
 interface PageProps { params: Promise<{ slug: string }> }
 
@@ -24,7 +25,12 @@ export default async function ManageEventsPage({ params }: PageProps) {
   const events = (await getClubManagedContent(club.id, "event")) as Event[];
   const canDelete = canApproveClubContent(auth.profile, club, auth.membership);
   const canPublish = canPublishClubContent(auth.profile, club, auth.membership, "event");
-  const canTakeAttendance = canManageClubRoster(auth.profile, club, auth.membership);
+  const supportSession = auth.profile.role === "super_admin"
+    ? await getActivePlatformSupportSession(auth.profile, club.school_id)
+    : null;
+  const canTakeAttendance = auth.profile.role === "super_admin"
+    ? Boolean(supportSession)
+    : canManageClubRoster(auth.profile, club, auth.membership);
   const courseworkEnabled = canManageClubCoursework(auth.profile, club, auth.membership);
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">

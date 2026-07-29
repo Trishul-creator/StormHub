@@ -33,14 +33,6 @@ export async function GET(
   if (error || !attachment || attachment.source_type !== "upload" || !attachment.storage_path) {
     return NextResponse.json({ error: "Attachment not found or access denied." }, { status: 404 });
   }
-  const { data: signed, error: signedError } = await admin.storage
-    .from("coursework-private")
-    .createSignedUrl(attachment.storage_path, 60, {
-      download: attachment.file_name,
-    });
-  if (signedError || !signed?.signedUrl) {
-    return NextResponse.json({ error: "Could not prepare the private download." }, { status: 500 });
-  }
   if (auth.profile.role === "super_admin") {
     const { data: assignment } = await admin
       .from("club_assignments")
@@ -50,15 +42,30 @@ export async function GET(
     const { data: club } = assignment?.club_id
       ? await admin.from("clubs").select("school_id").eq("id", assignment.club_id).maybeSingle()
       : { data: null };
-    if (club?.school_id) {
-      await recordPlatformSupportAccess({
-        actor: auth.profile,
-        schoolId: club.school_id,
-        action: "download",
-        resourceType: `${scope}_attachment`,
-        resourceId: attachmentId,
-      });
+    if (!club?.school_id) {
+      return NextResponse.json({ error: "Support access could not be verified." }, { status: 403 });
     }
+    const recorded = await recordPlatformSupportAccess({
+      actor: auth.profile,
+      schoolId: club.school_id,
+      action: "download",
+      resourceType: `${scope}_attachment`,
+      resourceId: attachmentId,
+    });
+    if (!recorded) {
+      return NextResponse.json(
+        { error: "The private download stayed locked because support access could not be recorded." },
+        { status: 403 }
+      );
+    }
+  }
+  const { data: signed, error: signedError } = await admin.storage
+    .from("coursework-private")
+    .createSignedUrl(attachment.storage_path, 60, {
+      download: attachment.file_name,
+    });
+  if (signedError || !signed?.signedUrl) {
+    return NextResponse.json({ error: "Could not prepare the private download." }, { status: 500 });
   }
   return NextResponse.redirect(signed.signedUrl, {
     headers: { "cache-control": "private, no-store" },
