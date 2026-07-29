@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { Building2, MapPinned, Plus } from "lucide-react";
+import { AlertTriangle, Building2, MapPinned, Plus } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth";
-import { getAllDistricts, getDistrictById, getDistrictSchools } from "@/lib/districts";
+import {
+  getAllDistricts,
+  getDistrictById,
+  getDistrictSchools,
+  isDistrictSchemaAvailable,
+} from "@/lib/districts";
+import { getAllSchools } from "@/lib/schools";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/utils";
 
@@ -55,7 +61,12 @@ export default async function AdminDistrictsPage() {
   }
   if (profile.role !== "super_admin") redirect("/admin");
 
-  const districts = await getAllDistricts();
+  const [districts, districtSchemaAvailable, allSchools] = await Promise.all([
+    getAllDistricts(),
+    isDistrictSchemaAvailable(),
+    getAllSchools(),
+  ]);
+  const independentSchools = allSchools.filter((school) => !school.district_id);
   const schoolCounts: Record<string, number> = Object.fromEntries(
     await Promise.all(
       districts.map(async (district) => [
@@ -89,6 +100,19 @@ export default async function AdminDistrictsPage() {
         </div>
       </section>
 
+      {!districtSchemaAvailable && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-semibold">District migration required</p>
+            <p className="mt-1">
+              Existing schools remain available below. Apply the latest database migration
+              before creating districts or assigning district administrators.
+            </p>
+          </div>
+        </div>
+      )}
+
       <section aria-labelledby="district-workspaces-title">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -99,7 +123,7 @@ export default async function AdminDistrictsPage() {
               Platform administrators retain access across every district.
             </p>
           </div>
-          <details className="group relative">
+          {districtSchemaAvailable && <details className="group relative">
             <summary className="inline-flex h-9 cursor-pointer list-none items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90">
               <Plus className="h-4 w-4" />
               Create district
@@ -133,7 +157,7 @@ export default async function AdminDistrictsPage() {
               </label>
               <Button type="submit" className="w-full">Create district</Button>
             </form>
-          </details>
+          </details>}
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-tour="district-workspaces">
@@ -153,8 +177,44 @@ export default async function AdminDistrictsPage() {
               </Card>
             </Link>
           ))}
+          {districts.length === 0 && districtSchemaAvailable && (
+            <Card>
+              <CardHeader>
+                <CardTitle>No districts yet</CardTitle>
+                <CardDescription>Create the first district workspace to continue.</CardDescription>
+              </CardHeader>
+            </Card>
+          )}
         </div>
       </section>
+
+      {independentSchools.length > 0 && (
+        <section className="mt-8" aria-labelledby="independent-schools-title">
+          <h2 id="independent-schools-title" className="text-lg font-semibold text-storm-navy">
+            Independent schools
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            These existing workspaces are not attached to a district yet.
+          </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {independentSchools.map((school) => (
+              <Link key={school.id} href={`/admin/schools/${school.slug}`}>
+                <Card className="h-full transition-shadow hover:shadow-md">
+                  <CardHeader>
+                    <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-storm-electric/10 text-storm-electric">
+                      <Building2 className="h-5 w-5" />
+                    </div>
+                    <CardTitle>{school.name}</CardTitle>
+                    <CardDescription>
+                      {[school.city, school.state].filter(Boolean).join(", ") || "Location not set"}
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }

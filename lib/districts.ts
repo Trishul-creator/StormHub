@@ -5,6 +5,21 @@ import { createClient } from "@/lib/supabase/server";
 import { isDemoMode } from "@/lib/supabase/mode";
 import type { District, Profile, School } from "@/types/database";
 
+function isDistrictSchemaMissing(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  return error.code === "42P01"
+    || error.code === "PGRST205"
+    || error.message?.includes("public.districts") === true;
+}
+
+export async function isDistrictSchemaAvailable(): Promise<boolean> {
+  if (isDemoMode()) return true;
+  const supabase = createAdminClient() ?? await createClient();
+  if (!supabase) return false;
+  const { error } = await supabase.from("districts").select("id").limit(1);
+  return !error;
+}
+
 export async function getAllDistricts(): Promise<District[]> {
   if (isDemoMode()) {
     const { demoDistrict } = await import("@/lib/data/demo-data");
@@ -18,7 +33,7 @@ export async function getAllDistricts(): Promise<District[]> {
     .select("*")
     .order("name");
   if (error) {
-    console.error("[getAllDistricts]", error.message);
+    if (!isDistrictSchemaMissing(error)) console.error("[getAllDistricts]", error.message);
     return [];
   }
   return (data as District[]) ?? [];
@@ -39,7 +54,7 @@ export async function getDistrictBySlug(slug: string): Promise<District | null> 
     .eq("slug", slug)
     .maybeSingle();
   if (error) {
-    console.error("[getDistrictBySlug]", error.message);
+    if (!isDistrictSchemaMissing(error)) console.error("[getDistrictBySlug]", error.message);
     return null;
   }
   return data as District | null;
@@ -60,7 +75,7 @@ export async function getDistrictById(districtId: string | null | undefined): Pr
     .eq("id", districtId)
     .maybeSingle();
   if (error) {
-    console.error("[getDistrictById]", error.message);
+    if (!isDistrictSchemaMissing(error)) console.error("[getDistrictById]", error.message);
     return null;
   }
   return data as District | null;

@@ -1075,10 +1075,27 @@ export async function getScopedAdminStatistics(
 
   const supabase = await createClient();
   if (!supabase) return null;
-  const { data, error } = await supabase.rpc("get_admin_statistics", {
+  let result = await supabase.rpc("get_admin_statistics", {
     requested_school_id: schoolId,
     requested_district_id: districtId,
   });
+  if (
+    result.error
+    && profile.role !== "district_admin"
+    && (
+      result.error.code === "PGRST202"
+      || result.error.code === "42883"
+      || result.error.message.includes("get_admin_statistics")
+    )
+  ) {
+    // During a staged rollout, the app can still read the legacy one-argument
+    // RPC until the district migration is applied. District access itself
+    // remains unavailable until the new database function exists.
+    result = await supabase.rpc("get_admin_statistics", {
+      requested_school_id: schoolId,
+    });
+  }
+  const { data, error } = result;
   if (error) {
     console.error("[getScopedAdminStatistics]", error.message);
     return null;

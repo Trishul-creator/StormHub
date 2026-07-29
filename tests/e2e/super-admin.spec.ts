@@ -11,20 +11,26 @@ test.describe("super admin district chooser", () => {
     await page.goto("/admin/districts");
     await expect(page).toHaveURL(/\/admin\/districts/);
     await expect(page.getByRole("heading", { name: "Districts", exact: true })).toBeVisible();
-    await expect(page.getByText(/Northstar Staging District/i).first()).toBeVisible();
-    await page.locator("summary").filter({ hasText: "Create district" }).click();
-    await expect(page.getByText(/District name/i)).toBeVisible();
     const adminNavigation = page.getByRole("navigation", { name: "Administration" });
     await expect(adminNavigation).toBeVisible();
     await expect(adminNavigation.getByRole("link", { name: "Districts" })).toHaveAttribute("aria-current", "page");
     await expect(adminNavigation.getByRole("link", { name: "Statistics" })).toBeVisible();
 
-    await page.goto("/admin/districts/northstar-staging-district");
-    await expect(page.getByText(/School 1/i).first()).toBeVisible();
-    await expect(page.getByText(/School 2/i).first()).toBeVisible();
-    await page.locator("summary").filter({ hasText: "Create school" }).click();
-    await expect(page.getByText(/Workspace URL name/i)).toBeVisible();
-    await expect(page.getByText(/^Slug$/)).toHaveCount(0);
+    const hasDistrictSchema = await page.getByText(/Northstar Staging District/i).count() > 0;
+    if (hasDistrictSchema) {
+      await page.locator("summary").filter({ hasText: "Create district" }).click();
+      await expect(page.getByText(/District name/i)).toBeVisible();
+      await page.goto("/admin/districts/northstar-staging-district");
+      await expect(page.getByText(/School 1/i).first()).toBeVisible();
+      await expect(page.getByText(/School 2/i).first()).toBeVisible();
+      await page.locator("summary").filter({ hasText: "Create school" }).click();
+      await expect(page.getByText(/Workspace URL name/i)).toBeVisible();
+      await expect(page.getByText(/^Slug$/)).toHaveCount(0);
+    } else {
+      await expect(page.getByText(/District migration required/i)).toBeVisible();
+      await expect(page.getByText(/School 1/i).first()).toBeVisible();
+      await expect(page.getByText(/School 2/i).first()).toBeVisible();
+    }
 
     await adminNavigation.getByRole("link", { name: /support inbox/i }).click();
     await expect(page).toHaveURL(/\/admin\/feedback/);
