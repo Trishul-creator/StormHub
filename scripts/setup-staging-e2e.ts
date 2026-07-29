@@ -43,7 +43,7 @@ type SupabaseAdmin = {
 type E2EUser = {
   email: string;
   fullName: string;
-  role: "student" | "teacher" | "admin" | "super_admin";
+  role: "student" | "teacher" | "admin" | "district_admin" | "super_admin";
   schoolSlug: "school1" | "school2" | null;
   gradeLevel?: number | null;
 };
@@ -53,6 +53,12 @@ const users: E2EUser[] = [
     email: "e2e.superadmin@stormhub.test",
     fullName: "E2E Super Admin",
     role: "super_admin",
+    schoolSlug: null,
+  },
+  {
+    email: "e2e.districtadmin@stormhub.test",
+    fullName: "E2E District Admin",
+    role: "district_admin",
     schoolSlug: null,
   },
   {
@@ -110,6 +116,15 @@ const stagingSchools = [
   },
 ] as const;
 
+const stagingDistrict = {
+  id: "d0000000-0000-4000-8000-000000000098",
+  name: "Northstar Staging District",
+  slug: "northstar-staging-district",
+  city: "Staging",
+  state: "ST",
+  is_active: true,
+} as const;
+
 const school1Clubs = [
   {
     name: "Science Bowl",
@@ -160,6 +175,23 @@ async function assertRequiredTablesExist(admin: SupabaseAdmin) {
   }
 }
 
+async function hasDistrictSchema(admin: SupabaseAdmin): Promise<boolean> {
+  const { error } = await admin.from("districts").select("id,slug").limit(1);
+  if (!error) return true;
+  if (
+    error.code === "42P01"
+    || error.code === "PGRST205"
+    || String(error.message).includes("public.districts")
+  ) {
+    console.warn(
+      "Staging is using the pre-district schema for this PR preview. "
+        + "The local database job validates the complete district migration before merge."
+    );
+    return false;
+  }
+  throw error;
+}
+
 async function hasPilotPrivacySchema(admin: SupabaseAdmin): Promise<boolean> {
   const privacyRelations = [
     { table: "school_signup_access", columns: "school_id,access_code" },
@@ -187,8 +219,24 @@ async function hasPilotPrivacySchema(admin: SupabaseAdmin): Promise<boolean> {
   return false;
 }
 
-async function upsertStagingData(admin: SupabaseAdmin): Promise<Map<string, string>> {
-  const { error: schoolsError } = await admin.from("schools").upsert([...stagingSchools], { onConflict: "slug" });
+async function upsertStagingData(
+  admin: SupabaseAdmin,
+  districtSchemaReady: boolean,
+): Promise<Map<string, string>> {
+  if (districtSchemaReady) {
+    const { error: districtError } = await admin
+      .from("districts")
+      .upsert(stagingDistrict, { onConflict: "slug" });
+    if (districtError) throw districtError;
+  }
+
+  const { error: schoolsError } = await admin.from("schools").upsert(
+    stagingSchools.map((school) => ({
+      ...school,
+      ...(districtSchemaReady ? { district_id: stagingDistrict.id } : {}),
+    })),
+    { onConflict: "slug" },
+  );
   if (schoolsError) throw schoolsError;
 
   const { data: schools, error: refreshedSchoolsError } = await admin
@@ -366,8 +414,9 @@ async function main() {
   }) as SupabaseAdmin;
 
   await assertRequiredTablesExist(admin);
+  const districtSchemaReady = await hasDistrictSchema(admin);
   const privacySchemaReady = await hasPilotPrivacySchema(admin);
-  const schoolIds = await upsertStagingData(admin);
+  const schoolIds = await upsertStagingData(admin, districtSchemaReady);
   const { data: accessRows, error: accessError } = privacySchemaReady
     ? await admin
         .from("school_signup_access")
@@ -380,7 +429,10 @@ async function main() {
       .map((row) => [row.school_id, row.access_code])
   );
 
-  for (const user of users) {
+  const stagingUsers = districtSchemaReady
+    ? users
+    : users.filter((user) => user.role !== "district_admin");
+  for (const user of stagingUsers) {
     const schoolId = user.schoolSlug ? schoolIds.get(user.schoolSlug)! : null;
     const authSchoolId = schoolId ?? schoolIds.get("school1")!;
     const schoolAccessCode = accessCodes.get(authSchoolId);
@@ -416,7 +468,7 @@ async function main() {
 
     if (!userId) throw new Error(`Could not create or find ${user.email}.`);
     await assertAuthUserReady(admin, userId, user.email);
-    const { error: profileError } = await admin.from("profiles").upsert({
+    const profilePayload = {
       id: userId,
       email: user.email,
       full_name: user.fullName,
@@ -424,21 +476,33 @@ async function main() {
       school_id: schoolId,
       grade_level: user.gradeLevel ?? null,
       updated_at: new Date().toISOString(),
-    });
+      ...(districtSchemaReady && user.role === "district_admin"
+        ? { district_id: stagingDistrict.id }
+        : {}),
+    };
+    const { error: profileError } = await admin.from("profiles").upsert(profilePayload);
     if (profileError) throw profileError;
 
     const { data: profile, error: verifyProfileError } = await admin
       .from("profiles")
-      .select("id,email,role,school_id")
+      .select(districtSchemaReady
+        ? "id,email,role,school_id,district_id"
+        : "id,email,role,school_id")
       .eq("id", userId)
       .maybeSingle();
     if (verifyProfileError) throw verifyProfileError;
     if (!profile) throw new Error(`Profile was not created for ${user.email}.`);
     if (profile.role !== user.role) throw new Error(`Profile role mismatch for ${user.email}.`);
     if ((profile.school_id ?? null) !== schoolId) throw new Error(`Profile school mismatch for ${user.email}.`);
+    if (districtSchemaReady) {
+      const expectedDistrictId = user.role === "super_admin" ? null : stagingDistrict.id;
+      if ((profile.district_id ?? null) !== expectedDistrictId) {
+        throw new Error(`Profile district mismatch for ${user.email}.`);
+      }
+    }
   }
 
-  console.log(`Staging E2E data and users are ready: ${users.length} accounts.`);
+  console.log(`Staging E2E data and users are ready: ${stagingUsers.length} accounts.`);
 }
 
 main().catch((error) => {

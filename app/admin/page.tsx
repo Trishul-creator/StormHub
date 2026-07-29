@@ -25,7 +25,9 @@ import { getSchoolSignupAccess } from "@/lib/school-access";
 
 export default async function AdminPage() {
   const { profile } = await requireAdmin();
-  if (profile.role === "super_admin") redirect("/admin/schools");
+  if (profile.role === "super_admin" || profile.role === "district_admin") {
+    redirect("/admin/districts");
+  }
 
   const [analytics, pendingApprovals, manageableClubs] = await Promise.all([
     getAdminAnalytics(),
@@ -34,7 +36,7 @@ export default async function AdminPage() {
   ]);
   const school = await getSchoolForProfile(profile);
   const signupAccess = school
-    ? await getSchoolSignupAccess(profile, school.id)
+    ? await getSchoolSignupAccess(profile, school.id, school.district_id)
     : null;
   const attention = await getManagementDashboardAttention(manageableClubs);
   const priorities = buildManagementDashboardPriorities({

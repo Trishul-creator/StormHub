@@ -40,7 +40,7 @@ export default async function AuditPage() {
         .order("occurred_at", { ascending: false })
         .limit(200)
     : Promise.resolve({ data: [] });
-  let supportAuditQuery = admin && supportAvailability.available
+  let supportAuditQuery = admin && supportAvailability.available && profile.role !== "district_admin"
     ? admin
         .from("platform_support_access_log")
         .select("*, actor:profiles!actor_user_id(full_name,email), session:platform_support_sessions!session_id(reason,expires_at)")

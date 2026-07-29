@@ -12,9 +12,10 @@ import {
   Users,
 } from "lucide-react";
 import { WorkspaceNavigation, type WorkspaceNavigationLink } from "@/components/layout/workspace-navigation";
+import type { UserRole } from "@/types/database";
 
 interface AdminNavigationProps {
-  isSuperAdmin: boolean;
+  role: UserRole;
 }
 
 const sharedLinks = [
@@ -25,12 +26,17 @@ const sharedLinks = [
   { href: "/admin/audit", label: "Audit log", icon: History },
 ];
 
-export function AdminNavigation({ isSuperAdmin }: AdminNavigationProps) {
+export function AdminNavigation({ role }: AdminNavigationProps) {
+  const isSuperAdmin = role === "super_admin";
+  const isDistrictAdmin = role === "district_admin";
   const links: WorkspaceNavigationLink[] = [
     isSuperAdmin
-      ? { href: "/admin/schools", label: "Schools", icon: Building2 }
+      ? { href: "/admin/districts", label: "Districts", icon: Building2 }
+      : isDistrictAdmin
+        ? { href: "/admin/districts", label: "District", icon: Building2 }
       : { href: "/admin", label: "Overview", icon: LayoutDashboard },
-    ...sharedLinks.slice(0, 3),
+    ...sharedLinks.slice(0, 2),
+    ...(!isDistrictAdmin ? [sharedLinks[2]] : []),
     ...(isSuperAdmin ? [{ href: "/admin/feedback", label: "Support inbox", icon: Inbox }] : []),
     ...sharedLinks.slice(3),
   ];
@@ -38,7 +44,7 @@ export function AdminNavigation({ isSuperAdmin }: AdminNavigationProps) {
   return (
     <WorkspaceNavigation
       ariaLabel="Administration"
-      eyebrow={isSuperAdmin ? "Platform" : "School"}
+      eyebrow={isSuperAdmin ? "Platform" : isDistrictAdmin ? "District" : "School"}
       title="Administration"
       icon={ShieldCheck}
       links={links}

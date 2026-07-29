@@ -13,9 +13,13 @@ interface StatisticsScopeOption {
 export function StatisticsScopeSelector({
   schools,
   activeSlug,
+  baseQuery,
+  allLabel = "All schools",
 }: {
   schools: StatisticsScopeOption[];
   activeSlug: string | null;
+  baseQuery?: Record<string, string>;
+  allLabel?: string;
 }) {
   const router = useRouter();
   const [selectedSlug, setSelectedSlug] = useState(activeSlug ?? "");
@@ -27,8 +31,11 @@ export function StatisticsScopeSelector({
 
   function changeScope(nextSlug: string) {
     setSelectedSlug(nextSlug);
-    const destination = nextSlug
-      ? `/admin/statistics?school=${encodeURIComponent(nextSlug)}`
+    const query = new URLSearchParams(baseQuery);
+    if (nextSlug) query.set("school", nextSlug);
+    else query.delete("school");
+    const destination = query.size > 0
+      ? `/admin/statistics?${query.toString()}`
       : "/admin/statistics";
     startTransition(() => router.replace(destination, { scroll: false }));
   }
@@ -43,7 +50,7 @@ export function StatisticsScopeSelector({
         onChange={(event) => changeScope(event.target.value)}
         className="mt-1 block h-10 w-full min-w-56 rounded-lg border border-blue-200 bg-card px-3 pr-10 text-sm font-medium normal-case tracking-normal text-storm-navy shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:cursor-wait disabled:opacity-75 dark:border-blue-900"
       >
-        <option value="">All schools</option>
+        <option value="">{allLabel}</option>
         {schools.map((school) => (
           <option key={school.id} value={school.slug}>{school.name}</option>
         ))}

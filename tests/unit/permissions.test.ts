@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canAccessSchoolAdmin,
+  canAccessDistrictAdmin,
   canCreateClub,
   canDeleteUser,
   canEditRole,
@@ -18,6 +19,7 @@ import {
   canViewMemberContent,
   getSponsorAssignableClubs,
   isPlatformAdmin,
+  isDistrictAdmin,
   isSchoolAdmin,
   isStudent,
   isSuperAdmin,
@@ -79,6 +81,7 @@ describe("global role helpers", () => {
     expect(isTeacher(profile("teacher"))).toBe(true);
     expect(isSchoolAdmin(profile("admin"))).toBe(true);
     expect(isSuperAdmin(profile("super_admin"))).toBe(true);
+    expect(isDistrictAdmin(profile("district_admin"))).toBe(true);
     expect(isPlatformAdmin(profile("super_admin"))).toBe(true);
     expect(isSuperAdmin(profile("admin"))).toBe(false);
     expect(isStudent(profile("super_admin"))).toBe(false);
@@ -117,6 +120,31 @@ describe("school admin permissions", () => {
     const superAdmin = profile("super_admin");
     expect(canManageSchool(superAdmin, schoolA)).toBe(true);
     expect(canManageSchool(superAdmin, schoolB)).toBe(true);
+  });
+
+  it("limits district administrators to schools in their district", () => {
+    const districtAdmin = profile("district_admin", {
+      school_id: null,
+      district_id: "district-a",
+    });
+    expect(canAccessDistrictAdmin(districtAdmin, "district-a")).toBe(true);
+    expect(canAccessDistrictAdmin(districtAdmin, "district-b")).toBe(false);
+    expect(canAccessSchoolAdmin(districtAdmin, schoolA, "district-a")).toBe(true);
+    expect(canAccessSchoolAdmin(districtAdmin, schoolB, "district-b")).toBe(false);
+    expect(
+      canEditRole(
+        districtAdmin,
+        profile("admin", { school_id: schoolA, district_id: "district-a" }),
+        "teacher",
+      ),
+    ).toBe(true);
+    expect(
+      canEditRole(
+        districtAdmin,
+        profile("admin", { school_id: schoolB, district_id: "district-b" }),
+        "teacher",
+      ),
+    ).toBe(false);
   });
 
   it("does not allow students or teachers to manage a whole school", () => {

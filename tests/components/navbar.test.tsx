@@ -21,7 +21,7 @@ vi.mock("@/components/theme/theme-controls", () => ({
 }));
 
 describe("Navbar", () => {
-  it.each(["student", "teacher", "admin", "super_admin"] as const)(
+  it.each(["student", "teacher", "admin", "district_admin", "super_admin"] as const)(
     "always links the StormHub brand to the public home page for %s",
     (role) => {
       render(<Navbar isLoggedIn role={role} />);
@@ -35,6 +35,22 @@ describe("Navbar", () => {
     expect(screen.getByRole("link", { name: "Clubs" })).toHaveAttribute("href", "/clubs");
     expect(screen.getByRole("link", { name: "Calendar" })).toHaveAttribute("href", "/calendar");
     expect(screen.getByRole("link", { name: "Opportunities" })).toHaveAttribute("href", "/opportunities");
+  });
+
+  it("gives district administrators one scoped top-level workspace", () => {
+    render(
+      <Navbar
+        isLoggedIn
+        role="district_admin"
+        districtSlug="elkhorn-public-schools"
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "District Admin" })).toHaveAttribute(
+      "href",
+      "/admin/districts/elkhorn-public-schools",
+    );
+    expect(screen.queryByRole("link", { name: "Manage" })).not.toBeInTheDocument();
   });
 
   it("keeps administrator discovery catalogs in the top menu and adds administration", () => {

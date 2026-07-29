@@ -105,7 +105,13 @@ function formatMembershipRole(role: MembershipRole): string {
 }
 
 function userRoleRank(role: UserRole): number {
-  return { student: 1, teacher: 2, admin: 3, super_admin: 4 }[role];
+  return {
+    student: 1,
+    teacher: 2,
+    admin: 3,
+    district_admin: 4,
+    super_admin: 5,
+  }[role];
 }
 
 function membershipRoleRank(role: MembershipRole): number {
@@ -2155,7 +2161,11 @@ export async function updateUserRoleAndClubs(data: {
       message: promoted
         ? `An administrator promoted your StormHub account. Your homepage checklist has been reset for your new responsibilities.`
         : `An administrator changed your StormHub account role to ${roleLabel}.`,
-      link: data.role === "super_admin" ? "/admin/schools" : data.role === "admin" || data.role === "teacher" ? "/manage" : "/dashboard",
+      link: data.role === "super_admin" || data.role === "district_admin"
+        ? "/admin/districts"
+        : data.role === "admin" || data.role === "teacher"
+          ? "/manage"
+          : "/dashboard",
       sendEmail: promoted,
     });
   }
@@ -2260,9 +2270,7 @@ export async function updateUserAccountStatus(
   if (targetError || !targetData) return { success: false, error: "User not found." };
   const target = targetData as Profile;
   if (target.id === actor.id) return { success: false, error: "You cannot change your own account status." };
-  if (actor.role !== "super_admin" && (
-    target.school_id !== actor.school_id || !["student", "teacher"].includes(target.role)
-  )) {
+  if (!canDeleteUser(actor, target)) {
     return { success: false, error: "You do not have permission to change this account." };
   }
 
@@ -3162,11 +3170,9 @@ export async function updateSchoolSignupDomains(input: {
   domains: string;
 }): Promise<{ success: boolean; domains?: string[]; error?: string }> {
   const actor = await getCurrentProfile();
-  if (!actor || !["admin", "super_admin"].includes(actor.role)) {
+  const school = await getSchoolById(input.schoolId);
+  if (!actor || !school || !canManageSchoolAccess(actor, school.id, school.district_id)) {
     return { success: false, error: "Administrator access required." };
-  }
-  if (actor.role !== "super_admin" && actor.school_id !== input.schoolId) {
-    return { success: false, error: "You can only change signup settings for your own school." };
   }
 
   const { domains, invalidDomains } = parseSignupDomainInput(input.domains);
@@ -3207,7 +3213,8 @@ export async function rotateSchoolSignupAccessCode(
   }
   const actor = await getCurrentProfile();
   const admin = createAdminClient();
-  if (!actor || !admin || !canManageSchoolAccess(actor, schoolId)) {
+  const school = await getSchoolById(schoolId);
+  if (!actor || !admin || !school || !canManageSchoolAccess(actor, school.id, school.district_id)) {
     return { success: false, error: "Administrator access required." };
   }
 

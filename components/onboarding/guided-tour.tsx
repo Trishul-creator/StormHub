@@ -63,12 +63,16 @@ function buildTourSteps(role: UserRole, canManage: boolean): TourStep[] {
   const primaryTitle =
     role === "super_admin"
       ? "Platform administration"
+      : role === "district_admin"
+        ? "District administration"
       : role === "student"
         ? "Your dashboard"
         : "Your management home";
   const primaryDescription =
     role === "super_admin"
-      ? "This is your platform school chooser. Select a school before working with school-scoped data."
+      ? "This is your platform district chooser. Open a district, then select a school before working with school-scoped data."
+      : role === "district_admin"
+        ? "This workspace shows only your district. Open a school for its users, settings, and school-level statistics."
       : role === "admin"
         ? "Management is your school operations home for approvals, assigned clubs, and administrative work."
         : role === "teacher"
@@ -92,8 +96,8 @@ function buildTourSteps(role: UserRole, canManage: boolean): TourStep[] {
       description:
         role === "student"
           ? "This short queue combines your closest assignment, opportunity, and event deadlines. It never shows more than four items."
-          : role === "super_admin"
-            ? "This short queue flags school workspaces that need setup or publishing attention."
+          : role === "super_admin" || role === "district_admin"
+            ? "District and school cards keep organizational setup one click away."
             : role === "teacher"
               ? "This short queue combines submissions to grade, approaching coursework, and club events."
               : "This short queue combines pending approvals and upcoming school activity.",
@@ -133,11 +137,19 @@ function buildTourSteps(role: UserRole, canManage: boolean): TourStep[] {
       : role === "super_admin"
         ? [
             {
-              selector: '[data-tour="school-workspaces"]',
-              title: "Choose a school workspace",
-              description: "Platform administrators select a school before opening its scoped users, clubs, opportunities, or statistics.",
+              selector: '[data-tour="district-workspaces"]',
+              title: "Choose a district workspace",
+              description: "Platform administrators open a district before selecting one of its school workspaces.",
             },
           ]
+        : role === "district_admin"
+          ? [
+              {
+                selector: '[data-tour="district-schools"]',
+                title: "Choose a school in your district",
+                description: "Every school here is inside your assigned district. Open one for scoped settings, users, previews, and statistics.",
+              },
+            ]
         : [
             {
               selector: '[data-tour="managed-clubs"]',
@@ -154,13 +166,15 @@ function buildTourSteps(role: UserRole, canManage: boolean): TourStep[] {
           ]),
   ];
 
-  if (role === "super_admin") {
+  if (role === "super_admin" || role === "district_admin") {
     return [
       ...openingSteps,
       {
         selector: '[data-tour="admin-tools"]',
-        title: "Platform administration menu",
-        description: "Use this scoped menu for schools, statistics, users and roles, moderation, support, deletion requests, and the audit log.",
+        title: role === "super_admin" ? "Platform administration menu" : "District administration menu",
+        description: role === "super_admin"
+          ? "Use this menu for districts, statistics, users and roles, moderation, support, deletion requests, and the audit log."
+          : "Use this menu for your district, scoped statistics, school-level users and roles, deletion requests, and the audit log.",
       },
       ...accountSteps(role),
     ];

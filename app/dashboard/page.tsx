@@ -20,7 +20,9 @@ import { getRoleOnboardingItems } from "@/lib/product";
 export default async function DashboardPage() {
   const { userId, profile } = await requireAuth("/dashboard");
 
-  if (profile.role === "super_admin") redirect("/admin/schools");
+  if (profile.role === "super_admin" || profile.role === "district_admin") {
+    redirect("/admin/districts");
+  }
   if (profile.role === "admin" || profile.role === "teacher") redirect("/manage");
 
   const [dashboard, manageableClubs] = await Promise.all([

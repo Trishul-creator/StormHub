@@ -29,7 +29,8 @@ export interface AuthContext {
 
 export function defaultPathForProfile(profile: Pick<Profile, "role"> | null | undefined): string {
   if (!profile) return "/dashboard";
-  if (profile.role === "super_admin") return "/admin/schools";
+  if (profile.role === "super_admin") return "/admin/districts";
+  if (profile.role === "district_admin") return "/admin/districts";
   if (profile.role === "admin" || profile.role === "teacher") return "/manage";
   return "/dashboard";
 }
@@ -164,7 +165,7 @@ export async function requireAuth(redirectTo?: string): Promise<AuthContext & { 
     redirect(path);
   }
   if (
-    auth.profile.role !== "super_admin"
+    !["district_admin", "super_admin"].includes(auth.profile.role)
     && !auth.profile.school_id
     && redirectTo !== "/auth/complete-profile"
   ) {

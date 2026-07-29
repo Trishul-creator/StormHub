@@ -195,6 +195,14 @@ export async function getAllSchools(): Promise<School[]> {
 }
 
 export function getFilterableSchools(schools: School[], profile?: Profile | null): School[] {
+  if (profile?.role === "district_admin") {
+    return schools.filter(
+      (school) =>
+        school.district_id === profile.district_id
+        && school.is_active !== false
+        && school.is_public !== false
+    );
+  }
   if (profile && profile.role !== "super_admin") {
     return schools.filter((school) => school.id === profile.school_id);
   }

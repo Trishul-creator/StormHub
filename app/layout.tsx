@@ -9,6 +9,7 @@ import { getAuthContext, hasManagementAccess } from "@/lib/auth";
 import { SetupBanner } from "@/components/layout/setup-banner";
 import { getUnreadNotificationCount, getUserNotifications } from "@/lib/notifications";
 import { getSchoolForProfile } from "@/lib/schools";
+import { getDistrictForProfile } from "@/lib/districts";
 import { ThemeScript } from "@/components/theme/theme-script";
 import { GuidedTour } from "@/components/onboarding/guided-tour";
 
@@ -22,11 +23,12 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const demoMode = isDemoMode();
   const { isLoggedIn, email: userEmail, profile } = await getAuthContext();
-  const [canManage, notifications, unreadNotificationCount, school] = await Promise.all([
+  const [canManage, notifications, unreadNotificationCount, school, district] = await Promise.all([
     hasManagementAccess(profile),
     getUserNotifications(profile?.id ?? null, 5),
     getUnreadNotificationCount(profile?.id ?? null),
     getSchoolForProfile(profile),
+    getDistrictForProfile(profile),
   ]);
   const tourRelevantAt = profile?.onboarding_reset_at ?? profile?.created_at;
   const tourAutoStart = Boolean(
@@ -50,6 +52,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           notifications={notifications}
           unreadNotificationCount={unreadNotificationCount}
           schoolSlug={school?.slug}
+          districtSlug={district?.slug}
         />
         <SetupBanner />
         <main id="main-content" className="min-h-[calc(100vh-4rem)]" tabIndex={-1}>{children}</main>

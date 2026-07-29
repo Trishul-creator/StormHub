@@ -15,16 +15,26 @@ export function generateSchoolSignupAccessCode(): string {
   return `SH-${token.slice(0, 4)}-${token.slice(4, 8)}-${token.slice(8, 12)}`;
 }
 
-export function canManageSchoolAccess(actor: Profile, schoolId: string): boolean {
+export function canManageSchoolAccess(
+  actor: Profile,
+  schoolId: string,
+  schoolDistrictId?: string | null,
+): boolean {
   return actor.role === "super_admin"
+    || (
+      actor.role === "district_admin"
+      && !!schoolDistrictId
+      && actor.district_id === schoolDistrictId
+    )
     || (actor.role === "admin" && actor.school_id === schoolId);
 }
 
 export async function getSchoolSignupAccess(
   actor: Profile,
-  schoolId: string
+  schoolId: string,
+  schoolDistrictId?: string | null,
 ): Promise<SchoolSignupAccess | null> {
-  if (!canManageSchoolAccess(actor, schoolId)) return null;
+  if (!canManageSchoolAccess(actor, schoolId, schoolDistrictId)) return null;
   const admin = createAdminClient();
   if (!admin) return null;
   const { data, error } = await admin
