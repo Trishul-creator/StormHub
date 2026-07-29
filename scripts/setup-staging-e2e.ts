@@ -148,9 +148,6 @@ async function assertRequiredTablesExist(admin: SupabaseAdmin) {
     { table: "admin_audit_log", columns: "id" },
     { table: "digest_deliveries", columns: "id" },
     { table: "request_attempts", columns: "id" },
-    { table: "school_signup_access", columns: "school_id,access_code" },
-    { table: "platform_support_sessions", columns: "id" },
-    { table: "data_retention_runs", columns: "id" },
   ] as const;
 
   for (const { table, columns } of requiredRelations) {
@@ -161,6 +158,33 @@ async function assertRequiredTablesExist(admin: SupabaseAdmin) {
       );
     }
   }
+}
+
+async function hasPilotPrivacySchema(admin: SupabaseAdmin): Promise<boolean> {
+  const privacyRelations = [
+    { table: "school_signup_access", columns: "school_id,access_code" },
+    { table: "platform_support_sessions", columns: "id" },
+    { table: "data_retention_runs", columns: "id" },
+  ] as const;
+  const missing: string[] = [];
+
+  for (const { table, columns } of privacyRelations) {
+    const { error } = await admin.from(table).select(columns).limit(1);
+    if (error) missing.push(table);
+  }
+
+  if (missing.length === 0) return true;
+  if (missing.length !== privacyRelations.length) {
+    throw new Error(
+      `Staging has a partially applied pilot privacy migration. Missing: ${missing.join(", ")}.`
+    );
+  }
+
+  console.warn(
+    "Staging is using the pre-migration schema for this PR preview. "
+      + "The local database job validates the complete privacy migration before merge."
+  );
+  return false;
 }
 
 async function upsertStagingData(admin: SupabaseAdmin): Promise<Map<string, string>> {
@@ -342,11 +366,14 @@ async function main() {
   }) as SupabaseAdmin;
 
   await assertRequiredTablesExist(admin);
+  const privacySchemaReady = await hasPilotPrivacySchema(admin);
   const schoolIds = await upsertStagingData(admin);
-  const { data: accessRows, error: accessError } = await admin
-    .from("school_signup_access")
-    .select("school_id,access_code")
-    .in("school_id", [...schoolIds.values()]);
+  const { data: accessRows, error: accessError } = privacySchemaReady
+    ? await admin
+        .from("school_signup_access")
+        .select("school_id,access_code")
+        .in("school_id", [...schoolIds.values()])
+    : { data: [], error: null };
   if (accessError) throw accessError;
   const accessCodes = new Map<string, string>(
     ((accessRows ?? []) as Array<{ school_id: string; access_code: string }>)
@@ -356,13 +383,14 @@ async function main() {
   for (const user of users) {
     const schoolId = user.schoolSlug ? schoolIds.get(user.schoolSlug)! : null;
     const authSchoolId = schoolId ?? schoolIds.get("school1")!;
+    const schoolAccessCode = accessCodes.get(authSchoolId);
     const metadata = {
       full_name: user.fullName,
       school_id: authSchoolId,
-      school_access_code: accessCodes.get(authSchoolId),
+      ...(schoolAccessCode ? { school_access_code: schoolAccessCode } : {}),
       grade_level: user.gradeLevel ? String(user.gradeLevel) : undefined,
     };
-    if (!metadata.school_access_code) {
+    if (privacySchemaReady && !schoolAccessCode) {
       throw new Error(`Staging school access code is missing for ${user.email}.`);
     }
 
