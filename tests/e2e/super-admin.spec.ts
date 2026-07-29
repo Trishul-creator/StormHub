@@ -35,7 +35,14 @@ test.describe("super admin district chooser", () => {
     await page.goto("/admin/schools/school1");
     await expect(page).toHaveURL(/\/admin\/schools\/school1/);
     await expect(page.getByText(/Platform Admin Mode/i)).toBeVisible();
-    await expect(page.getByRole("link", { name: /draft club catalog/i })).toBeVisible();
+    await page.getByRole("link", { name: /add clubs/i }).click();
+    await expect(page).toHaveURL(/\/admin\/schools\/school1\/drafts/);
+    await expect(page.getByRole("heading", { name: /add a club to school 1/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /browse starter clubs/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /create a custom club/i })).toHaveAttribute(
+      "href",
+      "/manage/clubs/new?school=school1"
+    );
 
     await page.goto("/admin/schools/school2");
     await expect(page).toHaveURL(/\/admin\/schools\/school2/);

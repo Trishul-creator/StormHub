@@ -71,13 +71,20 @@ export default async function AdminSchoolPage({ params }: AdminSchoolPageProps) 
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {profile.role === "super_admin" && (
-          <ActionCard href={`/admin/schools/${school.slug}/drafts`} icon={Users} title="Draft club catalog" description="Review prepared draft clubs before publishing them." />
+          <ActionCard href={`/admin/schools/${school.slug}/drafts`} icon={Users} title="Add clubs" description="Use a prepared starter or create a custom club for this school." />
         )}
-        <ActionCard href={`/s/${school.slug}/opportunities`} icon={Zap} title="Preview opportunities" description="View the opportunities visible in this school." />
+        {profile.role === "admin" && (
+          <ActionCard href="/manage/clubs/drafts" icon={Users} title="Add clubs" description="Use a prepared starter or create a custom club for your school." />
+        )}
+        {profile.role === "admin" ? (
+          <ActionCard href="/manage/opportunities" icon={Zap} title="Manage opportunities" description="Create and review school opportunities." />
+        ) : (
+          <ActionCard href={`/s/${school.slug}/opportunities`} icon={Zap} title="Preview opportunities" description="View the opportunities visible in this school." />
+        )}
         <ActionCard href={`/s/${school.slug}/calendar`} icon={Calendar} title="Preview calendar" description="View this school’s calendar entries." />
         <ActionCard href={`/admin/users?school=${school.slug}`} icon={Settings} title="Users and roles" description="Assign school admins, teachers, and students for this school." />
         <ActionCard href={`/admin/statistics?school=${school.slug}`} icon={BarChart3} title="Statistics" description="Review school participation and active-club trends." />
-        {profile.role === "admin" && (
+        {profile.role === "super_admin" && (
           <ActionCard href="/manage/email-outbox" icon={Mail} title="Email status" description="Review controlled important and urgent email records." />
         )}
       </div>

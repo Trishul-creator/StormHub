@@ -33,7 +33,8 @@ describe("DraftClubCatalog", () => {
   it("searches and filters a large school catalog", () => {
     render(<DraftClubCatalog clubs={clubs} mode="admin" />);
 
-    expect(screen.getByText("3 templates")).toBeVisible();
+    expect(screen.getByText("3 draft clubs")).toBeVisible();
+    expect(screen.getAllByRole("link", { name: "Use this club" })).toHaveLength(3);
     fireEvent.change(screen.getByLabelText("Search draft clubs"), { target: { value: "engineering" } });
     expect(screen.getByRole("heading", { name: "Robotics Club" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Art Club" })).not.toBeInTheDocument();

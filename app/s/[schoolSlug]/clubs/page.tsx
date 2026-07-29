@@ -54,24 +54,22 @@ export default async function SchoolClubsPage({ params, searchParams }: SchoolCl
         description="Discover clubs in this school workspace."
       >
         {auth.profile?.role === "teacher" && auth.profile.school_id === school.id && (
-          <>
-            <Button variant="outline" asChild>
-              <Link href="/manage/clubs/drafts">Club drafts</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/manage/clubs/new">Propose club</Link>
-            </Button>
-          </>
+          <Button asChild>
+            <Link href="/manage/clubs/drafts">Propose a club</Link>
+          </Button>
         )}
         {(auth.profile?.role === "super_admin" || (auth.profile?.role === "admin" && auth.profile.school_id === school.id)) && (
-          <>
-            <Button variant="outline" asChild>
-              <Link href="/manage/clubs/drafts">Draft clubs</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/manage/clubs/new">Create club</Link>
-            </Button>
-          </>
+          <Button asChild>
+            <Link
+              href={
+                auth.profile.role === "super_admin"
+                  ? `/admin/schools/${school.slug}/drafts`
+                  : "/manage/clubs/drafts"
+              }
+            >
+              Add a club
+            </Link>
+          </Button>
         )}
       </PageHeader>
       <div data-tour="club-directory-tools" className="mb-6">
