@@ -45,4 +45,28 @@ describe("statistics scope selector", () => {
       expect(replace).toHaveBeenCalledWith("/admin/statistics", { scroll: false });
     });
   });
+
+  it("supports direct district-wide scope selection for platform administrators", async () => {
+    render(
+      <StatisticsScopeSelector
+        schools={[{ id: "district-1", name: "Example District", slug: "example-district" }]}
+        activeSlug={null}
+        label="District"
+        queryKey="district"
+        clearQueryKeys={["school"]}
+        allLabel="Platform-wide"
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("District"), {
+      target: { value: "example-district" },
+    });
+
+    await waitFor(() => {
+      expect(replace).toHaveBeenCalledWith(
+        "/admin/statistics?district=example-district",
+        { scroll: false }
+      );
+    });
+  });
 });

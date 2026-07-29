@@ -15,11 +15,17 @@ export function StatisticsScopeSelector({
   activeSlug,
   baseQuery,
   allLabel = "All schools",
+  label = "View scope",
+  queryKey = "school",
+  clearQueryKeys = [],
 }: {
   schools: StatisticsScopeOption[];
   activeSlug: string | null;
   baseQuery?: Record<string, string>;
   allLabel?: string;
+  label?: string;
+  queryKey?: "school" | "district";
+  clearQueryKeys?: Array<"school" | "district">;
 }) {
   const router = useRouter();
   const [selectedSlug, setSelectedSlug] = useState(activeSlug ?? "");
@@ -32,8 +38,9 @@ export function StatisticsScopeSelector({
   function changeScope(nextSlug: string) {
     setSelectedSlug(nextSlug);
     const query = new URLSearchParams(baseQuery);
-    if (nextSlug) query.set("school", nextSlug);
-    else query.delete("school");
+    for (const key of clearQueryKeys) query.delete(key);
+    if (nextSlug) query.set(queryKey, nextSlug);
+    else query.delete(queryKey);
     const destination = query.size > 0
       ? `/admin/statistics?${query.toString()}`
       : "/admin/statistics";
@@ -42,9 +49,9 @@ export function StatisticsScopeSelector({
 
   return (
     <label className="relative block w-full text-xs font-semibold uppercase tracking-wide text-blue-950/70 dark:text-blue-200/75 sm:w-auto">
-      View scope
+      {label}
       <select
-        aria-label="View scope"
+        aria-label={label}
         value={selectedSlug}
         disabled={pending}
         onChange={(event) => changeScope(event.target.value)}

@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(14);
+SELECT plan(23);
 
 SELECT is(
   (SELECT name FROM public.districts WHERE slug = 'elkhorn-public-schools'),
@@ -121,6 +121,87 @@ SELECT isnt(
   TRUE,
   'district administrators cannot administer a school outside their district'
 );
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"61000000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}',
+  TRUE
+);
+SELECT lives_ok(
+  $$
+    SELECT public.update_district_details(
+      target_district_id => 'd0000000-0000-4000-8000-000000000001',
+      requested_name => 'Elkhorn Public Schools Updated',
+      requested_city => 'Elkhorn',
+      requested_state => 'NE',
+      requested_website_url => 'https://www.elkhornweb.org'
+    )
+  $$,
+  'district administrators can edit descriptive details for their own district'
+);
+SELECT is(
+  (
+    SELECT name
+    FROM public.districts
+    WHERE id = 'd0000000-0000-4000-8000-000000000001'
+  ),
+  'Elkhorn Public Schools Updated',
+  'district edits are saved'
+);
+SELECT throws_ok(
+  $$
+    SELECT public.update_district_details(
+      target_district_id => 'd1000000-0000-4000-8000-000000000002',
+      requested_name => 'Unauthorized change'
+    )
+  $$,
+  'P0001',
+  'Administrator access required for this district',
+  'district administrators cannot edit another district'
+);
+SELECT throws_ok(
+  $$
+    SELECT public.update_district_details(
+      target_district_id => 'd0000000-0000-4000-8000-000000000001',
+      requested_name => 'Elkhorn Public Schools Updated',
+      requested_slug => 'district-admin-cannot-change-this'
+    )
+  $$,
+  'P0001',
+  'Only platform administrators can change district routing or availability',
+  'district administrators cannot change district URLs'
+);
+SELECT lives_ok(
+  $$
+    SELECT public.update_school_details(
+      target_school_id => 'a0000000-0000-4000-8000-000000000001',
+      requested_name => 'Elkhorn South High School Updated',
+      requested_short_name => 'ESHS',
+      requested_city => 'Omaha',
+      requested_state => 'NE',
+      requested_website_url => 'https://eshs.elkhornweb.org',
+      requested_mascot => 'Storm',
+      requested_primary_color => '#123ABC',
+      requested_secondary_color => '#FFFFFF'
+    )
+  $$,
+  'district administrators can edit schools in their own district'
+);
+SELECT throws_ok(
+  $$
+    SELECT public.update_school_details(
+      target_school_id => 'b1000000-0000-4000-8000-000000000099',
+      requested_name => 'Unauthorized school change'
+    )
+  $$,
+  'P0001',
+  'Administrator access required for this school',
+  'district administrators cannot edit schools outside their district'
+);
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"61000000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}',
+  TRUE
+);
 SELECT is(
   (SELECT count(*) FROM public.districts),
   1::BIGINT,
@@ -185,6 +266,56 @@ SELECT throws_ok(
   'P0001',
   'District administrators can only view schools in their district',
   'district administrators cannot request out-of-district statistics'
+);
+
+RESET ROLE;
+
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"61000000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal1"}',
+  TRUE
+);
+SET LOCAL ROLE authenticated;
+
+SELECT lives_ok(
+  $$
+    SELECT public.update_school_details(
+      target_school_id => 'a0000000-0000-4000-8000-000000000001',
+      requested_name => 'School Admin Updated Name',
+      requested_short_name => 'SAUN',
+      requested_address => '20303 Blue Sage Parkway',
+      requested_city => 'Omaha',
+      requested_state => 'NE',
+      requested_zip => '68130',
+      requested_website_url => 'https://eshs.elkhornweb.org',
+      requested_logo_url => 'https://eshs.elkhornweb.org/logo.png',
+      requested_mascot => 'Storm',
+      requested_primary_color => '#112233',
+      requested_secondary_color => '#AABBCC'
+    )
+  $$,
+  'school administrators can edit descriptive details for their own school'
+);
+SELECT is(
+  (
+    SELECT name
+    FROM public.schools
+    WHERE id = 'a0000000-0000-4000-8000-000000000001'
+  ),
+  'School Admin Updated Name',
+  'school-admin edits are saved'
+);
+SELECT throws_ok(
+  $$
+    SELECT public.update_school_details(
+      target_school_id => 'a0000000-0000-4000-8000-000000000001',
+      requested_name => 'School Admin Updated Name',
+      requested_slug => 'school-admin-cannot-change-this'
+    )
+  $$,
+  'P0001',
+  'Only district or platform administrators can change school routing or availability',
+  'school administrators cannot change school URLs or availability'
 );
 
 RESET ROLE;
