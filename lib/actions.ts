@@ -25,6 +25,7 @@ import {
   canGradeClubCoursework,
   canPublishClubContent,
   canPublishClubCoursework,
+  canCreateClub,
   isAdminRole,
 } from "@/lib/permissions";
 import { clubRoleLabel, clubRoleRank } from "@/lib/club-roles";
@@ -890,6 +891,7 @@ export async function submitClubProposal(data: {
   shortDescription: string;
   category: string;
   sponsorUserId?: string;
+  schoolId?: string;
 }): Promise<{ success: boolean; error?: string; message?: string }> {
   if (isDemoMode()) return { success: false, error: "Club proposals are unavailable in demo mode." };
   const supabase = await createClient();
@@ -903,8 +905,16 @@ export async function submitClubProposal(data: {
   if (name.length < 3) return { success: false, error: "Club name is required." };
   const slugBase = slugify(name);
   const slug = `${slugBase}-${Date.now().toString(36)}`;
-  const school = await getCurrentSchool(profile);
-  const schoolId = profile.school_id ?? school?.id ?? DEFAULT_SCHOOL_ID;
+  const requestedSchoolId = data.schoolId?.trim() || profile.school_id;
+  const school = requestedSchoolId ? await getSchoolById(requestedSchoolId) : null;
+  if (!school) return { success: false, error: "Choose a valid school for this club." };
+  const schoolId = school.id;
+  const canSubmitForSchool = profile.role === "teacher"
+    ? profile.school_id === schoolId
+    : canCreateClub(profile, schoolId);
+  if (!canSubmitForSchool) {
+    return { success: false, error: "You cannot create a club for this school." };
+  }
   const sponsor = await getValidTeacherSponsor({
     sponsorUserId: data.sponsorUserId || (profile.role === "teacher" ? profile.id : null),
     schoolId,
@@ -950,6 +960,8 @@ export async function submitClubProposal(data: {
   }
   revalidatePath("/manage/clubs");
   revalidatePath("/manage/clubs/drafts");
+  revalidatePath(`/admin/schools/${school.slug}/drafts`);
+  revalidatePath(`/s/${school.slug}/clubs`);
   revalidatePath("/dashboard");
   return {
     success: true,

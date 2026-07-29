@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { ClubCreationOptions } from "@/components/manage/club-creation-options";
 import { DraftClubCatalog } from "@/components/manage/draft-club-catalog";
 import { requireAdmin } from "@/lib/auth";
 import { getManageableClubs } from "@/lib/data";
@@ -27,15 +28,30 @@ export default async function SchoolDraftsPage({ params }: SchoolDraftsPageProps
         <strong>Platform Admin Mode</strong> — draft club catalog for {school.name}.
       </div>
       <PageHeader
-        title={`${school.short_name || school.name} Draft Clubs`}
-        description="Prepared club templates are hidden from students until a school admin edits and publishes them."
+        title={`Add a Club to ${school.short_name || school.name}`}
+        description="Use a prepared starter or create a custom club. Every club stays private until it is reviewed and published."
       >
         <Button variant="outline" asChild>
           <Link href={`/admin/schools/${school.slug}`}>Back to school</Link>
         </Button>
       </PageHeader>
 
-      <DraftClubCatalog clubs={clubs} mode="platform-admin" />
+      <ClubCreationOptions
+        customClubHref={`/manage/clubs/new?school=${encodeURIComponent(school.slug)}`}
+        customClubLabel="Create a custom club"
+      />
+
+      <section id="starter-club-catalog" className="scroll-mt-24" aria-labelledby="starter-club-catalog-title">
+        <div className="mb-4">
+          <h2 id="starter-club-catalog-title" className="text-xl font-semibold text-storm-navy">
+            Starter club catalog
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Choose a prepared club, confirm its details and Advisor, then publish it only for {school.name}.
+          </p>
+        </div>
+        <DraftClubCatalog clubs={clubs} mode="platform-admin" />
+      </section>
     </div>
   );
 }

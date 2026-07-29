@@ -95,12 +95,12 @@ export function DraftClubCatalog({
             </Button>
           ) : (
             <div className="flex items-center justify-end px-2 text-sm text-muted-foreground">
-              {clubs.length} templates
+              {clubs.length} draft clubs
             </div>
           )}
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Templates are private and inactive. Review the Advisor and details before publishing one for your school.
+          Draft clubs are private and inactive. Review the Advisor and details before publishing one for your school.
         </p>
       </div>
 
@@ -137,7 +137,7 @@ export function DraftClubCatalog({
                 <Button size="sm" asChild>
                   <Link href={`/manage/clubs/${club.slug}/edit?publish=1`}>
                     <Rocket className="h-4 w-4" />
-                    {mode === "platform-admin" ? "Publish" : "Review & publish"}
+                    Use this club
                   </Link>
                 </Button>
               ) : (

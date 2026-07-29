@@ -14,10 +14,14 @@ export function ClubProposalForm({
   requiresApproval = true,
   teachers = [],
   defaultSponsorUserId,
+  targetSchoolId,
+  returnHref = "/manage/clubs/drafts",
 }: {
   requiresApproval?: boolean;
   teachers?: Profile[];
   defaultSponsorUserId?: string;
+  targetSchoolId: string;
+  returnHref?: string;
 }) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -31,6 +35,7 @@ export function ClubProposalForm({
         shortDescription: String(form.get("shortDescription") ?? ""),
         category: String(form.get("category") ?? ""),
         sponsorUserId: String(form.get("sponsorUserId") ?? ""),
+        schoolId: targetSchoolId,
       });
       if (result.success) {
         toast({
@@ -39,7 +44,7 @@ export function ClubProposalForm({
             ? "A school admin can review and publish it."
             : "Review the draft details, then publish it when ready."),
         });
-        router.push(requiresApproval ? "/manage/clubs" : "/manage/clubs/drafts");
+        router.push(requiresApproval ? "/manage/clubs" : returnHref);
         router.refresh();
       } else {
         toast({ title: "Could not submit club", description: result.error, variant: "destructive" });
@@ -48,7 +53,7 @@ export function ClubProposalForm({
   }
 
   return (
-    <form onSubmit={submit} className="rounded-xl border bg-white p-6 space-y-4">
+    <form onSubmit={submit} className="space-y-4 rounded-xl border bg-card p-6">
       <div>
         <Label htmlFor="name">Club name</Label>
         <Input id="name" name="name" required className="mt-1" />
@@ -68,7 +73,7 @@ export function ClubProposalForm({
             id="sponsorUserId"
             name="sponsorUserId"
             defaultValue={defaultSponsorUserId ?? ""}
-            className="mt-1 h-10 w-full rounded-lg border bg-white px-3 text-sm"
+            className="mt-1 h-10 w-full rounded-lg border bg-card px-3 text-sm text-foreground"
           >
             <option value="">No Advisor assigned yet</option>
             {teachers.map((teacher) => (
@@ -79,11 +84,11 @@ export function ClubProposalForm({
           </select>
         </div>
       </div>
-      <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+      <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-100">
         Add dated meetings later from the club dashboard using Create Event. Club setup only creates the club profile.
       </p>
       <Button type="submit" disabled={pending}>
-        {pending ? "Submitting..." : requiresApproval ? "Submit proposal" : "Create draft club"}
+        {pending ? "Submitting..." : requiresApproval ? "Submit custom club proposal" : "Create custom club"}
       </Button>
     </form>
   );
