@@ -4,7 +4,8 @@ import { requireAdmin } from "@/lib/auth";
 import { getAdminUsers, isDemoMode } from "@/lib/data";
 import { getManageableClubs } from "@/lib/data";
 import { UserRoleEditor } from "@/components/admin/user-role-editor";
-import { getSchoolBySlug } from "@/lib/schools";
+import { getSchoolBySlug, getSchoolForProfile } from "@/lib/schools";
+import { canAccessSchoolAdmin } from "@/lib/permissions";
 import { GraduationCleanup } from "@/components/admin/graduation-cleanup";
 
 interface AdminUsersPageProps {
@@ -14,7 +15,16 @@ interface AdminUsersPageProps {
 export default async function AdminUsersPage({ searchParams }: AdminUsersPageProps) {
   const params = await searchParams;
   const { profile } = await requireAdmin();
-  const selectedSchool = profile.role === "super_admin" && params.school ? await getSchoolBySlug(params.school) : null;
+  const requestedSchool = params.school ? await getSchoolBySlug(params.school) : null;
+  if (params.school && !requestedSchool) notFound();
+  if (
+    requestedSchool
+    && !canAccessSchoolAdmin(profile, requestedSchool.id, requestedSchool.district_id)
+  ) {
+    notFound();
+  }
+  const selectedSchool = requestedSchool
+    ?? (profile.role === "admin" ? await getSchoolForProfile(profile) : null);
   const users = await getAdminUsers(selectedSchool?.id);
   const clubs = await getManageableClubs(profile, selectedSchool?.id);
   const demo = isDemoMode();
@@ -25,11 +35,13 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
         title="Users & Roles"
         description={
           selectedSchool
-            ? `School inventory for ${selectedSchool.name}. Platform admins are intentionally excluded.`
-            : "Manage user roles and permissions. Platform admins are intentionally excluded from school inventory."
+            ? `School inventory for ${selectedSchool.name}. District and platform administrators are intentionally excluded.`
+            : profile.role === "district_admin"
+              ? "Manage school-level accounts across your district. Choose a school workspace to assign teacher club sponsorships."
+              : "Manage user roles and permissions. District and platform administrators are intentionally excluded from school inventory."
         }
       />
-      {!demo && <GraduationCleanup />}
+      {!demo && profile.role !== "district_admin" && <GraduationCleanup />}
       <div className="rounded-xl border overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-storm-light/50">
@@ -80,8 +92,11 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
       <p className="mt-4 text-sm text-muted-foreground">
         {demo
           ? "Demo user data is shown. Role changes are unavailable in demo mode."
-          : "Admins can assign students or teachers. Only super admins can modify admin-level accounts."}
+          : profile.role === "district_admin"
+            ? "District administrators can assign student, teacher, and school-admin roles within their district."
+            : "School admins can assign students or teachers. Platform administrators can modify school-admin accounts."}
       </p>
     </div>
   );
 }
+import { notFound } from "next/navigation";

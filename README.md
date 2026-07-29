@@ -134,7 +134,7 @@ Enabled core surfaces:
 - Account suspension, graduation deactivation, data export, and deletion requests
 - Immutable administrative audit log
 - School admin/user/role management
-- Super-admin school workspace creation
+- Platform district and school workspace creation
 - Email/password confirmation, password recovery, and Google sign-in
 - Optional AI assistant, disabled until district approval
 
@@ -143,13 +143,15 @@ Roles:
 - `student`: school-specific student account
 - `teacher`: school-specific teacher/sponsor account
 - `admin`: school admin for one school
-- `super_admin`: platform admin; creates and manages school workspaces
+- `district_admin`: district administrator; manages the schools and school-level accounts in one district
+- `super_admin`: ultimate platform admin; creates and manages districts across the platform
 
 Routes:
 
 - `/`: neutral StormHub platform landing page
 - `/s/[schoolSlug]`: public school workspace
-- `/admin/schools`: super admin platform dashboard and school chooser
+- `/admin/districts`: platform/district administration workspace
+- `/admin/schools/[schoolSlug]`: authorized school administration workspace
 - `/manage`: school management dashboard for school admins/teachers
 - `/dashboard`: student dashboard
 

@@ -2,6 +2,7 @@ export type UserRole =
   | "student"
   | "teacher"
   | "admin"
+  | "district_admin"
   | "super_admin";
 
 export type AccountStatus = "active" | "suspended" | "deactivated";
@@ -56,8 +57,21 @@ export type NotificationType =
   | "content_rejected"
   | "system_message";
 
+export interface District {
+  id: string;
+  name: string;
+  slug: string;
+  city?: string | null;
+  state?: string | null;
+  website_url?: string | null;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface School {
   id: string;
+  district_id?: string | null;
   name: string;
   slug: string;
   short_name?: string | null;
@@ -80,6 +94,7 @@ export interface School {
 export interface Profile {
   id: string;
   school_id?: string | null;
+  district_id?: string | null;
   full_name?: string | null;
   email?: string | null;
   grade_level?: number | null;
@@ -503,6 +518,7 @@ export interface AnalyticsSummary {
 
 export interface AdminStatistics {
   scopeSchoolId: string | null;
+  scopeDistrictId?: string | null;
   totalPeople: number;
   activePeople: number;
   engagedPeople30d: number;

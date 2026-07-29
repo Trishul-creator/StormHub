@@ -5,14 +5,27 @@ import type {
   ClubResource,
   Event,
   Opportunity,
+  District,
   School,
   Workshop,
 } from "@/types/database";
 
 const SCHOOL_ID = "a0000000-0000-4000-8000-000000000001";
+const DISTRICT_ID = "d0000000-0000-4000-8000-000000000099";
+
+export const demoDistrict: District = {
+  id: DISTRICT_ID,
+  name: "Northstar School District (Demo)",
+  slug: "northstar-demo-district",
+  city: "Demo City",
+  state: "USA",
+  website_url: null,
+  is_active: true,
+};
 
 export const demoSchool: School = {
   id: SCHOOL_ID,
+  district_id: DISTRICT_ID,
   name: "Northstar High School (Demo)",
   short_name: "Northstar Demo",
   slug: "northstar-demo",

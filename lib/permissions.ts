@@ -8,9 +8,9 @@ import type {
 
 const CLUB_LEADER_ROLES: MembershipRole[] = ["officer", "president", "sponsor"];
 
-const ADMIN_ROLES: UserRole[] = ["admin", "super_admin"];
+const ADMIN_ROLES: UserRole[] = ["admin", "district_admin", "super_admin"];
 const MANAGER_ROLES: UserRole[] = ["teacher", "admin", "super_admin"];
-const APPROVER_ROLES: UserRole[] = ["teacher", "admin", "super_admin"];
+const APPROVER_ROLES: UserRole[] = ["teacher", "admin", "district_admin", "super_admin"];
 
 export function isStudent(user: Profile | null | undefined): boolean {
   return user?.role === "student";
@@ -22,6 +22,10 @@ export function isTeacher(user: Profile | null | undefined): boolean {
 
 export function isSchoolAdmin(user: Profile | null | undefined): boolean {
   return user?.role === "admin";
+}
+
+export function isDistrictAdmin(user: Profile | null | undefined): boolean {
+  return user?.role === "district_admin";
 }
 
 export function isSuperAdmin(user: Profile | null | undefined): boolean {
@@ -122,19 +126,43 @@ export function canAccessPlatformAdmin(user: Profile | null): boolean {
   return isSuperAdmin(user);
 }
 
-export function canAccessSchoolAdmin(user: Profile | null, schoolId?: string | null): boolean {
+export function canAccessDistrictAdmin(user: Profile | null, districtId?: string | null): boolean {
+  if (!user || !districtId) return false;
+  return user.role === "super_admin"
+    || (user.role === "district_admin" && user.district_id === districtId);
+}
+
+export function canAccessSchoolAdmin(
+  user: Profile | null,
+  schoolId?: string | null,
+  schoolDistrictId?: string | null
+): boolean {
   if (!user) return false;
   if (user.role === "super_admin") return true;
+  if (user.role === "district_admin") {
+    return !!schoolDistrictId && user.district_id === schoolDistrictId;
+  }
   return user.role === "admin" && !!schoolId && user.school_id === schoolId;
 }
 
-export function canManageSchool(user: Profile | null, schoolId?: string | null): boolean {
-  return canAccessSchoolAdmin(user, schoolId);
+export function canManageSchool(
+  user: Profile | null,
+  schoolId?: string | null,
+  schoolDistrictId?: string | null
+): boolean {
+  return canAccessSchoolAdmin(user, schoolId, schoolDistrictId);
 }
 
-export function canViewSchool(user: Profile | null, schoolId?: string | null): boolean {
+export function canViewSchool(
+  user: Profile | null,
+  schoolId?: string | null,
+  schoolDistrictId?: string | null
+): boolean {
   if (!user || !schoolId) return false;
   if (user.role === "super_admin") return true;
+  if (user.role === "district_admin") {
+    return !!schoolDistrictId && user.district_id === schoolDistrictId;
+  }
   return user.school_id === schoolId;
 }
 
@@ -156,6 +184,12 @@ export function canEditRole(
   newRole: UserRole
 ): boolean {
   if (!actor || !isAdminRole(actor.role) || actor.id === target.id) return false;
+  if (actor.role === "district_admin") {
+    return !!actor.district_id
+      && actor.district_id === target.district_id
+      && ["student", "teacher", "admin"].includes(target.role)
+      && ["student", "teacher", "admin"].includes(newRole);
+  }
   if (actor.role !== "super_admin") {
     if (!actor.school_id || actor.school_id !== target.school_id) return false;
     if (!["student", "teacher"].includes(target.role)) return false;
@@ -166,6 +200,11 @@ export function canEditRole(
 
 export function canDeleteUser(actor: Profile | null, target: Profile): boolean {
   if (!actor || !isAdminRole(actor.role) || actor.id === target.id) return false;
+  if (actor.role === "district_admin") {
+    return !!actor.district_id
+      && actor.district_id === target.district_id
+      && ["student", "teacher", "admin"].includes(target.role);
+  }
   if (actor.role !== "super_admin") {
     if (!actor.school_id || actor.school_id !== target.school_id) return false;
     if (!["student", "teacher"].includes(target.role)) return false;
@@ -327,25 +366,49 @@ export function canJoinClub(user: Profile | null, club: Club): boolean {
   return user?.role === "student" && !!user.school_id && user.school_id === club.school_id;
 }
 
-export function canCreateClub(user: Profile | null, schoolId?: string | null): boolean {
+export function canCreateClub(
+  user: Profile | null,
+  schoolId?: string | null,
+  schoolDistrictId?: string | null
+): boolean {
   if (!user || !schoolId) return false;
-  return user.role === "super_admin" || (user.role === "admin" && user.school_id === schoolId);
+  return user.role === "super_admin"
+    || (user.role === "district_admin"
+      && !!schoolDistrictId
+      && user.district_id === schoolDistrictId)
+    || (user.role === "admin" && user.school_id === schoolId);
 }
 
-export function canViewSchoolUsers(user: Profile | null, schoolId?: string | null): boolean {
-  return canAccessSchoolAdmin(user, schoolId);
+export function canViewSchoolUsers(
+  user: Profile | null,
+  schoolId?: string | null,
+  schoolDistrictId?: string | null,
+): boolean {
+  return canAccessSchoolAdmin(user, schoolId, schoolDistrictId);
 }
 
-export function canEditSchoolSettings(user: Profile | null, schoolId?: string | null): boolean {
-  return canAccessSchoolAdmin(user, schoolId);
+export function canEditSchoolSettings(
+  user: Profile | null,
+  schoolId?: string | null,
+  schoolDistrictId?: string | null,
+): boolean {
+  return canAccessSchoolAdmin(user, schoolId, schoolDistrictId);
 }
 
-export function canSendSchoolEmail(user: Profile | null, schoolId?: string | null): boolean {
-  return canAccessSchoolAdmin(user, schoolId);
+export function canSendSchoolEmail(
+  user: Profile | null,
+  schoolId?: string | null,
+  schoolDistrictId?: string | null,
+): boolean {
+  return canAccessSchoolAdmin(user, schoolId, schoolDistrictId);
 }
 
-export function canViewSchoolEmailLog(user: Profile | null, schoolId?: string | null): boolean {
-  return canAccessSchoolAdmin(user, schoolId);
+export function canViewSchoolEmailLog(
+  user: Profile | null,
+  schoolId?: string | null,
+  schoolDistrictId?: string | null,
+): boolean {
+  return canAccessSchoolAdmin(user, schoolId, schoolDistrictId);
 }
 
 export function isOfficerRole(role?: string): boolean {
@@ -357,6 +420,7 @@ export function roleLabel(role: UserRole): string {
     student: "Student",
     teacher: "Teacher/Advisor",
     admin: "School Admin",
+    district_admin: "District Admin",
     super_admin: "Platform Admin",
   };
   return labels[role] || role;

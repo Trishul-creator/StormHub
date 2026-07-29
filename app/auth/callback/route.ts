@@ -18,7 +18,7 @@ export async function GET(request: Request) {
           data.user.email ?? "",
           data.user.user_metadata?.full_name as string | undefined
         );
-        if (!profile || (profile.role !== "super_admin" && !profile.school_id)) {
+        if (!profile || (!["district_admin", "super_admin"].includes(profile.role) && !profile.school_id)) {
           const onboarding = new URL("/auth/complete-profile", origin);
           onboarding.searchParams.set("next", next);
           return NextResponse.redirect(onboarding);

@@ -5,8 +5,8 @@ import type { UserRole } from "@/types/database";
 
 export function GuidedTourSettings({ role }: { role: UserRole }) {
   const href =
-    role === "super_admin"
-      ? "/admin/schools?tour=1"
+    role === "super_admin" || role === "district_admin"
+      ? "/admin/districts?tour=1"
       : role === "admin" || role === "teacher"
         ? "/manage?tour=1"
         : "/dashboard?tour=1";

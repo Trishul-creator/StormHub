@@ -5,36 +5,63 @@ import { StatisticsScopeSelector } from "@/components/admin/statistics-scope-sel
 import { PageHeader } from "@/components/layout/page-header";
 import { requireAdmin } from "@/lib/auth";
 import { getScopedAdminStatistics } from "@/lib/data";
+import { getAllDistricts, getDistrictForProfile, getDistrictSchools } from "@/lib/districts";
 import { getAllSchools, getSchoolForProfile } from "@/lib/schools";
 
 interface AdminStatisticsPageProps {
-  searchParams: Promise<{ school?: string }>;
+  searchParams: Promise<{ school?: string; district?: string }>;
 }
 
 export default async function AdminStatisticsPage({ searchParams }: AdminStatisticsPageProps) {
   const { profile } = await requireAdmin();
-  const { school } = await searchParams;
+  const { school, district } = await searchParams;
   const requestedSchoolSlug = school?.trim() || undefined;
+  const requestedDistrictSlug = district?.trim() || undefined;
   const isSuperAdmin = profile.role === "super_admin";
-  const schools = isSuperAdmin ? await getAllSchools() : [];
-  const selectedSchool = isSuperAdmin
+  const isDistrictAdmin = profile.role === "district_admin";
+  const allDistricts = isSuperAdmin ? await getAllDistricts() : [];
+  const selectedDistrict = isSuperAdmin
+    ? requestedDistrictSlug
+      ? allDistricts.find((item) => item.slug === requestedDistrictSlug) ?? null
+      : null
+    : isDistrictAdmin
+      ? await getDistrictForProfile(profile)
+      : null;
+  if (isSuperAdmin && requestedDistrictSlug && !selectedDistrict) notFound();
+  if (isDistrictAdmin && !selectedDistrict) notFound();
+
+  const schools = selectedDistrict
+    ? await getDistrictSchools(selectedDistrict.id)
+    : isSuperAdmin
+      ? await getAllSchools()
+      : [];
+  const selectedSchool = isSuperAdmin || isDistrictAdmin
     ? requestedSchoolSlug
-      ? schools.find((school) => school.slug === requestedSchoolSlug) ?? null
+      ? schools.find((item) => item.slug === requestedSchoolSlug) ?? null
       : null
     : await getSchoolForProfile(profile);
 
-  if (isSuperAdmin && requestedSchoolSlug && !selectedSchool) notFound();
+  if ((isSuperAdmin || isDistrictAdmin) && requestedSchoolSlug && !selectedSchool) notFound();
 
   const expectedScopeSchoolId = selectedSchool?.id ?? null;
-  const statistics = await getScopedAdminStatistics(profile, expectedScopeSchoolId);
-  const statisticsScopeMatches = statistics?.scopeSchoolId === expectedScopeSchoolId;
+  const expectedScopeDistrictId = selectedDistrict?.id
+    ?? (profile.role === "admin" ? profile.district_id ?? null : null);
+  const statistics = await getScopedAdminStatistics(
+    profile,
+    expectedScopeSchoolId,
+    expectedScopeDistrictId,
+  );
+  const statisticsScopeMatches = statistics?.scopeSchoolId === expectedScopeSchoolId
+    && (statistics?.scopeDistrictId ?? null) === expectedScopeDistrictId;
   if (statistics && !statisticsScopeMatches) {
     console.error(
-      `[AdminStatisticsPage] Refusing mismatched statistics scope. Expected ${expectedScopeSchoolId ?? "platform"}, received ${statistics.scopeSchoolId ?? "platform"}.`
+      `[AdminStatisticsPage] Refusing mismatched statistics scope. Expected district ${expectedScopeDistrictId ?? "platform"} / school ${expectedScopeSchoolId ?? "all"}, received district ${statistics.scopeDistrictId ?? "platform"} / school ${statistics.scopeSchoolId ?? "all"}.`
     );
   }
   const scopedStatistics = statisticsScopeMatches ? statistics : null;
-  const scopeName = selectedSchool?.name ?? (isSuperAdmin ? "All schools" : "Your school");
+  const scopeName = selectedSchool?.name
+    ?? selectedDistrict?.name
+    ?? (isSuperAdmin ? "All schools" : "Your school");
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -60,16 +87,24 @@ export default async function AdminStatisticsPage({ searchParams }: AdminStatist
               {isSuperAdmin
                 ? selectedSchool
                   ? "This view is intentionally filtered to one school."
-                  : "Platform totals combine every school workspace."
-                : "School admins can only see aggregated data from their assigned school."}
+                  : selectedDistrict
+                    ? "This view combines only the schools in the selected district."
+                    : "Platform totals combine every school workspace."
+                : isDistrictAdmin
+                  ? selectedSchool
+                    ? "This view is intentionally filtered to one school in your district."
+                    : "District administrators can only see aggregated data from their assigned district."
+                  : "School admins can only see aggregated data from their assigned school."}
             </p>
           </div>
         </div>
 
-        {isSuperAdmin && schools.length > 0 && (
+        {(isSuperAdmin || isDistrictAdmin) && schools.length > 0 && (
           <StatisticsScopeSelector
             schools={schools.map(({ id, name, slug }) => ({ id, name, slug }))}
             activeSlug={selectedSchool?.slug ?? null}
+            baseQuery={selectedDistrict && isSuperAdmin ? { district: selectedDistrict.slug } : undefined}
+            allLabel={selectedDistrict ? `All ${selectedDistrict.name} schools` : "All schools"}
           />
         )}
       </div>
@@ -86,7 +121,7 @@ export default async function AdminStatisticsPage({ searchParams }: AdminStatist
           ].join(":")}
         >
           <StatisticsDashboard
-            key={scopedStatistics.scopeSchoolId ?? "platform"}
+            key={`${scopedStatistics.scopeDistrictId ?? "platform"}:${scopedStatistics.scopeSchoolId ?? "all"}`}
             statistics={scopedStatistics}
           />
         </div>

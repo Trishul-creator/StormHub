@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   getCurrentProfile: vi.fn(),
+  getSchoolById: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
@@ -18,6 +19,12 @@ vi.mock("@/lib/auth", () => ({
   getAuthUserId: vi.fn(),
   getCurrentProfile: mocks.getCurrentProfile,
 }));
+vi.mock("@/lib/schools", () => ({
+  DEFAULT_SCHOOL_ID: "school-1",
+  SUPPORT_EMAIL: "support@example.com",
+  getCurrentSchool: vi.fn(),
+  getSchoolById: mocks.getSchoolById,
+}));
 
 import { updateSchoolSignupDomains } from "@/lib/actions";
 
@@ -28,6 +35,13 @@ describe("updateSchoolSignupDomains", () => {
     vi.clearAllMocks();
     rpc.mockResolvedValue({ data: ["*"], error: null });
     mocks.createClient.mockResolvedValue({ rpc });
+    mocks.getSchoolById.mockImplementation(async (id: string) => ({
+      id,
+      district_id: id === "school-2" ? "district-2" : "district-1",
+      name: id,
+      slug: id,
+      is_active: true,
+    }));
   });
 
   it("lets a school admin update only their own school", async () => {
@@ -52,7 +66,7 @@ describe("updateSchoolSignupDomains", () => {
       domains: "*",
     })).resolves.toEqual({
       success: false,
-      error: "You can only change signup settings for your own school.",
+      error: "Administrator access required.",
     });
   });
 
@@ -69,6 +83,29 @@ describe("updateSchoolSignupDomains", () => {
       schoolId: "school-2",
       domains: "@Students.Example.edu",
     })).resolves.toEqual({ success: true, domains: ["students.example.edu"] });
+  });
+
+  it("lets a district admin update only schools in their district", async () => {
+    mocks.getCurrentProfile.mockResolvedValue({
+      id: "district-admin-1",
+      role: "district_admin",
+      school_id: null,
+      district_id: "district-1",
+      account_status: "active",
+    });
+
+    await expect(updateSchoolSignupDomains({
+      schoolId: "school-1",
+      domains: "*",
+    })).resolves.toEqual({ success: true, domains: ["*"] });
+
+    await expect(updateSchoolSignupDomains({
+      schoolId: "school-2",
+      domains: "*",
+    })).resolves.toEqual({
+      success: false,
+      error: "Administrator access required.",
+    });
   });
 
   it("rejects invalid domain settings before calling the database", async () => {

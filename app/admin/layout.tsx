@@ -6,7 +6,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <>
-      <AdminNavigation isSuperAdmin={profile.role === "super_admin"} />
+      <AdminNavigation role={profile.role} />
       {children}
     </>
   );

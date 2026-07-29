@@ -979,7 +979,10 @@ export async function getAdminAnalytics(): Promise<AnalyticsSummary> {
   };
 }
 
-function demoAdminStatistics(schoolId: string | null): AdminStatistics {
+function demoAdminStatistics(
+  schoolId: string | null,
+  districtId: string | null = null,
+): AdminStatistics {
   const activeMemberships = demoClubs.reduce((sum, club) => sum + (club.member_count ?? 0), 0);
   const totalPeople = Math.max(activeMemberships + 14, 48);
   const monthStart = new Date();
@@ -1024,6 +1027,7 @@ function demoAdminStatistics(schoolId: string | null): AdminStatistics {
 
   return {
     scopeSchoolId: schoolId,
+    scopeDistrictId: districtId,
     totalPeople,
     activePeople: totalPeople - 2,
     engagedPeople30d: Math.min(totalPeople - 2, Math.max(activeMemberships, 32)),
@@ -1037,6 +1041,7 @@ function demoAdminStatistics(schoolId: string | null): AdminStatistics {
       { role: "student", count: totalPeople - 10 },
       { role: "teacher", count: 7 },
       { role: "admin", count: 3 },
+      { role: "district_admin", count: 1 },
       { role: "super_admin", count: 0 },
     ],
     clubStatusDistribution,
@@ -1048,20 +1053,31 @@ function demoAdminStatistics(schoolId: string | null): AdminStatistics {
 export async function getScopedAdminStatistics(
   profile: Profile,
   requestedSchoolId?: string | null,
+  requestedDistrictId?: string | null,
 ): Promise<AdminStatistics | null> {
   if (!isAdminRole(profile.role)) return null;
 
-  const schoolId = profile.role === "super_admin"
+  const schoolId = profile.role === "super_admin" || profile.role === "district_admin"
     ? requestedSchoolId ?? null
     : profile.school_id ?? null;
+  const districtId = profile.role === "super_admin"
+    ? requestedDistrictId ?? null
+    : profile.district_id ?? null;
   if (profile.role === "admin" && !schoolId) return null;
+  if (profile.role === "district_admin" && !profile.district_id) return null;
 
-  if (isDemoMode()) return demoAdminStatistics(schoolId);
+  if (isDemoMode()) {
+    return demoAdminStatistics(
+      schoolId,
+      districtId,
+    );
+  }
 
   const supabase = await createClient();
   if (!supabase) return null;
   const { data, error } = await supabase.rpc("get_admin_statistics", {
     requested_school_id: schoolId,
+    requested_district_id: districtId,
   });
   if (error) {
     console.error("[getScopedAdminStatistics]", error.message);
@@ -1310,7 +1326,19 @@ export async function getManageableClubs(profile: Profile, schoolId?: string | n
   if (!supabase) return [];
   if (isAdminRole(profile.role)) {
     let query = supabase.from("clubs").select("*").order("name");
-    if (profile.role === "super_admin" && schoolId) {
+    if (profile.role === "district_admin") {
+      // District workspaces always choose a concrete school before loading
+      // private club administration data.
+      if (!profile.district_id || !schoolId) return [];
+      const { data: selectedSchool } = await supabase
+        .from("schools")
+        .select("id")
+        .eq("id", schoolId)
+        .eq("district_id", profile.district_id)
+        .maybeSingle();
+      if (!selectedSchool) return [];
+      query = query.eq("school_id", schoolId);
+    } else if (profile.role === "super_admin" && schoolId) {
       query = query.eq("school_id", schoolId);
     } else if (profile.role !== "super_admin" && profile.school_id) {
       query = query.eq("school_id", profile.school_id);
@@ -1599,8 +1627,23 @@ export async function getAdminUsers(schoolId?: string | null): Promise<AdminUser
     .from("profiles")
     .select("*, club_memberships(club_id,role,status,clubs(name,slug))")
     .neq("role", "super_admin")
+    .neq("role", "district_admin")
     .order("created_at", { ascending: false });
-  if (currentProfile?.role === "super_admin" && schoolId) {
+  if (currentProfile?.role === "district_admin") {
+    if (!currentProfile.district_id) return [];
+    if (schoolId) {
+      const { data: selectedSchool } = await supabase
+        .from("schools")
+        .select("id")
+        .eq("id", schoolId)
+        .eq("district_id", currentProfile.district_id)
+        .maybeSingle();
+      if (!selectedSchool) return [];
+      query = query.eq("school_id", schoolId);
+    } else {
+      query = query.eq("district_id", currentProfile.district_id);
+    }
+  } else if (currentProfile?.role === "super_admin" && schoolId) {
     query = query.eq("school_id", schoolId);
   } else if (currentProfile?.role !== "super_admin" && currentProfile?.school_id) {
     query = query.eq("school_id", currentProfile.school_id);

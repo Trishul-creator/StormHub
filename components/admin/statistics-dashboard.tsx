@@ -13,6 +13,7 @@ const roleLabels: Record<UserRole, string> = {
   student: "Students",
   teacher: "Teachers",
   admin: "School admins",
+  district_admin: "District admins",
   super_admin: "Platform admins",
 };
 

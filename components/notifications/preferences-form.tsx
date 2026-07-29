@@ -27,7 +27,7 @@ export function NotificationPreferencesForm({
     weekly_digest_enabled: initial.weekly_digest_enabled,
   });
   const [pending, startTransition] = useTransition();
-  const isAdmin = role === "admin" || role === "super_admin";
+  const isAdmin = role === "admin" || role === "district_admin" || role === "super_admin";
 
   function option(key: keyof PreferenceValues, label: string, description: string, disabled = false) {
     return (

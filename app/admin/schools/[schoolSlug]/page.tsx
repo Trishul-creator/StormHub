@@ -9,6 +9,7 @@ import { SchoolAccessCodeSettings } from "@/components/admin/school-access-code-
 import { PlatformSupportAccess } from "@/components/admin/platform-support-access";
 import { requireAdmin } from "@/lib/auth";
 import { getClubs, getEvents, getOpportunities } from "@/lib/data";
+import { canAccessSchoolAdmin } from "@/lib/permissions";
 import { getSchoolBySlug, getSchoolPublicUrl } from "@/lib/schools";
 import { getSchoolSignupAccess } from "@/lib/school-access";
 import {
@@ -22,25 +23,36 @@ interface AdminSchoolPageProps {
 
 export default async function AdminSchoolPage({ params }: AdminSchoolPageProps) {
   const { profile } = await requireAdmin();
-  if (profile.role !== "super_admin") redirect("/admin?error=super_admin_required");
 
   const { schoolSlug } = await params;
   const school = await getSchoolBySlug(schoolSlug);
   if (!school) notFound();
+  if (!canAccessSchoolAdmin(profile, school.id, school.district_id)) {
+    redirect("/admin?error=school_scope_required");
+  }
 
-  const [clubs, opportunities, events, signupAccess, supportSession, supportAvailability] = await Promise.all([
+  const [clubs, opportunities, events, signupAccess] = await Promise.all([
     getClubs({ schoolId: school.id }),
     getOpportunities({ schoolId: school.id }),
     getEvents({ schoolId: school.id, upcoming: true }),
-    getSchoolSignupAccess(profile, school.id),
-    getActivePlatformSupportSession(profile, school.id),
-    getPlatformSupportAvailability(),
+    getSchoolSignupAccess(profile, school.id, school.district_id),
   ]);
+  const [supportSession, supportAvailability] = profile.role === "super_admin"
+    ? await Promise.all([
+        getActivePlatformSupportSession(profile, school.id),
+        getPlatformSupportAvailability(),
+      ])
+    : [null, null];
+  const modeLabel = profile.role === "super_admin"
+    ? "Platform Admin Mode"
+    : profile.role === "district_admin"
+      ? "District Admin Mode"
+      : "School Admin Mode";
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-100">
-        <strong>Platform Admin Mode</strong> — you are managing {school.name}. Super admins are not joined to this school; this is an explicit workspace view.
+        <strong>{modeLabel}</strong> — you are managing {school.name} within your authorized scope.
       </div>
       <PageHeader
         title={school.name}
@@ -58,12 +70,16 @@ export default async function AdminSchoolPage({ params }: AdminSchoolPageProps) 
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <ActionCard href={`/admin/schools/${school.slug}/drafts`} icon={Users} title="Draft club catalog" description="Review prepared draft clubs before publishing them." />
-        <ActionCard href="/manage/opportunities" icon={Zap} title="Manage opportunities" description="Create and review school opportunities." />
-        <ActionCard href="/calendar" icon={Calendar} title="Preview calendar" description="View school calendar entries." />
+        {profile.role === "super_admin" && (
+          <ActionCard href={`/admin/schools/${school.slug}/drafts`} icon={Users} title="Draft club catalog" description="Review prepared draft clubs before publishing them." />
+        )}
+        <ActionCard href={`/s/${school.slug}/opportunities`} icon={Zap} title="Preview opportunities" description="View the opportunities visible in this school." />
+        <ActionCard href={`/s/${school.slug}/calendar`} icon={Calendar} title="Preview calendar" description="View this school’s calendar entries." />
         <ActionCard href={`/admin/users?school=${school.slug}`} icon={Settings} title="Users and roles" description="Assign school admins, teachers, and students for this school." />
         <ActionCard href={`/admin/statistics?school=${school.slug}`} icon={BarChart3} title="Statistics" description="Review school participation and active-club trends." />
-        <ActionCard href="/manage/email-outbox" icon={Mail} title="Email status" description="Review controlled important and urgent email records." />
+        {profile.role === "admin" && (
+          <ActionCard href="/manage/email-outbox" icon={Mail} title="Email status" description="Review controlled important and urgent email records." />
+        )}
       </div>
 
       <div className="mt-8 rounded-xl border bg-card p-5">
@@ -100,15 +116,17 @@ export default async function AdminSchoolPage({ params }: AdminSchoolPageProps) 
           domains={school.allowed_email_domains ?? []}
         />
       </div>
-      <div className="mt-6">
-        <PlatformSupportAccess
-          schoolId={school.id}
-          schoolName={school.name}
-          schoolSlug={school.slug}
-          initialSession={supportSession}
-          supportAvailable={supportAvailability.available}
-        />
-      </div>
+      {profile.role === "super_admin" && supportAvailability && (
+        <div className="mt-6">
+          <PlatformSupportAccess
+            schoolId={school.id}
+            schoolName={school.name}
+            schoolSlug={school.slug}
+            initialSession={supportSession}
+            supportAvailable={supportAvailability.available}
+          />
+        </div>
+      )}
     </div>
   );
 }

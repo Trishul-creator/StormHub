@@ -159,7 +159,7 @@ using the service-role database client.
 
 ## 4. Verify Email-Only Authentication
 
-Every student, teacher, admin, and super admin uses password sign-in plus Supabase email confirmation.
+Every student, teacher, school admin, district admin, and super admin uses password sign-in plus Supabase email confirmation.
 StormHub does not require phone numbers, SMS, or authenticator applications.
 
 1. In Supabase, open **Authentication > Providers > Email** and keep email signup and email
@@ -168,8 +168,9 @@ StormHub does not require phone numbers, SMS, or authenticator applications.
 3. Confirm the production URL and `/auth/callback` are present in Supabase redirect URL settings.
 4. Create one test account for every role. Confirm an unverified account is rejected and each account
    can sign in after using the confirmation link.
-5. Confirm school admins remain limited to their school and only super admins receive cross-school
-   access. Email confirmation does not replace role, school, account-status, or audit controls.
+5. Confirm school admins remain limited to their school, district admins remain limited to their
+   district, and super admins retain platform-wide access. Email confirmation does not replace role,
+   school/district, account-status, or audit controls.
 
 Do not share administrator accounts. Every administrator needs an individual confirmed email account.
 

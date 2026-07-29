@@ -23,7 +23,7 @@ export default async function CompleteProfilePage({ searchParams }: CompleteProf
     .eq("id", user.id)
     .maybeSingle();
   const profile = data as Profile | null;
-  if (profile?.school_id || profile?.role === "super_admin") {
+  if (profile?.school_id || ["district_admin", "super_admin"].includes(profile?.role ?? "")) {
     redirect(defaultPathForProfile(profile));
   }
 

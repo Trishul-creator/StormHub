@@ -31,6 +31,7 @@ interface NavbarProps {
   notifications?: Notification[];
   unreadNotificationCount?: number;
   schoolSlug?: string | null;
+  districtSlug?: string | null;
 }
 
 export function Navbar({
@@ -42,18 +43,33 @@ export function Navbar({
   notifications = [],
   unreadNotificationCount = 0,
   schoolSlug,
+  districtSlug,
 }: NavbarProps) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const primaryHref = role === "super_admin" ? "/admin/schools" : role === "admin" || role === "teacher" ? "/manage" : "/dashboard";
-  const primaryLabel = role === "super_admin" ? "Platform Admin" : role === "admin" || role === "teacher" ? "Manage" : "Dashboard";
+  const primaryHref = role === "super_admin"
+    ? "/admin/districts"
+    : role === "district_admin"
+      ? districtSlug
+        ? `/admin/districts/${districtSlug}`
+        : "/admin/districts"
+      : role === "admin" || role === "teacher"
+        ? "/manage"
+        : "/dashboard";
+  const primaryLabel = role === "super_admin"
+    ? "Platform Admin"
+    : role === "district_admin"
+      ? "District Admin"
+      : role === "admin" || role === "teacher"
+        ? "Manage"
+        : "Dashboard";
   const schoolClubHref = schoolSlug ? `/s/${schoolSlug}/clubs` : "/clubs";
   const schoolCalendarHref = schoolSlug ? `/s/${schoolSlug}/calendar` : "/calendar";
   const schoolOpportunitiesHref = schoolSlug ? `/s/${schoolSlug}/opportunities` : "/opportunities";
   const navLinks = !isLoggedIn
     ? baseNavLinks
-    : role === "super_admin"
+      : role === "super_admin" || role === "district_admin"
       ? [{ href: primaryHref, label: primaryLabel }]
       : role === "admin" || role === "teacher"
         ? [
@@ -74,7 +90,7 @@ export function Navbar({
             { href: schoolOpportunitiesHref, label: "Opportunities" },
           ];
   const isActivePath = (href: string) => {
-    if (role === "super_admin" && href === primaryHref && pathname.startsWith("/admin")) return true;
+    if ((role === "super_admin" || role === "district_admin") && href === primaryHref && pathname.startsWith("/admin")) return true;
     return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
   };
   const tourTargetForLink = (href: string, label: string) => {
@@ -128,7 +144,7 @@ export function Navbar({
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/search" aria-label="Search"><Search className="h-4 w-4" /></Link>
               </Button>
-              {canManage && role !== "super_admin" && primaryHref !== "/manage" && (
+              {canManage && role !== "super_admin" && role !== "district_admin" && primaryHref !== "/manage" && (
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/manage" data-tour="manage-nav"><Shield className="h-4 w-4 mr-1" />Manage</Link>
                 </Button>
@@ -195,7 +211,7 @@ export function Navbar({
               <>
                 <span data-tour="appearance"><ThemeToggle showLabel /></span>
                 <Link href="/search" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Search</Link>
-                {canManage && role !== "super_admin" && primaryHref !== "/manage" && <Link href="/manage" data-tour="manage-nav" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Manage</Link>}
+                {canManage && role !== "super_admin" && role !== "district_admin" && primaryHref !== "/manage" && <Link href="/manage" data-tour="manage-nav" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Manage</Link>}
                 <Link href="/notifications" data-tour="notifications-trigger" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>
                   Notifications{unreadNotificationCount > 0 ? ` (${unreadNotificationCount})` : ""}
                 </Link>

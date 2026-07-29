@@ -42,11 +42,16 @@ export function UserRoleEditor({
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const isSelf = user.id === actorId;
-  const protectedTarget = actorRole !== "super_admin" && !["student", "teacher"].includes(user.role);
+  const editableTargetRoles = actorRole === "district_admin"
+    ? ["student", "teacher", "admin"]
+    : ["student", "teacher"];
+  const protectedTarget = actorRole !== "super_admin" && !editableTargetRoles.includes(user.role);
   const canDelete = !isSelf && !protectedTarget;
   const roles: UserRole[] = actorRole === "super_admin"
     ? ["student", "teacher", "admin", "super_admin"]
-    : ["student", "teacher"];
+    : actorRole === "district_admin"
+      ? ["student", "teacher", "admin"]
+      : ["student", "teacher"];
 
   function toggleClub(clubId: string) {
     setClubIds((current) =>
@@ -108,7 +113,7 @@ export function UserRoleEditor({
     return (
       <div className="space-y-2">
         <span className="block text-xs text-muted-foreground">
-          {isSelf ? "Your own account cannot be changed here." : "Only a super admin can modify this account."}
+          {isSelf ? "Your own account cannot be changed here." : "A higher-level administrator must modify this account."}
         </span>
         {canDelete && (
           <Button size="sm" variant="destructive" onClick={removeUser} disabled={pending}>
@@ -125,7 +130,7 @@ export function UserRoleEditor({
       <select
         value={role}
         onChange={(event) => setRole(event.target.value as UserRole)}
-        className="flex h-9 w-full rounded-lg border bg-white px-3 text-sm"
+        className="flex h-9 w-full rounded-lg border bg-background px-3 text-sm text-foreground"
       >
         {roles.map((option) => (
           <option key={option} value={option}>{option.replace("_", " ")}</option>

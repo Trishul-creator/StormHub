@@ -43,7 +43,7 @@ type SupabaseAdmin = {
 type E2EUser = {
   email: string;
   fullName: string;
-  role: "student" | "teacher" | "admin" | "super_admin";
+  role: "student" | "teacher" | "admin" | "district_admin" | "super_admin";
   schoolSlug: "school1" | "school2" | null;
   gradeLevel?: number | null;
 };
@@ -53,6 +53,12 @@ const users: E2EUser[] = [
     email: "e2e.superadmin@stormhub.test",
     fullName: "E2E Super Admin",
     role: "super_admin",
+    schoolSlug: null,
+  },
+  {
+    email: "e2e.districtadmin@stormhub.test",
+    fullName: "E2E District Admin",
+    role: "district_admin",
     schoolSlug: null,
   },
   {
@@ -110,6 +116,15 @@ const stagingSchools = [
   },
 ] as const;
 
+const stagingDistrict = {
+  id: "d0000000-0000-4000-8000-000000000098",
+  name: "Northstar Staging District",
+  slug: "northstar-staging-district",
+  city: "Staging",
+  state: "ST",
+  is_active: true,
+} as const;
+
 const school1Clubs = [
   {
     name: "Science Bowl",
@@ -140,6 +155,7 @@ const school1Clubs = [
 async function assertRequiredTablesExist(admin: SupabaseAdmin) {
   const requiredRelations = [
     { table: "schools", columns: "id,allowed_email_domains" },
+    { table: "districts", columns: "id,slug" },
     { table: "school_settings", columns: "school_id" },
     { table: "clubs", columns: "id" },
     { table: "opportunities", columns: "id" },
@@ -188,7 +204,15 @@ async function hasPilotPrivacySchema(admin: SupabaseAdmin): Promise<boolean> {
 }
 
 async function upsertStagingData(admin: SupabaseAdmin): Promise<Map<string, string>> {
-  const { error: schoolsError } = await admin.from("schools").upsert([...stagingSchools], { onConflict: "slug" });
+  const { error: districtError } = await admin
+    .from("districts")
+    .upsert(stagingDistrict, { onConflict: "slug" });
+  if (districtError) throw districtError;
+
+  const { error: schoolsError } = await admin.from("schools").upsert(
+    stagingSchools.map((school) => ({ ...school, district_id: stagingDistrict.id })),
+    { onConflict: "slug" },
+  );
   if (schoolsError) throw schoolsError;
 
   const { data: schools, error: refreshedSchoolsError } = await admin
@@ -422,6 +446,7 @@ async function main() {
       full_name: user.fullName,
       role: user.role,
       school_id: schoolId,
+      district_id: user.role === "district_admin" ? stagingDistrict.id : undefined,
       grade_level: user.gradeLevel ?? null,
       updated_at: new Date().toISOString(),
     });
@@ -429,13 +454,17 @@ async function main() {
 
     const { data: profile, error: verifyProfileError } = await admin
       .from("profiles")
-      .select("id,email,role,school_id")
+      .select("id,email,role,school_id,district_id")
       .eq("id", userId)
       .maybeSingle();
     if (verifyProfileError) throw verifyProfileError;
     if (!profile) throw new Error(`Profile was not created for ${user.email}.`);
     if (profile.role !== user.role) throw new Error(`Profile role mismatch for ${user.email}.`);
     if ((profile.school_id ?? null) !== schoolId) throw new Error(`Profile school mismatch for ${user.email}.`);
+    const expectedDistrictId = user.role === "super_admin" ? null : stagingDistrict.id;
+    if ((profile.district_id ?? null) !== expectedDistrictId) {
+      throw new Error(`Profile district mismatch for ${user.email}.`);
+    }
   }
 
   console.log(`Staging E2E data and users are ready: ${users.length} accounts.`);

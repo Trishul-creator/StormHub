@@ -5,11 +5,16 @@ import {
 } from "@/lib/school-access";
 import type { Profile } from "@/types/database";
 
-function profile(role: Profile["role"], schoolId: string | null): Profile {
+function profile(
+  role: Profile["role"],
+  schoolId: string | null,
+  districtId: string | null = null,
+): Profile {
   return {
     id: `${role}-1`,
     role,
     school_id: schoolId,
+    district_id: districtId,
     account_status: "active",
   };
 }
@@ -27,6 +32,20 @@ describe("school signup access", () => {
     expect(canManageSchoolAccess(profile("admin", "school-a"), "school-a")).toBe(true);
     expect(canManageSchoolAccess(profile("admin", "school-a"), "school-b")).toBe(false);
     expect(canManageSchoolAccess(profile("super_admin", null), "school-b")).toBe(true);
+    expect(
+      canManageSchoolAccess(
+        profile("district_admin", null, "district-a"),
+        "school-b",
+        "district-a",
+      ),
+    ).toBe(true);
+    expect(
+      canManageSchoolAccess(
+        profile("district_admin", null, "district-a"),
+        "school-b",
+        "district-b",
+      ),
+    ).toBe(false);
     expect(canManageSchoolAccess(profile("teacher", "school-a"), "school-a")).toBe(false);
     expect(canManageSchoolAccess(profile("student", "school-a"), "school-a")).toBe(false);
   });

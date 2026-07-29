@@ -44,7 +44,8 @@ Global roles:
 - `student`
 - `teacher`
 - `admin` = school admin
-- `super_admin` = platform admin
+- `district_admin` = district administrator
+- `super_admin` = ultimate platform administrator
 
 Club roles:
 
@@ -58,25 +59,31 @@ Club roles:
 - Students use the main app for their own school: dashboard, clubs, opportunities, calendar, saved items, notifications, and settings.
 - Teachers manage sponsored clubs. A teacher may exist without assigned clubs.
 - School admins manage one school: clubs, drafts, opportunities, users, analytics, email outbox, and school content.
+- District administrators manage district setup, district/school statistics, school signup controls, and school-level accounts only inside their assigned district.
 - Officers and presidents manage their own club content and dashboard.
 - Sponsors and school admins can remove club content.
-- Super admins manage the platform and choose a school workspace. They can access school management views but should not receive school-task notifications/emails and do not join clubs as students.
+- Super admins manage the entire platform, create districts, attach or create schools, and assign district administrators. They can access school management views but should not receive school-task notifications/emails and do not join clubs as students.
 - Admins and super admins preview/manage clubs; they should not see Join Club as their primary action.
 
-## 6. School workspace model
+## 6. District and school workspace model
 
+- Districts contain schools through `schools.district_id`.
 - Each school has its own clubs, users, opportunities, events, notifications, and settings.
-- Students, teachers, and school admins are school-specific through `profiles.school_id`.
+- Students, teachers, and school admins are school-specific through `profiles.school_id`; their district is synchronized from the school.
+- District administrators have `profiles.district_id` and no school assignment.
 - School admins cannot manage other schools.
-- Super admins can access all schools and create/manage school workspaces.
+- District administrators cannot manage another district.
+- Super admins can access all districts and schools.
 - Public school routes use `/s/[schoolSlug]`.
 - Legacy routes such as `/clubs` and `/calendar` remain as compatibility/fallback surfaces, but school-scoped routes are preferred.
 
 ## 7. Main routes
 
 - `/` — neutral platform landing page.
-- `/admin/schools` — super admin school chooser.
-- `/admin/schools/[schoolSlug]` — super admin view into a school workspace.
+- `/admin/districts` — platform district chooser or the current district administrator’s workspace.
+- `/admin/districts/[districtSlug]` — district schools, manager assignments, and school creation.
+- `/admin/schools` — compatibility redirect to the correct administration workspace.
+- `/admin/schools/[schoolSlug]` — authorized platform, district, or school-admin view into a school workspace.
 - `/admin/schools/[schoolSlug]/drafts` — school draft club catalog for a selected school.
 - `/s/[schoolSlug]` — public school workspace page.
 - `/clubs` and `/s/[schoolSlug]/clubs` — club discovery.
