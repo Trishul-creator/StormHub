@@ -13,7 +13,7 @@ test.describe("scoped admin statistics", () => {
     await expect(page.getByRole("heading", { name: "Statistics", exact: true })).toBeVisible();
     await expect(page.getByText("Scope enforced")).toBeVisible();
     await expect(page.getByText(/School admins can only see aggregated data from their assigned school/i)).toBeVisible();
-    await expect(page.getByLabel("View scope")).toHaveCount(0);
+    await expect(page.getByLabel("School")).toHaveCount(0);
 
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter(
@@ -29,17 +29,18 @@ test.describe("scoped admin statistics", () => {
     await page.goto("/admin/statistics");
 
     await expect(page.getByRole("heading", { name: "Statistics", exact: true })).toBeVisible();
-    await expect(page.getByLabel("View scope")).toBeVisible();
+    await expect(page.getByLabel("District")).toBeVisible();
+    await expect(page.getByLabel("School")).toBeVisible();
     await expect(page.getByText(/Platform totals combine every school workspace/i)).toBeVisible();
     await expect(page.locator("[data-statistics-scope]")).toHaveAttribute(
       "data-statistics-scope",
       "platform"
     );
 
-    await page.getByLabel("View scope").selectOption("school1");
+    await page.getByLabel("School").selectOption("school1");
 
     await expect(page).toHaveURL(/\/admin\/statistics\?school=school1/);
-    await expect(page.getByLabel("View scope")).toHaveValue("school1");
+    await expect(page.getByLabel("School")).toHaveValue("school1");
     await expect(page.locator("[data-statistics-scope]")).toHaveAttribute(
       "data-statistics-scope",
       "b0000000-0000-4000-8000-000000000001"
@@ -50,9 +51,9 @@ test.describe("scoped admin statistics", () => {
       .getAttribute("data-statistics-fingerprint");
     expect(school1Fingerprint).toBeTruthy();
 
-    await page.getByLabel("View scope").selectOption("school2");
+    await page.getByLabel("School").selectOption("school2");
     await expect(page).toHaveURL(/\/admin\/statistics\?school=school2/);
-    await expect(page.getByLabel("View scope")).toHaveValue("school2");
+    await expect(page.getByLabel("School")).toHaveValue("school2");
     await expect(page.locator("[data-statistics-scope]")).toHaveAttribute(
       "data-statistics-scope",
       "b0000000-0000-4000-8000-000000000002"

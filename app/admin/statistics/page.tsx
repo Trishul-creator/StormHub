@@ -99,13 +99,28 @@ export default async function AdminStatisticsPage({ searchParams }: AdminStatist
           </div>
         </div>
 
-        {(isSuperAdmin || isDistrictAdmin) && schools.length > 0 && (
-          <StatisticsScopeSelector
-            schools={schools.map(({ id, name, slug }) => ({ id, name, slug }))}
-            activeSlug={selectedSchool?.slug ?? null}
-            baseQuery={selectedDistrict && isSuperAdmin ? { district: selectedDistrict.slug } : undefined}
-            allLabel={selectedDistrict ? `All ${selectedDistrict.name} schools` : "All schools"}
-          />
+        {(isSuperAdmin || isDistrictAdmin) && (
+          <div className="grid w-full gap-3 rounded-xl border border-blue-100 bg-card/65 p-3 sm:w-auto sm:grid-cols-2 dark:border-blue-900/70">
+            {isSuperAdmin && (
+              <StatisticsScopeSelector
+                schools={allDistricts.map(({ id, name, slug }) => ({ id, name, slug }))}
+                activeSlug={selectedDistrict?.slug ?? null}
+                allLabel="Platform-wide"
+                label="District"
+                queryKey="district"
+                clearQueryKeys={["school"]}
+              />
+            )}
+            {schools.length > 0 && (
+              <StatisticsScopeSelector
+                schools={schools.map(({ id, name, slug }) => ({ id, name, slug }))}
+                activeSlug={selectedSchool?.slug ?? null}
+                baseQuery={selectedDistrict && isSuperAdmin ? { district: selectedDistrict.slug } : undefined}
+                allLabel={selectedDistrict ? `All ${selectedDistrict.name} schools` : "All schools"}
+                label="School"
+              />
+            )}
+          </div>
         )}
       </div>
 

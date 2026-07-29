@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import { BarChart3, Calendar, CheckCircle2, Mail, Settings, Users, Zap } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
@@ -10,21 +11,81 @@ import { PlatformSupportAccess } from "@/components/admin/platform-support-acces
 import { requireAdmin } from "@/lib/auth";
 import { getClubs, getEvents, getOpportunities } from "@/lib/data";
 import { canAccessSchoolAdmin } from "@/lib/permissions";
-import { getSchoolBySlug, getSchoolPublicUrl } from "@/lib/schools";
+import { getSchoolById, getSchoolBySlug, getSchoolPublicUrl } from "@/lib/schools";
 import { getSchoolSignupAccess } from "@/lib/school-access";
+import { createClient } from "@/lib/supabase/server";
 import {
   getActivePlatformSupportSession,
   getPlatformSupportAvailability,
 } from "@/lib/support-access";
+import { slugify } from "@/lib/utils";
 
 interface AdminSchoolPageProps {
   params: Promise<{ schoolSlug: string }>;
+  searchParams: Promise<{ updated?: string; error?: string }>;
 }
 
-export default async function AdminSchoolPage({ params }: AdminSchoolPageProps) {
+async function updateSchoolDetailsAction(formData: FormData) {
+  "use server";
+
+  const { profile } = await requireAdmin();
+  const schoolId = String(formData.get("school_id") ?? "");
+  const currentSlug = String(formData.get("current_slug") ?? "");
+  const school = await getSchoolById(schoolId);
+  if (!school || !canAccessSchoolAdmin(profile, school.id, school.district_id)) {
+    redirect("/admin?error=school_scope_required");
+  }
+
+  const supabase = await createClient();
+  if (!supabase) redirect(`/admin/schools/${currentSlug}?error=database_required`);
+
+  const canControlWorkspace = profile.role === "super_admin" || profile.role === "district_admin";
+  const name = String(formData.get("name") ?? "").trim();
+  const requestedSlug = canControlWorkspace
+    ? slugify(String(formData.get("slug") ?? "").trim() || name)
+    : null;
+  const { data, error } = await supabase.rpc("update_school_details", {
+    target_school_id: school.id,
+    requested_name: name,
+    requested_short_name: String(formData.get("short_name") ?? "").trim() || null,
+    requested_address: String(formData.get("address") ?? "").trim() || null,
+    requested_city: String(formData.get("city") ?? "").trim() || null,
+    requested_state: String(formData.get("state") ?? "").trim() || null,
+    requested_zip: String(formData.get("zip") ?? "").trim() || null,
+    requested_website_url: String(formData.get("website_url") ?? "").trim() || null,
+    requested_logo_url: String(formData.get("logo_url") ?? "").trim() || null,
+    requested_mascot: String(formData.get("mascot") ?? "").trim() || null,
+    requested_primary_color: String(formData.get("primary_color") ?? "").trim() || null,
+    requested_secondary_color: String(formData.get("secondary_color") ?? "").trim() || null,
+    requested_slug: requestedSlug,
+    requested_is_active: canControlWorkspace
+      ? formData.get("is_active") === "on"
+      : null,
+    requested_is_public: canControlWorkspace
+      ? formData.get("is_public") === "on"
+      : null,
+  });
+  if (error) {
+    console.error("[updateSchoolDetailsAction]", error.message);
+    redirect(`/admin/schools/${currentSlug}?error=update_school_failed`);
+  }
+
+  const updated = data as { slug?: string } | null;
+  const nextSlug = updated?.slug || currentSlug;
+  revalidatePath(`/admin/schools/${currentSlug}`);
+  revalidatePath(`/admin/schools/${nextSlug}`);
+  revalidatePath(`/s/${currentSlug}`);
+  revalidatePath(`/s/${nextSlug}`);
+  revalidatePath("/admin/districts");
+  revalidatePath("/admin/statistics");
+  redirect(`/admin/schools/${nextSlug}?updated=school`);
+}
+
+export default async function AdminSchoolPage({ params, searchParams }: AdminSchoolPageProps) {
   const { profile } = await requireAdmin();
 
   const { schoolSlug } = await params;
+  const notice = await searchParams;
   const school = await getSchoolBySlug(schoolSlug);
   if (!school) notFound();
   if (!canAccessSchoolAdmin(profile, school.id, school.district_id)) {
@@ -62,6 +123,110 @@ export default async function AdminSchoolPage({ params }: AdminSchoolPageProps) 
           <Link href={getSchoolPublicUrl(school)}>Open public school page</Link>
         </Button>
       </PageHeader>
+
+      {notice.updated === "school" && (
+        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
+          School details were updated.
+        </div>
+      )}
+      {notice.error === "update_school_failed" && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
+          The school could not be updated. Check the required name, URLs, state, colors, and workspace URL name.
+        </div>
+      )}
+
+      <details className="mb-8 rounded-2xl border bg-card">
+        <summary className="cursor-pointer list-none px-5 py-4 font-semibold text-storm-navy">
+          Edit school details
+          <span className="ml-2 text-sm font-normal text-muted-foreground">
+            {profile.role === "admin"
+              ? "Identity, location, branding, and website"
+              : "Identity, branding, routing, and availability"}
+          </span>
+        </summary>
+        <form action={updateSchoolDetailsAction} className="grid gap-4 border-t p-5 md:grid-cols-2">
+          <input type="hidden" name="school_id" value={school.id} />
+          <input type="hidden" name="current_slug" value={school.slug} />
+          <label className="block text-sm">
+            <span className="font-medium text-foreground">School name</span>
+            <input name="name" required defaultValue={school.name} className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-foreground">Short name</span>
+            <input name="short_name" defaultValue={school.short_name ?? ""} className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" />
+          </label>
+          {(profile.role === "super_admin" || profile.role === "district_admin") && (
+            <label className="block text-sm md:col-span-2">
+              <span className="font-medium text-foreground">Workspace URL name</span>
+              <input name="slug" required defaultValue={school.slug} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" />
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Changing this updates the school’s public and administrative URLs.
+              </span>
+            </label>
+          )}
+          <label className="block text-sm md:col-span-2">
+            <span className="font-medium text-foreground">Street address</span>
+            <input name="address" defaultValue={school.address ?? ""} className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-foreground">City</span>
+            <input name="city" defaultValue={school.city ?? ""} className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm">
+              <span className="font-medium text-foreground">State</span>
+              <input name="state" defaultValue={school.state ?? ""} maxLength={50} pattern="[A-Za-z][A-Za-z .-]{1,49}" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" />
+            </label>
+            <label className="block text-sm">
+              <span className="font-medium text-foreground">ZIP code</span>
+              <input name="zip" defaultValue={school.zip ?? ""} className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" />
+            </label>
+          </div>
+          <label className="block text-sm">
+            <span className="font-medium text-foreground">School website</span>
+            <input name="website_url" type="url" placeholder="https://www.example.org" defaultValue={school.website_url ?? ""} className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-foreground">Logo URL</span>
+            <input name="logo_url" type="url" placeholder="https://www.example.org/logo.png" defaultValue={school.logo_url ?? ""} className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-foreground">Mascot</span>
+            <input name="mascot" defaultValue={school.mascot ?? ""} className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm">
+              <span className="font-medium text-foreground">Primary color</span>
+              <input name="primary_color" placeholder="#123ABC" defaultValue={school.primary_color ?? ""} pattern="#[0-9A-Fa-f]{6}" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" />
+            </label>
+            <label className="block text-sm">
+              <span className="font-medium text-foreground">Secondary color</span>
+              <input name="secondary_color" placeholder="#FFFFFF" defaultValue={school.secondary_color ?? ""} pattern="#[0-9A-Fa-f]{6}" className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground" />
+            </label>
+          </div>
+          {(profile.role === "super_admin" || profile.role === "district_admin") && (
+            <div className="grid gap-3 md:col-span-2 md:grid-cols-2">
+              <label className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm">
+                <input name="is_active" type="checkbox" defaultChecked={school.is_active !== false} />
+                <span>
+                  <strong className="text-foreground">School active</strong>
+                  <span className="ml-2 text-muted-foreground">Allow normal use of this workspace.</span>
+                </span>
+              </label>
+              <label className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm">
+                <input name="is_public" type="checkbox" defaultChecked={school.is_public !== false} />
+                <span>
+                  <strong className="text-foreground">Publicly listed</strong>
+                  <span className="ml-2 text-muted-foreground">Show the school in permitted public listings.</span>
+                </span>
+              </label>
+            </div>
+          )}
+          <div className="md:col-span-2">
+            <Button type="submit">Save school details</Button>
+          </div>
+        </form>
+      </details>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Metric title="Published clubs" value={clubs.length} icon={Users} />
