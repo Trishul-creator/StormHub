@@ -31,11 +31,36 @@ test.describe("scoped admin statistics", () => {
     await expect(page.getByRole("heading", { name: "Statistics", exact: true })).toBeVisible();
     await expect(page.getByLabel("View scope")).toBeVisible();
     await expect(page.getByText(/Platform totals combine every school workspace/i)).toBeVisible();
+    await expect(page.locator("[data-statistics-scope]")).toHaveAttribute(
+      "data-statistics-scope",
+      "platform"
+    );
 
     await page.getByLabel("View scope").selectOption("school1");
-    await page.getByRole("button", { name: "Apply" }).click();
 
     await expect(page).toHaveURL(/\/admin\/statistics\?school=school1/);
+    await expect(page.getByLabel("View scope")).toHaveValue("school1");
+    await expect(page.locator("[data-statistics-scope]")).toHaveAttribute(
+      "data-statistics-scope",
+      "b0000000-0000-4000-8000-000000000001"
+    );
     await expect(page.getByText(/intentionally filtered to one school/i)).toBeVisible();
+    const school1Fingerprint = await page
+      .locator("[data-statistics-scope]")
+      .getAttribute("data-statistics-fingerprint");
+    expect(school1Fingerprint).toBeTruthy();
+
+    await page.getByLabel("View scope").selectOption("school2");
+    await expect(page).toHaveURL(/\/admin\/statistics\?school=school2/);
+    await expect(page.getByLabel("View scope")).toHaveValue("school2");
+    await expect(page.locator("[data-statistics-scope]")).toHaveAttribute(
+      "data-statistics-scope",
+      "b0000000-0000-4000-8000-000000000002"
+    );
+    const school2Fingerprint = await page
+      .locator("[data-statistics-scope]")
+      .getAttribute("data-statistics-fingerprint");
+    expect(school2Fingerprint).toBeTruthy();
+    expect(school2Fingerprint).not.toBe(school1Fingerprint);
   });
 });
