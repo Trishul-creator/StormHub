@@ -3,13 +3,29 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(15);
+SELECT plan(21);
 
 SELECT has_function(
   'public',
   'assign_district_administrator',
   ARRAY['uuid', 'uuid'],
   'district-administrator assignment has one transactional RPC'
+);
+
+SELECT has_function(
+  'public',
+  'record_platform_support_access',
+  ARRAY['uuid', 'text', 'text', 'uuid'],
+  'platform support views have an audited RPC'
+);
+
+SELECT ok(
+  NOT has_function_privilege(
+    'anon',
+    'public.record_platform_support_access(uuid,text,text,uuid)',
+    'EXECUTE'
+  ),
+  'anonymous callers cannot record or probe platform support access'
 );
 
 SELECT isnt(
@@ -255,6 +271,86 @@ SELECT is(
   TRUE,
   'elevated assignment remains visible in the administrative audit trail'
 );
+
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"fa300000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}',
+  TRUE
+);
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  public.record_platform_support_access(
+    'fa200000-0000-4000-8000-000000000001',
+    'view',
+    'school_opportunity_inventory',
+    'fa200000-0000-4000-8000-000000000001'
+  ),
+  FALSE,
+  'platform support access cannot be recorded without an active exact-school session'
+);
+
+RESET ROLE;
+
+INSERT INTO public.platform_support_sessions (
+  id,
+  actor_user_id,
+  school_id,
+  reason,
+  started_at,
+  expires_at
+) VALUES (
+  'fa500000-0000-4000-8000-000000000001',
+  'fa300000-0000-4000-8000-000000000001',
+  'fa200000-0000-4000-8000-000000000001',
+  'Verify audited platform support access.',
+  NOW(),
+  NOW() + INTERVAL '30 minutes'
+);
+
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  public.record_platform_support_access(
+    'fa200000-0000-4000-8000-000000000001',
+    'view',
+    'school_opportunity_inventory',
+    'fa200000-0000-4000-8000-000000000001'
+  ),
+  TRUE,
+  'an active exact-school support session records the private read'
+);
+
+RESET ROLE;
+
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.platform_support_access_log
+    WHERE session_id = 'fa500000-0000-4000-8000-000000000001'
+      AND actor_user_id = 'fa300000-0000-4000-8000-000000000001'
+      AND school_id = 'fa200000-0000-4000-8000-000000000001'
+      AND action = 'view'
+      AND resource_type = 'school_opportunity_inventory'
+  ),
+  1::BIGINT,
+  'the access evidence captures session, actor, school, action, and resource'
+);
+
+SET LOCAL ROLE authenticated;
+
+SELECT is(
+  public.record_platform_support_access(
+    'fa200000-0000-4000-8000-000000000099',
+    'view',
+    'school_opportunity_inventory',
+    NULL
+  ),
+  FALSE,
+  'an active support session never authorizes a different school'
+);
+
+RESET ROLE;
 
 SELECT * FROM finish();
 

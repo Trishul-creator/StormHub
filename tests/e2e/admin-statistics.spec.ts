@@ -39,7 +39,8 @@ test.describe("scoped admin statistics", () => {
 
     await page.getByLabel("School").selectOption("school1");
 
-    await expect(page).toHaveURL(/\/admin\/statistics\?school=school1/);
+    await expect(page.getByLabel("Updating statistics")).toBeHidden({ timeout: 15_000 });
+    await expect(page).toHaveURL(/\/admin\/statistics\?school=school1/, { timeout: 15_000 });
     await expect(page.getByLabel("School")).toHaveValue("school1");
     await expect(page.locator("[data-statistics-scope]")).toHaveAttribute(
       "data-statistics-scope",
@@ -52,7 +53,8 @@ test.describe("scoped admin statistics", () => {
     expect(school1Fingerprint).toBeTruthy();
 
     await page.getByLabel("School").selectOption("school2");
-    await expect(page).toHaveURL(/\/admin\/statistics\?school=school2/);
+    await expect(page.getByLabel("Updating statistics")).toBeHidden({ timeout: 15_000 });
+    await expect(page).toHaveURL(/\/admin\/statistics\?school=school2/, { timeout: 15_000 });
     await expect(page.getByLabel("School")).toHaveValue("school2");
     await expect(page.locator("[data-statistics-scope]")).toHaveAttribute(
       "data-statistics-scope",

@@ -11,21 +11,20 @@ test.describe("scoped opportunity management", () => {
     await expect(page.getByRole("heading", { name: /existing opportunities/i })).toBeVisible();
     await expect(page.locator('[data-tour="opportunity-management"]')).toBeVisible();
 
-    await page.goto("/admin/schools/school2/opportunities");
-    await expect(page).not.toHaveURL(/\/admin\/schools\/school2\/opportunities/);
-    await expect(page).toHaveURL(/\/admin(?:\?|$)/);
+    const response = await page.goto("/admin/schools/school2/opportunities");
+    expect([200, 404]).toContain(response?.status());
+    await expect(
+      page.getByRole("heading", { level: 1, name: /school 2 opportunities/i })
+    ).toHaveCount(0);
   });
 
-  test("platform admins use an explicit school workspace", async ({ page }) => {
+  test("platform admins need an explicit audited support session", async ({ page }) => {
     skipWithoutCredentials("super_admin");
     await signIn(page, "super_admin");
 
     await page.goto("/admin/schools/school1/opportunities");
-    await expect(page.getByRole("heading", { level: 1, name: /school 1 opportunities/i })).toBeVisible();
-    await expect(page.locator('[data-tour="opportunity-management"]')).toBeVisible();
-    await expect(page.getByRole("link", { name: /preview student view/i })).toHaveAttribute(
-      "href",
-      "/s/school1/opportunities"
-    );
+    await expect(page).toHaveURL(/\/admin\/schools\/school1#support-access$/);
+    await expect(page.getByText(/Platform Admin Mode/i)).toBeVisible();
+    await expect(page.locator('[data-tour="opportunity-management"]')).toHaveCount(0);
   });
 });

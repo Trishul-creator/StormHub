@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 interface StatisticsScopeOption {
@@ -18,6 +17,7 @@ export function StatisticsScopeSelector({
   label = "View scope",
   queryKey = "school",
   clearQueryKeys = [],
+  onNavigate,
 }: {
   schools: StatisticsScopeOption[];
   activeSlug: string | null;
@@ -26,13 +26,14 @@ export function StatisticsScopeSelector({
   label?: string;
   queryKey?: "school" | "district";
   clearQueryKeys?: Array<"school" | "district">;
+  onNavigate?: (destination: string) => void;
 }) {
-  const router = useRouter();
   const [selectedSlug, setSelectedSlug] = useState(activeSlug ?? "");
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
 
   useEffect(() => {
     setSelectedSlug(activeSlug ?? "");
+    setPending(false);
   }, [activeSlug]);
 
   function changeScope(nextSlug: string) {
@@ -44,7 +45,18 @@ export function StatisticsScopeSelector({
     const destination = query.size > 0
       ? `/admin/statistics?${query.toString()}`
       : "/admin/statistics";
-    startTransition(() => router.replace(destination, { scroll: false }));
+    setPending(true);
+    if (onNavigate) {
+      onNavigate(destination);
+      return;
+    }
+
+    // A full navigation is intentional here. Next.js client transitions can
+    // leave streamed, data-heavy statistics routes suspended after the RSC
+    // response is aborted, which makes the selector appear permanently busy.
+    // Reloading the scoped URL keeps the query string, session, and server-side
+    // authorization checks deterministic.
+    window.location.assign(destination);
   }
 
   return (

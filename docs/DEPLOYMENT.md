@@ -27,7 +27,7 @@ supabase migration list
 ```
 
 For this release, the final remote list must contain every migration through
-`20260730270000_cross_tenant_transition_integrity.sql`. When a PR includes a new migration, apply
+`20260730280000_platform_support_access_logging.sql`. When a PR includes a new migration, apply
 the complete pending chain to staging before authenticated E2E. Never mark a migration as applied
 unless the exact schema was independently verified in that project.
 

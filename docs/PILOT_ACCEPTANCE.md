@@ -10,7 +10,7 @@ Record a result and evidence for every item before inviting pilot users.
 - axe serious/critical accessibility checks and keyboard navigation
 - Supabase migration reset, database lint, and pgTAP role matrix
 - Staging schema check proves every required privacy, district, tenant-RPC, policy, and operational
-  migration through `20260730270000_cross_tenant_transition_integrity.sql` is present; missing
+  migration through `20260730280000_platform_support_access_logging.sql` is present; missing
   schema fails rather than skipping a flow
 - Staging E2E and Vercel preview
 - CodeQL

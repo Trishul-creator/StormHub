@@ -42,7 +42,8 @@ test.describe("authenticated school workspace boundaries", () => {
     await expect(page.getByRole("heading", { name: /School 1 Clubs/i })).toBeVisible();
 
     const response = await page.goto("/s/school2/clubs");
-    expect(response?.status()).toBe(404);
+    expect([200, 404]).toContain(response?.status());
     await expect(page.getByText(/School 2 Clubs/i)).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
   });
 });

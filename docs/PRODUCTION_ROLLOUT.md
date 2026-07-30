@@ -41,6 +41,7 @@ production. The current release must contain every migration through:
 20260730250000_tenant_deletion_integrity.sql
 20260730260000_independent_school_offboarding.sql
 20260730270000_cross_tenant_transition_integrity.sql
+20260730280000_platform_support_access_logging.sql
 ```
 
 Use one linked-project workflow per environment:
@@ -237,7 +238,7 @@ If either `20260710160000` or `20260720120000` is already installed but missing 
 history, repair that exact version only after comparing the hosted schema. Never rerun a guessed repair.
 
 After the push, production `supabase migration list` must include every checked-in migration through
-`20260730270000`. A missing row blocks production acceptance even when the current UI appears to
+`20260730280000`. A missing row blocks production acceptance even when the current UI appears to
 work.
 
 Configure approved signup domains in the application after the migration is applied:
@@ -294,7 +295,7 @@ secret is absent.
 ## 6A. Confirm Privacy Release Controls
 
 Apply every migration through
-`20260730270000_cross_tenant_transition_integrity.sql` before performing these checks.
+`20260730280000_platform_support_access_logging.sql` before performing these checks.
 
 ### Legal holds and tenant offboarding
 

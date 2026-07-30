@@ -24,7 +24,7 @@ store credentials, student data, signed contracts, or private contact details in
 | Staging authenticated E2E | Pass without retry-only failures | |
 | CodeQL | Pass | |
 | Production dependency audit | No moderate-or-higher production finding | |
-| Migration parity | Staging and production contain every checked-in migration through `20260730270000_cross_tenant_transition_integrity.sql` | |
+| Migration parity | Staging and production contain every checked-in migration through `20260730280000_platform_support_access_logging.sql` | |
 
 ## Tenant And Privacy Evidence
 

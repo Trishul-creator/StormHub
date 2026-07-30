@@ -251,6 +251,15 @@ async function assertRequiredTablesExist(admin: SupabaseAdmin) {
       name: "is_profile_tenant_active",
       args: { target_user_id: "00000000-0000-4000-8000-000000000000" },
     },
+    {
+      name: "record_platform_support_access",
+      args: {
+        target_school_id: "00000000-0000-4000-8000-000000000000",
+        requested_action: "view",
+        requested_resource_type: "schema_probe",
+        requested_resource_id: null,
+      },
+    },
     { name: "has_any_active_legal_hold", args: {} },
     {
       name: "can_review_account_deletion_request",
