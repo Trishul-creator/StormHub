@@ -6,7 +6,11 @@ import { ClubProposalForm } from "@/components/manage/club-proposal-form";
 import { Button } from "@/components/ui/button";
 import { requireAuth } from "@/lib/auth";
 import { getSchoolTeachers } from "@/lib/data";
-import { canCreateClub, isAdminRole } from "@/lib/permissions";
+import {
+  canAccessSchoolAdmin,
+  canCreateClub,
+  isAdminRole,
+} from "@/lib/permissions";
 import { getSchoolBySlug, getSchoolForProfile } from "@/lib/schools";
 
 interface NewClubPageProps {
@@ -15,26 +19,41 @@ interface NewClubPageProps {
 
 export default async function NewClubPage({ searchParams }: NewClubPageProps) {
   const { profile } = await requireAuth("/manage/clubs/new");
+  if (profile.role === "super_admin") {
+    redirect("/admin/schools?error=platform_support_read_only");
+  }
   if (profile.role !== "teacher" && !isAdminRole(profile.role)) redirect("/manage/clubs");
 
   const { school: requestedSchoolSlug } = await searchParams;
-  const school = profile.role === "super_admin"
+  const usesAdministrativeSchoolScope =
+    profile.role === "district_admin";
+  const school = usesAdministrativeSchoolScope
     ? requestedSchoolSlug
       ? await getSchoolBySlug(requestedSchoolSlug)
       : null
     : await getSchoolForProfile(profile);
 
-  if (profile.role === "super_admin" && !requestedSchoolSlug) redirect("/admin/schools");
+  if (usesAdministrativeSchoolScope && !requestedSchoolSlug) {
+    redirect("/admin");
+  }
   if (requestedSchoolSlug && !school) notFound();
-  if (!school) redirect(profile.role === "super_admin" ? "/admin/schools" : "/manage/clubs");
+  if (!school) {
+    redirect(usesAdministrativeSchoolScope ? "/admin" : "/manage/clubs");
+  }
+  if (
+    usesAdministrativeSchoolScope
+    && !canAccessSchoolAdmin(profile, school.id, school.district_id)
+  ) {
+    notFound();
+  }
 
-  const requiresApproval = !canCreateClub(profile, school.id);
+  const requiresApproval = !canCreateClub(profile, school.id, school.district_id);
   if (profile.role !== "teacher" && requiresApproval) redirect("/manage/clubs");
 
   const teachers = profile.role === "teacher"
     ? [profile]
     : await getSchoolTeachers(school.id);
-  const returnHref = profile.role === "super_admin"
+  const returnHref = usesAdministrativeSchoolScope
     ? `/admin/schools/${school.slug}/drafts`
     : "/manage/clubs/drafts";
 

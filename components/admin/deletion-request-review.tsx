@@ -7,7 +7,13 @@ import { reviewAccountDeletionRequest } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
-export function DeletionRequestReview({ requestId }: { requestId: string }) {
+export function DeletionRequestReview({
+  requestId,
+  retry = false,
+}: {
+  requestId: string;
+  retry?: boolean;
+}) {
   const [notes, setNotes] = useState("");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -42,11 +48,13 @@ export function DeletionRequestReview({ requestId }: { requestId: string }) {
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="destructive" onClick={() => review("complete")} disabled={pending}>
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-          Complete deletion
+          {retry ? "Retry deletion" : "Complete deletion"}
         </Button>
-        <Button size="sm" variant="outline" onClick={() => review("reject")} disabled={pending}>
-          <XCircle className="h-4 w-4" /> Reject
-        </Button>
+        {!retry && (
+          <Button size="sm" variant="outline" onClick={() => review("reject")} disabled={pending}>
+            <XCircle className="h-4 w-4" /> Reject
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -20,6 +20,7 @@ export default async function ManageAnnouncementsPage({ params }: PageProps) {
   const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
   const auth = await requireClubManager(club);
+  const readOnlySupport = auth.readOnlySupport;
   const announcements = (await getClubManagedContent(club.id, "announcement")) as ClubAnnouncement[];
   const canDelete = canApproveClubContent(auth.profile, club, auth.membership);
   const canPublish = canPublishClubContent(auth.profile, club, auth.membership, "announcement");
@@ -27,14 +28,25 @@ export default async function ManageAnnouncementsPage({ params }: PageProps) {
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
-      <PageHeader title="Create for your club" description={`Publish announcements, assignments, events, and materials for ${club.name}.`} />
-      <ClubCreateNavigation
-        clubSlug={slug}
-        activeType="announcement"
-        courseworkEnabled={courseworkEnabled}
+      <PageHeader
+        title={readOnlySupport ? "Announcements — read only" : "Create for your club"}
+        description={
+          readOnlySupport
+            ? `Inspect ${club.name} announcements during this recorded support session.`
+            : `Publish announcements, assignments, events, and materials for ${club.name}.`
+        }
       />
-      <ContentForm type="announcement" clubSlug={slug} canPublish={canPublish} />
-      <section className="mt-8 rounded-xl border bg-card p-5 shadow-sm">
+      {!readOnlySupport && (
+        <>
+          <ClubCreateNavigation
+            clubSlug={slug}
+            activeType="announcement"
+            courseworkEnabled={courseworkEnabled}
+          />
+          <ContentForm type="announcement" clubSlug={slug} canPublish={canPublish} />
+        </>
+      )}
+      <section className={`${readOnlySupport ? "mt-2" : "mt-8"} rounded-xl border bg-card p-5 shadow-sm`}>
         <h2 className="font-semibold text-storm-navy">Previous announcements</h2>
         <div className="mt-4 space-y-3">
           {announcements.map((announcement) => (

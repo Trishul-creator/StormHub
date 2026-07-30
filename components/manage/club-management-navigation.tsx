@@ -3,9 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bell,
+  BookOpenCheck,
+  CalendarDays,
   Eye,
   LayoutDashboard,
+  Link as LinkIcon,
   PlusCircle,
+  ShieldAlert,
   Settings,
   Users,
 } from "lucide-react";
@@ -18,6 +23,7 @@ interface ClubManagementNavigationProps {
   slug: string;
   canManageRoster: boolean;
   membershipRole?: MembershipRole | null;
+  readOnlySupport?: boolean;
 }
 
 export function ClubManagementNavigation({
@@ -25,17 +31,32 @@ export function ClubManagementNavigation({
   slug,
   canManageRoster,
   membershipRole,
+  readOnlySupport = false,
 }: ClubManagementNavigationProps) {
   const pathname = usePathname();
   const baseHref = `/manage/clubs/${slug}`;
-  const links = [
-    { href: baseHref, label: "Overview", icon: LayoutDashboard },
-    { href: `${baseHref}/announcements`, label: "Create", icon: PlusCircle, contentHub: true },
-    ...(canManageRoster
-      ? [{ href: `${baseHref}/members`, label: "Members", icon: Users }]
-      : []),
-    { href: `${baseHref}/edit`, label: "Settings", icon: Settings },
-  ];
+  const links: Array<{
+    href: string;
+    label: string;
+    icon: typeof LayoutDashboard;
+    contentHub?: boolean;
+  }> = readOnlySupport
+    ? [
+        { href: baseHref, label: "Overview", icon: LayoutDashboard },
+        { href: `${baseHref}/announcements`, label: "Announcements", icon: Bell },
+        { href: `${baseHref}/events`, label: "Events", icon: CalendarDays },
+        { href: `${baseHref}/resources`, label: "Resources", icon: LinkIcon },
+        { href: `${baseHref}/coursework`, label: "Coursework", icon: BookOpenCheck },
+        { href: `${baseHref}/members`, label: "Members", icon: Users },
+      ]
+    : [
+        { href: baseHref, label: "Overview", icon: LayoutDashboard },
+        { href: `${baseHref}/announcements`, label: "Create", icon: PlusCircle, contentHub: true },
+        ...(canManageRoster
+          ? [{ href: `${baseHref}/members`, label: "Members", icon: Users }]
+          : []),
+        { href: `${baseHref}/edit`, label: "Settings", icon: Settings },
+      ];
   const isActive = (href: string, contentHub?: boolean) => (
     contentHub
       ? [
@@ -55,20 +76,29 @@ export function ClubManagementNavigation({
         <div className="flex items-center justify-between gap-4 border-b bg-storm-light/25 px-4 py-3 sm:px-5">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-storm-electric">
-              Club workspace
+              {readOnlySupport ? "Read-only support" : "Club workspace"}
             </p>
             <p className="truncate font-semibold text-storm-navy">{clubName}</p>
             <p className="text-xs text-muted-foreground">
-              {membershipRole ? clubRoleLabel(membershipRole) : "Administrator"}
+              {readOnlySupport
+                ? "Temporary, recorded platform access"
+                : membershipRole ? clubRoleLabel(membershipRole) : "Administrator"}
             </p>
           </div>
-          <Link
-            href={`/clubs/${slug}/member`}
-            className="flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-card hover:text-storm-electric"
-          >
-            <Eye className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Member view</span>
-          </Link>
+          {readOnlySupport ? (
+            <span className="flex shrink-0 items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+              <ShieldAlert className="h-4 w-4" aria-hidden="true" />
+              No changes allowed
+            </span>
+          ) : (
+            <Link
+              href={`/clubs/${slug}/member`}
+              className="flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-card hover:text-storm-electric"
+            >
+              <Eye className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Member view</span>
+            </Link>
+          )}
         </div>
         <nav
           aria-label={`${clubName} management`}

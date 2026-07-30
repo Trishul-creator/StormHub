@@ -14,9 +14,11 @@ test.describe("teacher opportunity access", () => {
       .first()
       .getByRole("link", { name: /^opportunities$/i });
     await expect(opportunityLink).toBeVisible();
-    await opportunityLink.click();
-
-    await expect(page).toHaveURL(/\/s\/[^/]+\/opportunities/);
+    await expect(opportunityLink).toHaveAttribute("href", /\/s\/[^/]+\/opportunities/);
+    await Promise.all([
+      page.waitForURL(/\/s\/[^/]+\/opportunities/),
+      opportunityLink.click(),
+    ]);
     await expect(
       page.getByRole("heading", { level: 1, name: /opportunities/i })
     ).toBeVisible();

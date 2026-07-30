@@ -46,7 +46,7 @@ export function ProfileSettingsForm({ profile }: { profile: Profile }) {
             className="mt-1.5 h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm transition-[border-color,box-shadow] duration-200 focus-visible:border-storm-electric/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           >
             <option value="">Not set</option>
-            {[6, 7, 8, 9, 10, 11, 12].map((grade) => (
+            {[9, 10, 11, 12].map((grade) => (
               <option key={grade} value={grade}>{grade}th grade</option>
             ))}
           </select>

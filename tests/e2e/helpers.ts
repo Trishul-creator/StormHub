@@ -83,5 +83,8 @@ export async function signIn(page: Page, role: E2ERole) {
     .waitFor({ state: "visible", timeout: 2_000 })
     .then(() => true)
     .catch(() => false);
-  if (walkthroughStarted) await closeWalkthrough.click();
+  if (walkthroughStarted) {
+    await closeWalkthrough.click();
+    await expect(closeWalkthrough).toBeHidden({ timeout: 5_000 });
+  }
 }

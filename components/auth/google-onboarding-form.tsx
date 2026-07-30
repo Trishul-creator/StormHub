@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
+import { HIGH_SCHOOL_AGE_ASSURANCE } from "@/lib/policy";
 
 interface OnboardingSchool {
   id: string;
@@ -37,6 +38,10 @@ export function GoogleOnboardingForm({
       fullName: String(form.get("fullName") ?? ""),
       gradeLevel: String(form.get("gradeLevel") ?? ""),
       accessCode: String(form.get("accessCode") ?? ""),
+      acceptedPolicies: form.get("policyAccepted") === "on",
+      ageAssurance: form.get("ageAssurance") === "on"
+        ? HIGH_SCHOOL_AGE_ASSURANCE
+        : undefined,
       next,
     });
     setLoading(false);
@@ -93,18 +98,21 @@ export function GoogleOnboardingForm({
             />
           </div>
           <div>
-            <Label htmlFor="google-gradeLevel">Grade</Label>
+            <Label htmlFor="google-gradeLevel">Grade (students)</Label>
             <select
               id="google-gradeLevel"
               name="gradeLevel"
               defaultValue=""
               className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             >
-              <option value="">Select grade</option>
+              <option value="">School staff or not applicable</option>
               {[9, 10, 11, 12].map((grade) => (
                 <option key={grade} value={grade}>{grade}th grade</option>
               ))}
             </select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Students should select their current high-school grade. Staff roles are assigned by an administrator.
+            </p>
           </div>
           <div>
             <Label htmlFor="google-accessCode">School access code</Label>
@@ -121,7 +129,13 @@ export function GoogleOnboardingForm({
             </p>
           </div>
           <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
-            <input type="checkbox" required className="mt-1 h-4 w-4 rounded border-input" />
+            <input name="ageAssurance" type="checkbox" required className="mt-1 h-4 w-4 rounded border-input" />
+            <span>
+              I confirm that I am at least 13 and am authorized to use this high-school workspace.
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+            <input name="policyAccepted" type="checkbox" required className="mt-1 h-4 w-4 rounded border-input" />
             <span>
               I will use StormHub for school purposes and agree to the{" "}
               <a href="/acceptable-use" className="text-storm-electric hover:underline">Acceptable Use Policy</a>,{" "}

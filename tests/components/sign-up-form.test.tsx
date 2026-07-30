@@ -66,10 +66,12 @@ describe("SignUpForm", () => {
     fireEvent.change(screen.getByLabelText("School"), { target: { value: "school-1" } });
     fireEvent.change(screen.getByLabelText("Full name"), { target: { value: "Test Student" } });
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "student@example.edu" } });
-    fireEvent.change(screen.getByLabelText("Grade"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("Grade (students)"), { target: { value: "10" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "StrongPassword123" } });
     fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "StrongPassword123" } });
     fireEvent.change(screen.getByLabelText("School access code"), { target: { value: "SH-1234-ABCD-5678" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /at least 13/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /agree to the/i }));
     const loadedAt = document.querySelector<HTMLInputElement>('input[name="loadedAt"]');
     expect(loadedAt).not.toBeNull();
     fireEvent.change(loadedAt!, { target: { value: String(Date.now() - 2000) } });
@@ -85,7 +87,13 @@ describe("SignUpForm", () => {
         10,
         "SH-1234-ABCD-5678",
         "school-1",
-        expect.objectContaining({ captchaToken: null, website: "", loadedAt: expect.any(Number) })
+        expect.objectContaining({
+          captchaToken: null,
+          website: "",
+          loadedAt: expect.any(Number),
+          acceptedPolicies: true,
+          ageAssurance: "13_or_older",
+        })
       );
     });
     expect(toast).toHaveBeenCalledWith({

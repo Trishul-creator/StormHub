@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArchiveX,
   BarChart3,
   Building2,
   FileCheck2,
@@ -37,7 +38,8 @@ export function AdminNavigation({ role }: AdminNavigationProps) {
       : { href: "/admin", label: "Overview", icon: LayoutDashboard },
     ...sharedLinks.slice(0, 2),
     ...(!isDistrictAdmin ? [sharedLinks[2]] : []),
-    ...(isSuperAdmin ? [{ href: "/admin/feedback", label: "Support inbox", icon: Inbox }] : []),
+    { href: "/admin/feedback", label: "Support inbox", icon: Inbox },
+    { href: "/admin/offboarding", label: "Tenant offboarding", icon: ArchiveX },
     ...sharedLinks.slice(3),
   ];
 

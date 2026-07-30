@@ -35,6 +35,7 @@ import type {
   PendingApprovalItem,
   School,
   AdminUser,
+  AdminUserPage,
   AdminStatistics,
   FeedbackItem,
   ApprovalContentType,
@@ -42,7 +43,11 @@ import type {
 import { isAdminRole } from "@/lib/permissions";
 import { shouldServePublicDemoContent } from "@/lib/public-content";
 import { CLUB_FILTER_GROUPS } from "@/lib/utils";
-import { DEFAULT_SCHOOL_ID, getCurrentSchool } from "@/lib/schools";
+import {
+  DEFAULT_SCHOOL_ID,
+  getCurrentSchool,
+  getSchoolByIdForViewer,
+} from "@/lib/schools";
 import type { ManagementDashboardAttention } from "@/lib/dashboard-priorities";
 
 export { isDemoMode } from "@/lib/supabase/mode";
@@ -61,24 +66,30 @@ async function shouldUseDemoContent(): Promise<boolean> {
 }
 
 async function resolveSchoolId(explicitSchoolId?: string | null, profile?: Profile | null): Promise<string | null> {
-  if (explicitSchoolId) return explicitSchoolId;
-  const school = await getCurrentSchool(profile);
+  const viewer = profile === undefined ? await getCurrentProfile() : profile;
+  if (explicitSchoolId) {
+    const school = await getSchoolByIdForViewer(explicitSchoolId, viewer);
+    return school?.id ?? null;
+  }
+  const school = await getCurrentSchool(viewer);
   return school?.id ?? DEFAULT_SCHOOL_ID;
 }
 
 async function attachMemberCounts(clubs: Club[]): Promise<Club[]> {
   if (isDemoMode() || clubs.length === 0) return clubs;
-  const supabase = createAdminClient() ?? await createClient();
+  const supabase = await createClient();
   if (!supabase) return clubs;
   const ids = clubs.map((c) => c.id);
-  const { data } = await supabase
-    .from("club_memberships")
-    .select("club_id")
-    .in("club_id", ids)
-    .eq("status", "active");
+  const { data, error } = await supabase.rpc("get_visible_club_member_counts", {
+    club_uuids: ids,
+  });
+  if (error) {
+    console.error("[attachMemberCounts]", error.message);
+    return clubs;
+  }
   const counts: Record<string, number> = {};
-  (data ?? []).forEach((m: { club_id: string }) => {
-    counts[m.club_id] = (counts[m.club_id] ?? 0) + 1;
+  (data ?? []).forEach((row: { club_id: string; member_count: number | string }) => {
+    counts[row.club_id] = Number(row.member_count) || 0;
   });
   return clubs.map((c) => ({ ...c, member_count: counts[c.id] ?? 0 }));
 }
@@ -111,19 +122,22 @@ export async function getClubs(filters?: {
     }
     return clubs.filter(
       (c) =>
+        c.is_active &&
         c.is_listed &&
         c.visibility === "public" &&
         ["interest_open", "active"].includes(c.status)
     );
   }
 
-  const supabase = createAdminClient() ?? await createClient();
+  const supabase = await createClient();
   if (!supabase) return [];
   const schoolId = await resolveSchoolId(filters?.schoolId);
+  if (filters?.schoolId && !schoolId) return [];
 
   let query = supabase
     .from("clubs")
     .select("*")
+    .eq("is_active", true)
     .eq("is_listed", true)
     .eq("visibility", "public")
     .in("status", ["interest_open", "active"]);
@@ -157,7 +171,8 @@ export async function getClubBySlug(slug: string, schoolId?: string | null): Pro
   }
   const supabase = await createClient();
   if (!supabase) return null;
-  const resolvedSchoolId = schoolId ?? (await resolveSchoolId());
+  const resolvedSchoolId = await resolveSchoolId(schoolId);
+  if (schoolId && !resolvedSchoolId) return null;
   let query = supabase.from("clubs").select("*").eq("slug", slug);
   if (resolvedSchoolId) query = query.eq("school_id", resolvedSchoolId);
   const { data, error } = await query.single();
@@ -172,7 +187,7 @@ export async function getManagedClubBySlug(slug: string): Promise<Club | null> {
   if (isDemoMode()) {
     return demoClubs.find((c) => c.slug === slug) ?? null;
   }
-  const supabase = createAdminClient() ?? await createClient();
+  const supabase = await createClient();
   if (!supabase) return null;
   const { data, error } = await supabase.from("clubs").select("*").eq("slug", slug).maybeSingle();
   if (error) {
@@ -187,14 +202,17 @@ export async function getClubMemberCount(clubId: string): Promise<number> {
     const club = demoClubs.find((c) => c.id === clubId);
     return club?.member_count ?? 0;
   }
-  const supabase = createAdminClient() ?? await createClient();
+  const supabase = await createClient();
   if (!supabase) return 0;
-  const { count } = await supabase
-    .from("club_memberships")
-    .select("*", { count: "exact", head: true })
-    .eq("club_id", clubId)
-    .eq("status", "active");
-  return count ?? 0;
+  const { data, error } = await supabase.rpc("get_visible_club_member_counts", {
+    club_uuids: [clubId],
+  });
+  if (error) {
+    console.error("[getClubMemberCount]", error.message);
+    return 0;
+  }
+  const row = (data as Array<{ club_id: string; member_count: number | string }> | null)?.[0];
+  return row ? Number(row.member_count) || 0 : 0;
 }
 
 export async function getUserClubMembership(
@@ -1509,13 +1527,14 @@ export async function getManagementDashboardAttention(
 
 export async function getSchoolTeachers(schoolId: string | null | undefined): Promise<Profile[]> {
   if (!schoolId || isDemoMode()) return [];
-  const supabase = createAdminClient() ?? await createClient();
+  const supabase = await createClient();
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("profiles")
-    .select("id,school_id,full_name,email,grade_level,avatar_url,role,created_at,updated_at")
+    .select("id,school_id,full_name,email,avatar_url,role")
     .eq("school_id", schoolId)
     .eq("role", "teacher")
+    .eq("account_status", "active")
     .order("full_name", { ascending: true, nullsFirst: false });
   if (error) {
     console.error("[getSchoolTeachers]", error.message);
@@ -1626,9 +1645,42 @@ export async function getPendingApprovals(): Promise<PendingApprovalItem[]> {
   });
 }
 
-export async function getAdminUsers(schoolId?: string | null): Promise<AdminUser[]> {
+export const ADMIN_USERS_PAGE_SIZE = 50;
+
+export function normalizeAdminUserSearch(value?: string | null): string {
+  return (value ?? "")
+    .trim()
+    .replace(/[^\p{L}\p{N}@.+\-'\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 100);
+}
+
+export async function getAdminUsers(options?: {
+  schoolId?: string | null;
+  search?: string | null;
+  role?: Profile["role"] | null;
+  page?: number;
+  pageSize?: number;
+}): Promise<AdminUserPage> {
+  const page = Number.isInteger(options?.page) && (options?.page ?? 0) > 0
+    ? options!.page!
+    : 1;
+  const pageSize = Math.min(
+    100,
+    Math.max(1, Number.isInteger(options?.pageSize) ? options!.pageSize! : ADMIN_USERS_PAGE_SIZE)
+  );
+  const search = normalizeAdminUserSearch(options?.search);
+  const emptyPage = (): AdminUserPage => ({
+    users: [],
+    total: 0,
+    page,
+    pageSize,
+    totalPages: 1,
+  });
+
   if (isDemoMode()) {
-    return [{
+    const demoUsers: AdminUser[] = [{
       id: "demo-student",
       email: "student@example.com",
       full_name: "Demo Student",
@@ -1636,87 +1688,147 @@ export async function getAdminUsers(schoolId?: string | null): Promise<AdminUser
       school_id: DEFAULT_SCHOOL_ID,
       club_assignments: [],
     }];
+    const matchingUsers = demoUsers.filter((user) =>
+      (!options?.role || user.role === options.role)
+      && (
+        !search
+        || `${user.full_name ?? ""} ${user.email ?? ""}`.toLowerCase().includes(search.toLowerCase())
+      )
+    );
+    return {
+      users: matchingUsers,
+      total: matchingUsers.length,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(matchingUsers.length / pageSize)),
+    };
   }
   const supabase = await createClient();
-  if (!supabase) return [];
+  if (!supabase) return emptyPage();
   const currentProfile = await getCurrentProfile();
-  let query = supabase
-    .from("profiles")
-    .select("*, club_memberships(club_id,role,status,clubs(name,slug))")
-    .neq("role", "super_admin")
-    .neq("role", "district_admin")
-    .order("created_at", { ascending: false });
-  if (currentProfile?.role === "district_admin") {
-    if (!currentProfile.district_id) return [];
-    if (schoolId) {
-      const { data: selectedSchool } = await supabase
-        .from("schools")
-        .select("id")
-        .eq("id", schoolId)
-        .eq("district_id", currentProfile.district_id)
-        .maybeSingle();
-      if (!selectedSchool) return [];
-      query = query.eq("school_id", schoolId);
-    } else {
-      query = query.eq("district_id", currentProfile.district_id);
-    }
-  } else if (currentProfile?.role === "super_admin" && schoolId) {
-    query = query.eq("school_id", schoolId);
-  } else if (currentProfile?.role !== "super_admin" && currentProfile?.school_id) {
-    query = query.eq("school_id", currentProfile.school_id);
-  }
-  const { data, error } = await query;
+  if (!currentProfile || !isAdminRole(currentProfile.role)) return emptyPage();
+
+  const requestedSchoolId = options?.schoolId?.trim() || null;
+  const { data, error } = await supabase.rpc("get_admin_user_inventory", {
+    requested_page: page,
+    requested_page_size: pageSize,
+    search_text: search || null,
+    requested_school_id: requestedSchoolId,
+    requested_role: options?.role ?? null,
+  });
   if (error) {
     console.error("[getAdminUsers]", error.message);
-    return [];
+    return emptyPage();
   }
-  type UserRow = Profile & {
-    club_memberships?: Array<{
-      club_id: string;
-      role: ClubMembership["role"];
-      status: ClubMembership["status"];
-      clubs: { name: string; slug: string } | { name: string; slug: string }[] | null;
-    }>;
+
+  type MembershipRow = {
+    club_id: string;
+    role: ClubMembership["role"];
+    status: ClubMembership["status"];
+    club_name?: string | null;
+    club_slug?: string | null;
   };
-  return ((data ?? []) as UserRow[]).map((user) => ({
-    ...user,
-    club_assignments: (user.club_memberships ?? []).map((membership) => {
-      const club = Array.isArray(membership.clubs) ? membership.clubs[0] : membership.clubs;
-      return {
-        club_id: membership.club_id,
-        club_name: club?.name ?? "Unknown club",
-        club_slug: club?.slug ?? "",
-        role: membership.role,
-        status: membership.status,
-      };
-    }),
+  type InventoryRow = {
+    user_id: string;
+    school_id?: string | null;
+    district_id?: string | null;
+    full_name?: string | null;
+    email?: string | null;
+    user_role: Profile["role"];
+    account_status?: Profile["account_status"];
+    school_name?: string | null;
+    district_name?: string | null;
+    club_assignments?: MembershipRow[];
+    total_count: number | string;
+  };
+  const rows = (data ?? []) as InventoryRow[];
+  const adminUsers: AdminUser[] = rows.map((user) => ({
+    id: user.user_id,
+    school_id: user.school_id,
+    district_id: user.district_id,
+    full_name: user.full_name,
+    email: user.email,
+    role: user.user_role,
+    account_status: user.account_status,
+    school_name: user.school_name,
+    district_name: user.district_name,
+    club_assignments: (user.club_assignments ?? []).map((membership) => ({
+      club_id: membership.club_id,
+      club_name: membership.club_name ?? "Unknown club",
+      club_slug: membership.club_slug ?? "",
+      role: membership.role,
+      status: membership.status,
+    })),
   }));
+  let total = Number(rows[0]?.total_count ?? 0);
+  if (rows.length === 0 && page > 1) {
+    const { data: countProbe, error: countProbeError } = await supabase.rpc("get_admin_user_inventory", {
+      requested_page: 1,
+      requested_page_size: 1,
+      search_text: search || null,
+      requested_school_id: requestedSchoolId,
+      requested_role: options?.role ?? null,
+    });
+    if (countProbeError) {
+      console.error("[getAdminUsers:count]", countProbeError.message);
+    } else {
+      total = Number(
+        ((countProbe ?? []) as Array<{ total_count: number | string }>)[0]?.total_count ?? 0
+      );
+    }
+  }
+  return {
+    users: adminUsers,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
 }
 
 export async function getClubRoster(clubId: string): Promise<ClubMembership[]> {
   if (isDemoMode()) return [];
-  const supabase = createAdminClient() ?? await createClient();
+  const supabase = await createClient();
   if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("club_memberships")
-    .select("*, profile:profiles(*)")
-    .eq("club_id", clubId)
-    .eq("status", "active")
-    .order("joined_at");
+  const { data, error } = await supabase.rpc("get_club_roster", {
+    club_uuid: clubId,
+  });
   if (error) {
     console.error("[getClubRoster]", error.message);
     return [];
   }
-  return (data as ClubMembership[]) ?? [];
+  return ((data ?? []) as Array<{
+    membership_id: string;
+    club_id: string;
+    user_id: string;
+    membership_role: ClubMembership["role"];
+    full_name: string;
+    avatar_url?: string | null;
+    email?: string | null;
+  }>).map((row) => ({
+    id: row.membership_id,
+    club_id: row.club_id,
+    user_id: row.user_id,
+    status: "active",
+    role: row.membership_role,
+    profile: {
+      id: row.user_id,
+      role: row.membership_role === "sponsor" ? "teacher" : "student",
+      full_name: row.full_name,
+      avatar_url: row.avatar_url,
+      email: row.email,
+    },
+  }));
 }
 
-export async function getFeedbackItems(): Promise<FeedbackItem[]> {
-  if (isDemoMode()) return [];
+export async function getFeedbackItems(schoolId: string): Promise<FeedbackItem[]> {
+  if (isDemoMode() || !schoolId) return [];
   const supabase = await createClient();
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("feedback")
     .select("*, profile:profiles(id,full_name,email,role), school:schools(id,name,slug)")
+    .eq("school_id", schoolId)
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) {

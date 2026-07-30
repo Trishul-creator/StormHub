@@ -179,6 +179,20 @@ describe("supabaseSignUp", () => {
     expect(result).toEqual({ success: false, error: "Passwords do not match." });
     expect(signUp).not.toHaveBeenCalled();
   });
+
+  it("rolls back an account when policy acceptance cannot be stored", async () => {
+    const { deleteUser } = setupClients({
+      acceptanceError: { code: "42P01", message: "policy_acceptances is missing" },
+    });
+
+    const result = await submitSignup();
+
+    expect(result).toEqual({
+      success: false,
+      error: "Account creation requires the latest privacy database migration. Please contact your administrator.",
+    });
+    expect(deleteUser).toHaveBeenCalledWith("user-1");
+  });
 });
 
 type QueryResult = {
@@ -190,6 +204,7 @@ function setupClients(input: {
   school?: QueryResult;
   signupConfig?: QueryResult;
   accessCodeValid?: boolean;
+  acceptanceError?: { code?: string; message: string } | null;
   signup?: {
     data: {
       user: { id: string } | null;
@@ -226,8 +241,11 @@ function setupClients(input: {
       error: null,
     }),
     from: vi.fn((table: string) => {
-      if (table !== "schools") throw new Error(`Unexpected admin table: ${table}`);
-      return { select: schoolSelect };
+      if (table === "schools") return { select: schoolSelect };
+      if (table === "policy_acceptances") {
+        return { upsert: vi.fn().mockResolvedValue({ error: input.acceptanceError ?? null }) };
+      }
+      throw new Error(`Unexpected admin table: ${table}`);
     }),
     auth: { admin: { deleteUser, updateUserById } },
   };
@@ -264,7 +282,13 @@ function submitSignup(email = "Student@Example.edu", confirmPassword = "StrongPa
     10,
     "SH-1234-ABCD-5678",
     "school-1",
-    { website: "", loadedAt: Date.now() - 2_000, captchaToken: null }
+    {
+      website: "",
+      loadedAt: Date.now() - 2_000,
+      captchaToken: null,
+      acceptedPolicies: true,
+      ageAssurance: "13_or_older",
+    }
   );
 }
 

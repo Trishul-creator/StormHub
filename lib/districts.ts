@@ -1,6 +1,5 @@
 import "server-only";
 
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isDemoMode } from "@/lib/supabase/mode";
 import type { District, Profile, School } from "@/types/database";
@@ -14,7 +13,7 @@ function isDistrictSchemaMissing(error: { code?: string; message?: string } | nu
 
 export async function isDistrictSchemaAvailable(): Promise<boolean> {
   if (isDemoMode()) return true;
-  const supabase = createAdminClient() ?? await createClient();
+  const supabase = await createClient();
   if (!supabase) return false;
   const { error } = await supabase.from("districts").select("id").limit(1);
   return !error;
@@ -26,17 +25,26 @@ export async function getAllDistricts(): Promise<District[]> {
     return [demoDistrict];
   }
 
-  const supabase = createAdminClient() ?? await createClient();
+  const supabase = await createClient();
   if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("districts")
-    .select("*")
-    .order("name");
-  if (error) {
-    if (!isDistrictSchemaMissing(error)) console.error("[getAllDistricts]", error.message);
-    return [];
+
+  const districts: District[] = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from("districts")
+      .select("*")
+      .order("name")
+      .order("id")
+      .range(offset, offset + pageSize - 1);
+    if (error) {
+      if (!isDistrictSchemaMissing(error)) console.error("[getAllDistricts]", error.message);
+      return [];
+    }
+    districts.push(...((data as District[] | null) ?? []));
+    if ((data?.length ?? 0) < pageSize) break;
   }
-  return (data as District[]) ?? [];
+  return districts;
 }
 
 export async function getDistrictBySlug(slug: string): Promise<District | null> {
@@ -46,7 +54,7 @@ export async function getDistrictBySlug(slug: string): Promise<District | null> 
     return demoDistrict.slug === slug ? demoDistrict : null;
   }
 
-  const supabase = createAdminClient() ?? await createClient();
+  const supabase = await createClient();
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("districts")
@@ -67,7 +75,7 @@ export async function getDistrictById(districtId: string | null | undefined): Pr
     return demoDistrict.id === districtId ? demoDistrict : null;
   }
 
-  const supabase = createAdminClient() ?? await createClient();
+  const supabase = await createClient();
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("districts")
@@ -93,16 +101,25 @@ export async function getDistrictSchools(districtId: string): Promise<School[]> 
     return demoSchool.district_id === districtId ? [demoSchool] : [];
   }
 
-  const supabase = createAdminClient() ?? await createClient();
+  const supabase = await createClient();
   if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("schools")
-    .select("*")
-    .eq("district_id", districtId)
-    .order("name");
-  if (error) {
-    console.error("[getDistrictSchools]", error.message);
-    return [];
+
+  const schools: School[] = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from("schools")
+      .select("*")
+      .eq("district_id", districtId)
+      .order("name")
+      .order("id")
+      .range(offset, offset + pageSize - 1);
+    if (error) {
+      console.error("[getDistrictSchools]", error.message);
+      return [];
+    }
+    schools.push(...((data as School[] | null) ?? []));
+    if ((data?.length ?? 0) < pageSize) break;
   }
-  return (data as School[]) ?? [];
+  return schools;
 }

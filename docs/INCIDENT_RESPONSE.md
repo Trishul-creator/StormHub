@@ -6,6 +6,7 @@
 - Technical lead: investigates Vercel, Supabase, and email delivery.
 - School contact: coordinates student/staff communication.
 - Privacy contact: evaluates student-data exposure and district reporting duties.
+- Vendor coordinator: opens and tracks urgent Supabase, Vercel, Resend, hCaptcha, or Google cases.
 
 Store current names and phone numbers in the district's private operations system, not this repository.
 
@@ -26,6 +27,8 @@ Store current names and phone numbers in the district's private operations syste
 6. If integrity is uncertain, stop writes by enabling maintenance controls or rolling back the app;
    do not delete evidence.
 7. Notify the district privacy/security contact for every SEV-1 event.
+8. Start an evidence log that records each action, actor, time, system, result, and preserved
+   artifact. Keep student details in the restricted incident record, not chat or a public issue.
 
 ## Diagnosis
 
@@ -35,6 +38,25 @@ Store current names and phone numbers in the district's private operations syste
 - Review Supabase Auth logs, Postgres logs, migration history, and `admin_audit_log`.
 - Review email provider logs and `email_outbox`/`digest_deliveries` for delivery incidents.
 - Test with a non-privileged account before declaring a permissions issue resolved.
+- Record the affected data fields, tenants, accounts, access method, earliest/latest event, and
+  whether information was viewed, changed, downloaded, or only potentially exposed.
+
+## Vendor Escalation
+
+- Open the provider's highest available security/support priority for any suspected provider
+  compromise, unrecoverable outage, or lost data.
+- Give the vendor a non-PII incident identifier, timestamps, region/project identifier, request IDs,
+  and the smallest necessary technical evidence. Do not email student records.
+- Record vendor case number, owner, promised response time, updates, and closure evidence.
+- Escalate internally if a SEV-1 vendor case has no acknowledgement within one hour or a SEV-2
+  case within four business hours. These are StormHub escalation targets, not promises by a vendor.
+
+## Notification Decision
+
+The privacy contact and District decide whether FERPA, COPPA, state student-privacy, breach, or
+contract notices are required. Record the applicable rule, known facts, decision maker, decision
+time, recipients, deadline, and approved notice. Do not delay containment while that analysis runs,
+and do not state that no breach occurred merely because logs are incomplete.
 
 ## Recovery
 
@@ -43,6 +65,8 @@ Store current names and phone numbers in the district's private operations syste
 3. For data corruption, stop writes, preserve a snapshot, and follow `BACKUP_AND_RECOVERY.md`.
 4. Confirm health, email-confirmed authentication, school isolation, and the affected user flow.
 5. Monitor for at least 30 minutes after recovery.
+6. If a backup is restored, replay approved deletions and account suspensions that occurred after
+   the recovery point before users regain access.
 
 ## Afterward
 

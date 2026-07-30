@@ -45,13 +45,13 @@ export function UserRoleEditor({
   const editableTargetRoles = actorRole === "district_admin"
     ? ["student", "teacher", "admin"]
     : ["student", "teacher"];
-  const protectedTarget = actorRole !== "super_admin" && !editableTargetRoles.includes(user.role);
+  const elevatedTarget = user.role === "district_admin" || user.role === "super_admin";
+  const protectedTarget = elevatedTarget
+    || (actorRole !== "super_admin" && !editableTargetRoles.includes(user.role));
   const canDelete = !isSelf && !protectedTarget;
-  const roles: UserRole[] = actorRole === "super_admin"
-    ? ["student", "teacher", "admin", "super_admin"]
-    : actorRole === "district_admin"
-      ? ["student", "teacher", "admin"]
-      : ["student", "teacher"];
+  const roles: UserRole[] = actorRole === "super_admin" || actorRole === "district_admin"
+    ? ["student", "teacher", "admin"]
+    : ["student", "teacher"];
 
   function toggleClub(clubId: string) {
     setClubIds((current) =>
@@ -113,7 +113,11 @@ export function UserRoleEditor({
     return (
       <div className="space-y-2">
         <span className="block text-xs text-muted-foreground">
-          {isSelf ? "Your own account cannot be changed here." : "A higher-level administrator must modify this account."}
+          {isSelf
+            ? "Your own account cannot be changed here."
+            : elevatedTarget
+              ? "Manage this elevated assignment from the district workspace."
+              : "A higher-level administrator must modify this account."}
         </span>
         {canDelete && (
           <Button size="sm" variant="destructive" onClick={removeUser} disabled={pending}>

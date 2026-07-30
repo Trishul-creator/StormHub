@@ -268,7 +268,7 @@ export function buildGlobalSearchResults(input: {
         type: "person",
         title: person.full_name || person.email || "Unnamed user",
         description: person.email,
-        href: "/admin/users",
+        href: `/admin/users?q=${encodeURIComponent(query)}`,
         context: person.role,
         score,
       });

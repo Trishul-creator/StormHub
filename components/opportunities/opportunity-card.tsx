@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { CategoryBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Opportunity } from "@/types/database";
-import { formatDate, isDeadlineSoon, opportunityActionLabel } from "@/lib/utils";
+import { formatDate, isDeadlineSoon, isOverdue, opportunityActionLabel } from "@/lib/utils";
 import { BookmarkButton } from "@/components/opportunities/bookmark-button";
 import { OpportunityParticipationButton } from "@/components/opportunities/opportunity-participation-button";
 
@@ -24,6 +24,7 @@ export function OpportunityCard({
   canParticipate = true,
 }: OpportunityCardProps) {
   const closingSoon = isDeadlineSoon(opportunity.deadline);
+  const isClosed = isOverdue(opportunity.deadline);
   const actionLabel = opportunityActionLabel(opportunity.action_label);
 
   return (
@@ -97,6 +98,7 @@ export function OpportunityCard({
               externalUrl={opportunity.external_url}
               isLoggedIn={isLoggedIn}
               isSignedUp={isSignedUp}
+              isClosed={isClosed}
               compact
               className="shrink-0"
             />

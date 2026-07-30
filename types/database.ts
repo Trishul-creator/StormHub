@@ -7,6 +7,17 @@ export type UserRole =
 
 export type AccountStatus = "active" | "suspended" | "deactivated";
 
+export type TenantOffboardingScope = "school" | "district";
+export type TenantOffboardingStatus =
+  | "requested"
+  | "under_review"
+  | "export_ready"
+  | "approved"
+  | "scheduled"
+  | "completed"
+  | "rejected"
+  | "cancelled";
+
 export type ClubStatus = "draft" | "interest_open" | "active" | "paused" | "archived";
 
 export type ContentStatus =
@@ -14,6 +25,7 @@ export type ContentStatus =
   | "pending"
   | "approved"
   | "rejected"
+  | "closed"
   | "archived";
 
 export type Visibility = "public" | "members" | "officers" | "private" | "unlisted";
@@ -24,6 +36,12 @@ export type AssignmentSubmissionStatus = "draft" | "submitted" | "returned";
 export type AssignmentSubmissionMode = "submission" | "completion";
 export type CourseworkAttachmentSource = "upload" | "google_drive";
 export type CourseworkCopyMode = "reference" | "student_copy";
+export type CourseworkUploadTarget = "assignment" | "submission";
+export type CourseworkUploadIntentStatus =
+  | "pending"
+  | "registered"
+  | "rejected"
+  | "expired";
 
 export type MembershipRole =
   | "member"
@@ -143,6 +161,8 @@ export interface ClubMembership {
 }
 
 export interface AdminUser extends Profile {
+  school_name?: string | null;
+  district_name?: string | null;
   club_assignments: Array<{
     club_id: string;
     club_name: string;
@@ -150,6 +170,14 @@ export interface AdminUser extends Profile {
     role: MembershipRole;
     status: MembershipStatus;
   }>;
+}
+
+export interface AdminUserPage {
+  users: AdminUser[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 export interface ClubAnnouncement {
@@ -204,6 +232,24 @@ export interface ClubAssignment {
   attachments?: ClubAssignmentAttachment[];
   student_copies?: ClubAssignmentStudentCopy[];
   submission_attachments?: ClubSubmissionAttachment[];
+}
+
+export interface CourseworkUploadIntent {
+  id: string;
+  user_id: string;
+  assignment_id: string;
+  target: CourseworkUploadTarget;
+  storage_path: string;
+  file_name: string;
+  mime_type: string;
+  expected_size: number;
+  status: CourseworkUploadIntentStatus;
+  attachment_id?: string | null;
+  rejection_reason?: string | null;
+  expires_at: string;
+  registered_at?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ClubAssignmentSubmission {
@@ -497,6 +543,7 @@ export interface EmailOutboxItem {
   subject: string;
   body: string;
   type: string;
+  dedupe_key?: string | null;
   status: "pending" | "sent" | "failed" | "simulated";
   error_message?: string | null;
   sent_at?: string | null;

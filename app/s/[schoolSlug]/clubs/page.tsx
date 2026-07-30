@@ -10,7 +10,11 @@ import { getClubs } from "@/lib/data";
 import { checkMembership } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
 import { getSchoolBySlugForViewer } from "@/lib/schools";
-import { canJoinClub, canManageClub } from "@/lib/permissions";
+import {
+  canAccessSchoolAdmin,
+  canJoinClub,
+  canManageClub,
+} from "@/lib/permissions";
 import { CLUB_FILTER_GROUPS } from "@/lib/utils";
 import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
 
@@ -58,11 +62,11 @@ export default async function SchoolClubsPage({ params, searchParams }: SchoolCl
             <Link href="/manage/clubs/drafts">Propose a club</Link>
           </Button>
         )}
-        {(auth.profile?.role === "super_admin" || (auth.profile?.role === "admin" && auth.profile.school_id === school.id)) && (
+        {canAccessSchoolAdmin(auth.profile, school.id, school.district_id) && (
           <Button asChild>
             <Link
               href={
-                auth.profile.role === "super_admin"
+                auth.profile?.role === "super_admin" || auth.profile?.role === "district_admin"
                   ? `/admin/schools/${school.slug}/drafts`
                   : "/manage/clubs/drafts"
               }

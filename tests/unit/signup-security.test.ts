@@ -15,7 +15,23 @@ describe("signup security", () => {
     expect(validateSignupBotProof(undefined, 10_000)).toBeTruthy();
     expect(validateSignupBotProof({ website: "spam.example", loadedAt: 1_000 }, 10_000)).toBeTruthy();
     expect(validateSignupBotProof({ website: "", loadedAt: 9_000 }, 10_000)).toBeTruthy();
-    expect(validateSignupBotProof({ website: "", loadedAt: 8_000 }, 10_000)).toBeNull();
+    expect(validateSignupBotProof({
+      website: "",
+      loadedAt: 8_000,
+      acceptedPolicies: true,
+      ageAssurance: "13_or_older",
+    }, 10_000)).toBeNull();
+  });
+
+  it("requires policy acceptance and the high-school age assurance", () => {
+    expect(validateSignupBotProof({ website: "", loadedAt: 8_000 }, 10_000)).toMatch(
+      /terms.*privacy.*acceptable use/i
+    );
+    expect(validateSignupBotProof({
+      website: "",
+      loadedAt: 8_000,
+      acceptedPolicies: true,
+    }, 10_000)).toMatch(/age 13 or older/i);
   });
 
   it("uses the first forwarded address and hashes identifiers consistently", () => {

@@ -44,8 +44,8 @@ export default async function AssignmentReviewPage({ params }: AssignmentReviewP
   const { slug, assignmentId } = await params;
   const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
-  const { profile, membership } = await requireClubManager(club);
-  if (!canManageClubCoursework(profile, club, membership)) {
+  const { profile, membership, readOnlySupport } = await requireClubManager(club);
+  if (!readOnlySupport && !canManageClubCoursework(profile, club, membership)) {
     redirect(`/manage/clubs/${slug}?error=coursework_permission_required`);
   }
   const canPublish = canPublishClubCoursework(profile, club, membership);

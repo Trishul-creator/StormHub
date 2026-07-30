@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { POLICY_EFFECTIVE_DATE } from "@/lib/policy";
 import { SUPPORT_EMAIL } from "@/lib/schools";
 
 const rules = [
@@ -34,7 +35,7 @@ export default function AcceptableUsePage() {
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <PageHeader
         title="Acceptable Use Policy"
-        description="The rules that keep StormHub safe, school-appropriate, and useful."
+        description={`Effective ${POLICY_EFFECTIVE_DATE} · The rules that keep StormHub safe, school-appropriate, and useful.`}
       />
       <div className="grid gap-4 md:grid-cols-2">
         {rules.map((rule) => (

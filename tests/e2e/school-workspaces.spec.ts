@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { signIn, skipWithoutCredentials } from "./helpers";
 
 test.describe("public showcase separation", () => {
   test("requested school routes never reveal real school data before sign-in", async ({ page }) => {
@@ -29,5 +30,19 @@ test.describe("public showcase separation", () => {
       await expect(page.getByText("You’re viewing fictional sample data")).toBeVisible();
       await expect(page.getByLabel("School")).toHaveCount(0);
     }
+  });
+});
+
+test.describe("authenticated school workspace boundaries", () => {
+  test("students cannot open another school by typing its URL", async ({ page }) => {
+    skipWithoutCredentials("student");
+    await signIn(page, "student");
+
+    await page.goto("/s/school1/clubs");
+    await expect(page.getByRole("heading", { name: /School 1 Clubs/i })).toBeVisible();
+
+    const response = await page.goto("/s/school2/clubs");
+    expect(response?.status()).toBe(404);
+    await expect(page.getByText(/School 2 Clubs/i)).toHaveCount(0);
   });
 });

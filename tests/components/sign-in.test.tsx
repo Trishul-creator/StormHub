@@ -89,4 +89,51 @@ describe("sign-in feedback", () => {
     }));
     expect(mocks.demoSignIn).not.toHaveBeenCalled();
   });
+
+  it("rejects an external redirect parameter after a successful password sign-in", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/auth/sign-in?redirect=https%3A%2F%2Fevil.example%2Fcollect"
+    );
+    mocks.demoSignIn.mockResolvedValue({
+      success: true,
+      redirectTo: "/manage",
+    });
+
+    render(<SignInPage />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "admin@example.edu" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "StrongPassword123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/manage"));
+    expect(mocks.push).not.toHaveBeenCalledWith(expect.stringContaining("evil.example"));
+  });
+
+  it("preserves a valid internal redirect after a successful password sign-in", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/auth/sign-in?redirect=%2Fopportunities%2Frobotics"
+    );
+    mocks.demoSignIn.mockResolvedValue({
+      success: true,
+      redirectTo: "/dashboard",
+    });
+
+    render(<SignInPage />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "student@example.edu" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "StrongPassword123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/opportunities/robotics"));
+  });
 });

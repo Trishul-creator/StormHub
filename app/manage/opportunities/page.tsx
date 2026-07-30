@@ -1,19 +1,30 @@
-import { PageHeader } from "@/components/layout/page-header";
-import { ContentForm } from "@/components/forms/content-form";
-import { requireAdmin } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { DeadlineReminderButton } from "@/components/manage/deadline-reminder-button";
+import { OpportunityManagement } from "@/components/manage/opportunity-management";
+import { PageHeader } from "@/components/layout/page-header";
+import { requireAdmin } from "@/lib/auth";
+import { getManagedOpportunitiesForSchool } from "@/lib/opportunity-admin";
+import { getSchoolById } from "@/lib/schools";
 
 export default async function ManageOpportunitiesPage() {
-  await requireAdmin();
+  const { profile } = await requireAdmin();
+  if (profile.role !== "admin" || !profile.school_id) {
+    redirect("/admin/schools");
+  }
+
+  const school = await getSchoolById(profile.school_id);
+  if (!school) redirect("/admin?error=school_scope_required");
+  const opportunities = await getManagedOpportunitiesForSchool(profile, school);
+
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
+    <div className="container mx-auto max-w-6xl px-4 py-8">
       <PageHeader
-        title="Create School-wide Opportunity"
-        description="Post a science fair, college visit, scholarship, application, audition, or other action students can sign up for. Club meetings belong on the calendar instead."
+        title={`${school.short_name || school.name} opportunities`}
+        description="Create, revise, close, archive, and review every school-wide opportunity from one inventory."
       >
-        <DeadlineReminderButton />
+        <DeadlineReminderButton schoolId={school.id} />
       </PageHeader>
-      <ContentForm type="opportunity" />
+      <OpportunityManagement school={school} opportunities={opportunities} />
     </div>
   );
 }

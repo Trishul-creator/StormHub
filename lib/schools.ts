@@ -1,7 +1,6 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { isDemoMode } from "@/lib/supabase/mode";
 import type { Profile, School } from "@/types/database";
 
@@ -44,7 +43,7 @@ export async function getSchoolBySlug(slug: string): Promise<School | null> {
     return demoSchool;
   }
 
-  const supabase = createAdminClient() ?? await createClient();
+  const supabase = await createClient();
   if (!supabase) return null;
 
   const { data, error } = await supabase
@@ -67,7 +66,7 @@ export async function getSchoolById(schoolId: string | null | undefined): Promis
     return demoSchool;
   }
 
-  const supabase = createAdminClient() ?? await createClient();
+  const supabase = await createClient();
   if (!supabase) return null;
 
   const { data, error } = await supabase
@@ -84,7 +83,8 @@ export async function getSchoolById(schoolId: string | null | undefined): Promis
 }
 
 export async function getDefaultSchool(): Promise<School | null> {
-  return getSchoolBySlug(DEFAULT_SCHOOL_SLUG);
+  const schools = await getSignupSchools();
+  return schools.find((school) => school.slug === DEFAULT_SCHOOL_SLUG) ?? schools[0] ?? null;
 }
 
 export async function getPublicDemoSchool(): Promise<School> {
@@ -92,12 +92,29 @@ export async function getPublicDemoSchool(): Promise<School> {
   return demoSchool;
 }
 
+export function canProfileViewSchool(
+  profile: Profile | null | undefined,
+  school: Pick<School, "id" | "district_id">
+): boolean {
+  if (!profile || (profile.account_status && profile.account_status !== "active")) return false;
+  if (profile.role === "super_admin") return true;
+  if (profile.role === "district_admin") {
+    return Boolean(
+      profile.district_id
+      && school.district_id
+      && profile.district_id === school.district_id
+    );
+  }
+  return Boolean(profile.school_id && profile.school_id === school.id);
+}
+
 export async function getSchoolBySlugForViewer(
   slug: string,
   profile?: Profile | null
 ): Promise<School | null> {
   if (!profile) return getPublicDemoSchool();
-  return getSchoolBySlug(slug);
+  const school = await getSchoolBySlug(slug);
+  return school && canProfileViewSchool(profile, school) ? school : null;
 }
 
 export async function getSchoolByIdForViewer(
@@ -105,7 +122,8 @@ export async function getSchoolByIdForViewer(
   profile?: Profile | null
 ): Promise<School | null> {
   if (!profile) return getPublicDemoSchool();
-  return getSchoolById(schoolId);
+  const school = await getSchoolById(schoolId);
+  return school && canProfileViewSchool(profile, school) ? school : null;
 }
 
 export async function getSchoolForProfile(profile?: Profile | null): Promise<School | null> {
@@ -155,7 +173,7 @@ export async function getSchoolSettings(schoolId: string | null | undefined): Pr
   const resolvedSchoolId = schoolId || DEFAULT_SCHOOL_ID;
   if (isDemoMode()) return defaultSchoolSettings(resolvedSchoolId);
 
-  const supabase = createAdminClient() ?? await createClient();
+  const supabase = await createClient();
   if (!supabase) return defaultSchoolSettings(resolvedSchoolId);
 
   const { data, error } = await supabase
@@ -179,19 +197,76 @@ export async function getAllSchools(): Promise<School[]> {
     return [demoSchool];
   }
 
-  const supabase = createAdminClient() ?? await createClient();
+  const supabase = await createClient();
   if (!supabase) return [];
 
-  const { data, error } = await supabase
-    .from("schools")
-    .select("*")
-    .order("name");
-
-  if (error) {
-    console.error("[getAllSchools]", error.message);
-    return [];
+  const schools: School[] = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from("schools")
+      .select("*")
+      .order("name")
+      .order("id")
+      .range(offset, offset + pageSize - 1);
+    if (error) {
+      console.error("[getAllSchools]", error.message);
+      return [];
+    }
+    schools.push(...((data as School[] | null) ?? []));
+    if ((data?.length ?? 0) < pageSize) break;
   }
-  return (data as School[]) ?? [];
+  return schools;
+}
+
+/**
+ * Returns only the public fields needed to choose a school during signup.
+ * The database RPC intentionally excludes domains, addresses, configuration,
+ * access codes, and administrative metadata.
+ */
+export async function getSignupSchools(search?: string | null): Promise<School[]> {
+  if (isDemoMode()) {
+    const { demoSchool } = await import("@/lib/data/demo-data");
+    return [demoSchool];
+  }
+
+  const supabase = await createClient();
+  if (!supabase) return [];
+  const schools: School[] = [];
+  const pageSize = 250;
+  const normalizedSearch = search?.trim().slice(0, 100) || null;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.rpc("list_signup_schools", {
+      page_offset: offset,
+      page_limit: pageSize,
+      search_text: normalizedSearch,
+    });
+    if (error) {
+      console.error("[getSignupSchools]", error.message);
+      return [];
+    }
+    schools.push(...((data as School[] | null) ?? []));
+    if ((data?.length ?? 0) < pageSize) break;
+  }
+  return schools;
+}
+
+/**
+ * Administrative selectors include inactive and private schools because
+ * account support, offboarding, and historical records remain necessary
+ * after a school is no longer publicly discoverable.
+ */
+export function getAdminScopeSchools(schools: School[], profile: Profile): School[] {
+  if (profile.role === "super_admin") return schools;
+  if (profile.role === "district_admin") {
+    return schools.filter((school) =>
+      Boolean(profile.district_id && school.district_id === profile.district_id)
+    );
+  }
+  if (profile.role === "admin") {
+    return schools.filter((school) => school.id === profile.school_id);
+  }
+  return [];
 }
 
 export function getFilterableSchools(schools: School[], profile?: Profile | null): School[] {

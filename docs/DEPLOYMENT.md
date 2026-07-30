@@ -1,6 +1,6 @@
 # StormHub Deployment and Staging Guide
 
-Last updated: 2026-07-02
+Last updated: 2026-07-30
 
 ## Environments
 
@@ -13,16 +13,23 @@ Never point mutating E2E tests at production.
 
 ## Staging Supabase setup
 
-Use the new empty `StormHub Staging` Supabase project. Prefer timestamped files in `supabase/migrations/` for new database changes. For the current baseline, apply the base schema and patches once from the Supabase SQL Editor:
+Use an empty, non-production `StormHub Staging` Supabase project. The timestamped files under
+`supabase/migrations/` are the source of truth; do not initialize a new project from the legacy
+top-level SQL snapshots or by pasting a subset into the SQL Editor.
 
-1. `supabase/schema.sql`
-2. `supabase/policies.sql`
-3. `supabase/multi-school-platform-cleanup.sql`
-4. `supabase/improve-signups-roster-and-profile.sql`
-5. `supabase/allow-club-leaders-publish.sql`
-6. `supabase/allow-teachers-without-clubs.sql`
+```bash
+supabase login
+supabase link --project-ref <staging-project-ref>
+supabase migration list
+supabase db push --dry-run
+supabase db push
+supabase migration list
+```
 
-When a PR includes a new file under `supabase/migrations/`, apply that migration to staging before running authenticated staging E2E. Keep `supabase/policies.sql` as the current full RLS snapshot, and use timestamped migrations as the repeatable production/staging change log.
+For this release, the final remote list must contain every migration through
+`20260730270000_cross_tenant_transition_integrity.sql`. When a PR includes a new migration, apply
+the complete pending chain to staging before authenticated E2E. Never mark a migration as applied
+unless the exact schema was independently verified in that project.
 
 `supabase/staging-setup.sql` is optional backup/documentation SQL. GitHub Actions does not require it for recurring staging setup.
 
@@ -40,9 +47,9 @@ Reason:
 - `fix-current-db.sql` is a patch for an existing production-like project, not the clean staging initializer.
 - `reset-pilot-schools-to-draft-club-catalog.sql` is intentionally destructive for specific pilot-school club data.
 
-## What staging SQL creates
+## What the migration chain creates
 
-The SQL order above creates or patches:
+The migration chain creates and patches, among other relations:
 
 - `schools`
 - `school_settings`
@@ -70,7 +77,8 @@ The SQL order above creates or patches:
 - minimal School 1 club interest opportunities
 - School 2 intentionally empty for cross-school empty-state tests
 
-If these rows are missing, the setup script recreates them. Manual SQL is only needed when the staging database schema or migrations are missing.
+If these rows are missing, the setup script recreates them. If required schema is missing, stop and
+apply the checked-in migration chain; do not repair the gap with ad hoc manual SQL.
 
 ## Staging Auth user setup
 
@@ -202,8 +210,14 @@ Do not set these production env vars:
 E2E_ENVIRONMENT=staging
 E2E_ALLOW_MUTATIONS=true
 E2E_TEST_PASSWORD=<anything>
+```
+
+Set these production safety flags explicitly:
+
+```env
 AI_FEATURES_ENABLED=false
 GROQ_ENABLED=false
+AI_DATA_SHARING_APPROVED=false
 ```
 
 ## Email safety
@@ -262,7 +276,9 @@ Future E2E tests that create, update, or delete rows must call the mutation guar
 
 `.github/workflows/e2e-staging.yml` runs guarded staging setup and E2E only when staging secrets exist.
 
-The workflow prepares required staging rows automatically with `npm run staging:setup`; do not manually rerun `supabase/staging-setup.sql` for every PR. Manual SQL is only needed if the staging database schema/migrations are missing.
+The workflow prepares required staging rows automatically with `npm run staging:setup`; do not
+manually rerun `supabase/staging-setup.sql` for every PR. If the staging schema is behind, apply the
+checked-in migration chain before rerunning the workflow.
 
 Required GitHub secrets for staging E2E:
 

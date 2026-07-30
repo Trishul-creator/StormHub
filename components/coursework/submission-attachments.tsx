@@ -48,14 +48,21 @@ export function SubmissionAttachments({
         fileSize: file.size,
         mimeType: file.type || null,
       });
-      if (!prepared.success || !prepared.path || !prepared.token) {
+      if (
+        !prepared.success
+        || !prepared.intentId
+        || !prepared.path
+        || !prepared.token
+        || !prepared.fileName
+        || !prepared.mimeType
+      ) {
         errors.push(`${file.name}: ${prepared.error || "could not prepare upload"}`);
         continue;
       }
       const { error: uploadError } = await supabase.storage
         .from("coursework-private")
         .uploadToSignedUrl(prepared.path, prepared.token, file, {
-          contentType: file.type || "application/octet-stream",
+          contentType: prepared.mimeType,
         });
       if (uploadError) {
         errors.push(`${file.name}: ${uploadError.message}`);
@@ -65,10 +72,11 @@ export function SubmissionAttachments({
         clubSlug,
         assignmentId,
         target: "submission",
+        intentId: prepared.intentId,
         storagePath: prepared.path,
-        fileName: file.name,
+        fileName: prepared.fileName,
         fileSize: file.size,
-        mimeType: file.type || null,
+        mimeType: prepared.mimeType,
       });
       if (!registered.success) {
         errors.push(`${file.name}: ${registered.error || "could not attach file"}`);
@@ -164,6 +172,7 @@ export function SubmissionAttachments({
               <input
                 type="file"
                 multiple
+                accept=".pdf,.txt,.png,.jpg,.jpeg,.gif,.webp,.heic,.heif"
                 className="sr-only"
                 disabled={uploading}
                 onChange={(event) => {
@@ -204,7 +213,9 @@ export function SubmissionAttachments({
           />
         </div>
       )}
-      <p className="text-xs text-muted-foreground">Maximum private upload size: 20 MB per file.</p>
+      <p className="text-xs text-muted-foreground">
+        Up to 10 approved school-document attachments, 20 MB per file and 100 MB total.
+      </p>
     </div>
   );
 }

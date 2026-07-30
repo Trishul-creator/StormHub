@@ -5,6 +5,13 @@ import {
   getSupabaseUrl,
   isExplicitStagingE2E,
 } from "../lib/env";
+import {
+  ACCEPTABLE_USE_VERSION,
+  HIGH_SCHOOL_AGE_ASSURANCE,
+  POLICY_ACCEPTANCE_METADATA,
+  PRIVACY_POLICY_VERSION,
+  TERMS_VERSION,
+} from "../lib/policy";
 
 const requiredPassword = process.env.E2E_TEST_PASSWORD?.trim();
 
@@ -34,6 +41,10 @@ function assertSafeToMutate() {
 
 type SupabaseAdmin = {
   auth: ReturnType<typeof createClient>["auth"];
+  rpc: (
+    fn: string,
+    args?: Record<string, unknown>
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
   // This script intentionally uses dynamic table names because it runs before
   // generated Supabase database types exist in the app.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -154,15 +165,60 @@ const school1Clubs = [
 
 async function assertRequiredTablesExist(admin: SupabaseAdmin) {
   const requiredRelations = [
-    { table: "schools", columns: "id,allowed_email_domains" },
+    {
+      table: "districts",
+      columns: "id,slug,is_active,access_disabled_at,access_disabled_by_offboarding_request",
+    },
+    {
+      table: "schools",
+      columns:
+        "id,district_id,address,allowed_email_domains,access_disabled_at,access_disabled_by_offboarding_request",
+    },
     { table: "school_settings", columns: "school_id" },
     { table: "clubs", columns: "id" },
-    { table: "opportunities", columns: "id" },
-    { table: "profiles", columns: "id,account_status,graduation_year" },
-    { table: "account_deletion_requests", columns: "id" },
+    { table: "opportunities", columns: "id,status" },
+    { table: "profiles", columns: "id,district_id,account_status,graduation_year" },
+    {
+      table: "account_deletion_requests",
+      columns:
+        "id,target_user_id_snapshot,requester_role,scope_type,school_id,district_id,status",
+    },
     { table: "admin_audit_log", columns: "id" },
     { table: "digest_deliveries", columns: "id" },
     { table: "request_attempts", columns: "id" },
+    { table: "school_signup_access", columns: "school_id,access_code" },
+    { table: "platform_support_sessions", columns: "id" },
+    { table: "data_retention_runs", columns: "id,status,skipped_reason" },
+    {
+      table: "legal_holds",
+      columns: "id,scope_type,district_id,school_id,category,released_at",
+    },
+    {
+      table: "account_deletion_executions",
+      columns: "id,target_user_id,school_id,district_id,status,prepared_at,auth_deleted_at",
+    },
+    { table: "policy_acceptances", columns: "id,privacy_version,age_assurance" },
+    {
+      table: "email_outbox",
+      columns: "id,attempt_count,next_attempt_at,claim_token,dedupe_key",
+    },
+    {
+      table: "tenant_offboarding_requests",
+      columns: "id,scope_type,district_id,school_id,status,tenant_state_before",
+    },
+    {
+      table: "tenant_offboarding_events",
+      columns: "id,request_id,event_type,occurred_at",
+    },
+    {
+      table: "tenant_offboarding_profile_snapshots",
+      columns: "request_id,profile_id,previous_account_status",
+    },
+    {
+      table: "coursework_upload_intents",
+      columns:
+        "id,user_id,assignment_id,target,storage_path,expected_size,status,expires_at,attachment_id,object_removed_at",
+    },
   ] as const;
 
   for (const { table, columns } of requiredRelations) {
@@ -173,67 +229,215 @@ async function assertRequiredTablesExist(admin: SupabaseAdmin) {
       );
     }
   }
-}
 
-async function hasDistrictSchema(admin: SupabaseAdmin): Promise<boolean> {
-  const { error } = await admin.from("districts").select("id,slug").limit(1);
-  if (!error) return true;
-  if (
-    error.code === "42P01"
-    || error.code === "PGRST205"
-    || String(error.message).includes("public.districts")
-  ) {
-    console.warn(
-      "Staging is using the pre-district schema for this PR preview. "
-        + "The local database job validates the complete district migration before merge."
-    );
-    return false;
-  }
-  throw error;
-}
-
-async function hasPilotPrivacySchema(admin: SupabaseAdmin): Promise<boolean> {
-  const privacyRelations = [
-    { table: "school_signup_access", columns: "school_id,access_code" },
-    { table: "platform_support_sessions", columns: "id" },
-    { table: "data_retention_runs", columns: "id" },
+  const requiredRpcs = [
+    {
+      name: "list_signup_schools",
+      args: { page_offset: 0, page_limit: 1, search_text: null },
+    },
+    { name: "get_visible_club_member_counts", args: { club_uuids: [] } },
+    {
+      name: "can_read_school_feedback",
+      args: { target_school_id: "00000000-0000-4000-8000-000000000000" },
+    },
+    {
+      name: "can_read_admin_profile",
+      args: {
+        target_school_id: "00000000-0000-4000-8000-000000000000",
+        target_district_id: "00000000-0000-4000-8000-000000000000",
+      },
+    },
+    {
+      name: "is_profile_tenant_active",
+      args: { target_user_id: "00000000-0000-4000-8000-000000000000" },
+    },
+    { name: "has_any_active_legal_hold", args: {} },
+    {
+      name: "can_review_account_deletion_request",
+      args: { target_request_id: "00000000-0000-4000-8000-000000000000" },
+    },
+    {
+      name: "finalize_user_account_deletion",
+      args: {
+        target_execution_id: "00000000-0000-4000-8000-000000000000",
+        requested_status: "completed",
+        requested_error: null,
+      },
+    },
+    {
+      name: "finalize_coursework_attachment_removal",
+      args: {
+        target_attachment_id: "00000000-0000-4000-8000-000000000000",
+        target_assignment_id: "00000000-0000-4000-8000-000000000000",
+        target_attachment_kind: "assignment",
+        expected_storage_path: null,
+      },
+    },
   ] as const;
-  const missing: string[] = [];
-
-  for (const { table, columns } of privacyRelations) {
-    const { error } = await admin.from(table).select(columns).limit(1);
-    if (error) missing.push(table);
+  for (const rpc of requiredRpcs) {
+    const { error } = await admin.rpc(rpc.name, rpc.args);
+    if (error) {
+      throw new Error(
+        `Staging schema is missing required RPC ${rpc.name}. Apply every migration through the current branch before rerunning E2E. Provider message: ${error.message}`
+      );
+    }
   }
 
-  if (missing.length === 0) return true;
-  if (missing.length !== privacyRelations.length) {
-    throw new Error(
-      `Staging has a partially applied pilot privacy migration. Missing: ${missing.join(", ")}.`
-    );
+  const organizationRpcProbes = [
+    {
+      name: "update_school_details",
+      args: {
+        target_school_id: "00000000-0000-4000-8000-000000000000",
+        requested_name: "Schema probe",
+      },
+      expectedError: "School not found",
+    },
+    {
+      name: "update_district_details",
+      args: {
+        target_district_id: "00000000-0000-4000-8000-000000000000",
+        requested_name: "Schema probe",
+      },
+      expectedError: "District not found",
+    },
+  ] as const;
+  for (const probe of organizationRpcProbes) {
+    const { error } = await admin.rpc(probe.name, probe.args);
+    if (!error || !error.message.includes(probe.expectedError)) {
+      throw new Error(
+        `Staging schema is missing the current ${probe.name} organization RPC. Apply every migration through the current branch before rerunning E2E.${error ? ` Provider message: ${error.message}` : ""}`
+      );
+    }
   }
 
-  console.warn(
-    "Staging is using the pre-migration schema for this PR preview. "
-      + "The local database job validates the complete privacy migration before merge."
-  );
-  return false;
+  const guardedRpcProbes = [
+    {
+      name: "get_admin_user_inventory",
+      args: {
+        requested_page: 1,
+        requested_page_size: 1,
+        search_text: null,
+        requested_school_id: null,
+        requested_role: null,
+      },
+      expectedError: "Administrator access required",
+    },
+    {
+      name: "assign_district_administrator",
+      args: {
+        target_user_id: "00000000-0000-4000-8000-000000000000",
+        target_district_id: "00000000-0000-4000-8000-000000000000",
+      },
+      expectedError: "Platform administrator access required",
+    },
+    {
+      name: "submit_tenant_offboarding_request",
+      args: {
+        requested_scope_type: "school",
+        requested_scope_id: "00000000-0000-4000-8000-000000000000",
+        requested_reason: "Staging schema probe only.",
+      },
+      expectedError: "Active administrator access required",
+    },
+    {
+      name: "review_tenant_offboarding_request",
+      args: {
+        target_request_id: "00000000-0000-4000-8000-000000000000",
+        next_status: "under_review",
+      },
+      expectedError: "Offboarding request not found",
+    },
+    {
+      name: "cancel_tenant_offboarding_request",
+      args: {
+        target_request_id: "00000000-0000-4000-8000-000000000000",
+        cancellation_reason: "Staging schema probe only.",
+      },
+      expectedError: "Offboarding request not found",
+    },
+    {
+      name: "create_coursework_upload_intent",
+      args: {
+        actor_user_uuid: "00000000-0000-4000-8000-000000000000",
+        assignment_uuid: "00000000-0000-4000-8000-000000000000",
+        upload_target: "submission",
+        object_path:
+          "00000000-0000-4000-8000-000000000000/submissions/00000000-0000-4000-8000-000000000000/schema-probe",
+        expected_file_name: "schema-probe.txt",
+        expected_mime_type: "text/plain",
+        expected_file_size: 1,
+      },
+      expectedError: "An active account is required",
+    },
+    {
+      name: "register_coursework_upload_intent",
+      args: {
+        intent_uuid: "00000000-0000-4000-8000-000000000000",
+        actor_user_uuid: "00000000-0000-4000-8000-000000000000",
+        assignment_uuid: "00000000-0000-4000-8000-000000000000",
+        upload_target: "submission",
+        object_path:
+          "00000000-0000-4000-8000-000000000000/submissions/00000000-0000-4000-8000-000000000000/schema-probe",
+        actual_file_name: "schema-probe.txt",
+        actual_mime_type: "text/plain",
+        actual_file_size: 1,
+      },
+      expectedError: "Private upload intent not found",
+    },
+    {
+      name: "prepare_user_account_deletion",
+      args: {
+        target_user_id: "00000000-0000-4000-8000-000000000000",
+      },
+      expectedError: "User not found",
+    },
+    {
+      name: "submit_account_deletion_request",
+      args: {
+        requested_reason: "Staging schema probe only.",
+      },
+      expectedError: "An active authenticated account is required",
+    },
+    {
+      name: "review_account_deletion_request",
+      args: {
+        target_request_id: "00000000-0000-4000-8000-000000000000",
+        requested_decision: "reject",
+        requested_notes: "Staging schema probe only.",
+      },
+      expectedError: "Account deletion request not found",
+    },
+    {
+      name: "delete_retention_batch",
+      args: {
+        target_table: "schema_probe",
+        target_before: new Date(0).toISOString(),
+        target_exclude_id: null,
+        target_limit: 1,
+      },
+      expectedError: "Unsupported retention table",
+    },
+  ] as const;
+  for (const probe of guardedRpcProbes) {
+    const { error } = await admin.rpc(probe.name, probe.args);
+    if (!error || !error.message.includes(probe.expectedError)) {
+      throw new Error(
+        `Staging schema is missing the current guarded RPC ${probe.name}. Apply every migration through the current branch before rerunning E2E.${error ? ` Provider message: ${error.message}` : ""}`
+      );
+    }
+  }
 }
 
-async function upsertStagingData(
-  admin: SupabaseAdmin,
-  districtSchemaReady: boolean,
-): Promise<Map<string, string>> {
-  if (districtSchemaReady) {
-    const { error: districtError } = await admin
-      .from("districts")
-      .upsert(stagingDistrict, { onConflict: "slug" });
-    if (districtError) throw districtError;
-  }
+async function upsertStagingData(admin: SupabaseAdmin): Promise<Map<string, string>> {
+  const { error: districtError } = await admin
+    .from("districts")
+    .upsert(stagingDistrict, { onConflict: "slug" });
+  if (districtError) throw districtError;
 
   const { error: schoolsError } = await admin.from("schools").upsert(
     stagingSchools.map((school) => ({
       ...school,
-      ...(districtSchemaReady ? { district_id: stagingDistrict.id } : {}),
+      district_id: stagingDistrict.id,
     })),
     { onConflict: "slug" },
   );
@@ -414,24 +618,18 @@ async function main() {
   }) as SupabaseAdmin;
 
   await assertRequiredTablesExist(admin);
-  const districtSchemaReady = await hasDistrictSchema(admin);
-  const privacySchemaReady = await hasPilotPrivacySchema(admin);
-  const schoolIds = await upsertStagingData(admin, districtSchemaReady);
-  const { data: accessRows, error: accessError } = privacySchemaReady
-    ? await admin
-        .from("school_signup_access")
-        .select("school_id,access_code")
-        .in("school_id", [...schoolIds.values()])
-    : { data: [], error: null };
+  const schoolIds = await upsertStagingData(admin);
+  const { data: accessRows, error: accessError } = await admin
+    .from("school_signup_access")
+    .select("school_id,access_code")
+    .in("school_id", [...schoolIds.values()]);
   if (accessError) throw accessError;
   const accessCodes = new Map<string, string>(
     ((accessRows ?? []) as Array<{ school_id: string; access_code: string }>)
       .map((row) => [row.school_id, row.access_code])
   );
 
-  const stagingUsers = districtSchemaReady
-    ? users
-    : users.filter((user) => user.role !== "district_admin");
+  const stagingUsers = users;
   for (const user of stagingUsers) {
     const schoolId = user.schoolSlug ? schoolIds.get(user.schoolSlug)! : null;
     const authSchoolId = schoolId ?? schoolIds.get("school1")!;
@@ -441,8 +639,12 @@ async function main() {
       school_id: authSchoolId,
       ...(schoolAccessCode ? { school_access_code: schoolAccessCode } : {}),
       grade_level: user.gradeLevel ? String(user.gradeLevel) : undefined,
+      [POLICY_ACCEPTANCE_METADATA.privacy]: PRIVACY_POLICY_VERSION,
+      [POLICY_ACCEPTANCE_METADATA.terms]: TERMS_VERSION,
+      [POLICY_ACCEPTANCE_METADATA.acceptableUse]: ACCEPTABLE_USE_VERSION,
+      [POLICY_ACCEPTANCE_METADATA.ageAssurance]: HIGH_SCHOOL_AGE_ASSURANCE,
     };
-    if (privacySchemaReady && !schoolAccessCode) {
+    if (!schoolAccessCode) {
       throw new Error(`Staging school access code is missing for ${user.email}.`);
     }
 
@@ -476,29 +678,41 @@ async function main() {
       school_id: schoolId,
       grade_level: user.gradeLevel ?? null,
       updated_at: new Date().toISOString(),
-      ...(districtSchemaReady && user.role === "district_admin"
+      ...(user.role === "district_admin"
         ? { district_id: stagingDistrict.id }
         : {}),
     };
     const { error: profileError } = await admin.from("profiles").upsert(profilePayload);
     if (profileError) throw profileError;
 
+    const { error: policyAcceptanceError } = await admin
+      .from("policy_acceptances")
+      .upsert({
+        user_id: userId,
+        school_id: schoolId,
+        privacy_version: PRIVACY_POLICY_VERSION,
+        terms_version: TERMS_VERSION,
+        acceptable_use_version: ACCEPTABLE_USE_VERSION,
+        age_assurance: HIGH_SCHOOL_AGE_ASSURANCE,
+        source: "existing_user",
+        accepted_at: new Date().toISOString(),
+      }, {
+        onConflict: "user_id,privacy_version,terms_version,acceptable_use_version",
+      });
+    if (policyAcceptanceError) throw policyAcceptanceError;
+
     const { data: profile, error: verifyProfileError } = await admin
       .from("profiles")
-      .select(districtSchemaReady
-        ? "id,email,role,school_id,district_id"
-        : "id,email,role,school_id")
+      .select("id,email,role,school_id,district_id")
       .eq("id", userId)
       .maybeSingle();
     if (verifyProfileError) throw verifyProfileError;
     if (!profile) throw new Error(`Profile was not created for ${user.email}.`);
     if (profile.role !== user.role) throw new Error(`Profile role mismatch for ${user.email}.`);
     if ((profile.school_id ?? null) !== schoolId) throw new Error(`Profile school mismatch for ${user.email}.`);
-    if (districtSchemaReady) {
-      const expectedDistrictId = user.role === "super_admin" ? null : stagingDistrict.id;
-      if ((profile.district_id ?? null) !== expectedDistrictId) {
-        throw new Error(`Profile district mismatch for ${user.email}.`);
-      }
+    const expectedDistrictId = user.role === "super_admin" ? null : stagingDistrict.id;
+    if ((profile.district_id ?? null) !== expectedDistrictId) {
+      throw new Error(`Profile district mismatch for ${user.email}.`);
     }
   }
 

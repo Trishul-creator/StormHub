@@ -48,13 +48,31 @@ describe("Google Drive credential protection", () => {
     expect(verifyGoogleOAuthState(state)).toBeNull();
   });
 
-  it("prevents external OAuth return URLs", () => {
+  it.each([
+    "https://attacker.example/collect",
+    "//attacker.example/collect",
+    "/\\attacker.example/collect",
+  ])("prevents an unsafe OAuth return URL: %s", (returnTo) => {
+    const state = createGoogleOAuthState({ userId: "user-1", nonce: "nonce-1", returnTo });
+
+    expect(verifyGoogleOAuthState(state)).toMatchObject({
+      userId: "user-1",
+      nonce: "nonce-1",
+      returnTo: "/settings",
+    });
+  });
+
+  it("preserves a signed internal OAuth return URL", () => {
     const state = createGoogleOAuthState({
       userId: "user-1",
       nonce: "nonce-1",
-      returnTo: "https://attacker.example/collect",
+      returnTo: "/clubs/science-bowl/member?tab=coursework",
     });
 
-    expect(verifyGoogleOAuthState(state)?.returnTo).toBe("/settings");
+    expect(verifyGoogleOAuthState(state)).toMatchObject({
+      userId: "user-1",
+      nonce: "nonce-1",
+      returnTo: "/clubs/science-bowl/member?tab=coursework",
+    });
   });
 });

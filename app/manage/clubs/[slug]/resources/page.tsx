@@ -19,16 +19,28 @@ export default async function ManageResourcesPage({ params }: PageProps) {
   const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
   const auth = await requireClubManager(club);
+  const readOnlySupport = auth.readOnlySupport;
   const resources = (await getClubManagedContent(club.id, "resource")) as ClubResource[];
   const canDelete = canApproveClubContent(auth.profile, club, auth.membership);
   const canPublish = canPublishClubContent(auth.profile, club, auth.membership, "resource");
   const courseworkEnabled = canManageClubCoursework(auth.profile, club, auth.membership);
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
-      <PageHeader title="Create resource" description={`Share links and materials with ${club.name} members.`} />
-      <ClubCreateNavigation clubSlug={slug} activeType="resource" courseworkEnabled={courseworkEnabled} />
-      <ContentForm type="resource" clubSlug={slug} canPublish={canPublish} />
-      <section className="mt-8 rounded-xl border bg-card p-5 shadow-sm">
+      <PageHeader
+        title={readOnlySupport ? "Resources — read only" : "Create resource"}
+        description={
+          readOnlySupport
+            ? `Inspect ${club.name} resources during this recorded support session.`
+            : `Share links and materials with ${club.name} members.`
+        }
+      />
+      {!readOnlySupport && (
+        <>
+          <ClubCreateNavigation clubSlug={slug} activeType="resource" courseworkEnabled={courseworkEnabled} />
+          <ContentForm type="resource" clubSlug={slug} canPublish={canPublish} />
+        </>
+      )}
+      <section className={`${readOnlySupport ? "mt-2" : "mt-8"} rounded-xl border bg-card p-5 shadow-sm`}>
         <h2 className="font-semibold text-storm-navy">Previous resources</h2>
         <div className="mt-4 space-y-3">
           {resources.map((resource) => (

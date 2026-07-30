@@ -10,6 +10,7 @@ import {
   getGoogleDriveServerConfig,
   isGoogleDrivePickerConfigured,
 } from "@/lib/env";
+import { safeAuthRedirectPath } from "@/lib/auth-redirect";
 import type { GoogleDriveConnectionStatus } from "@/types/database";
 
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
@@ -90,8 +91,7 @@ function decodeCanonicalBase64Url(value: string): Buffer {
 }
 
 function safeReturnTo(value?: string | null): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/settings";
-  return value.slice(0, 1000);
+  return safeAuthRedirectPath(value, "/settings");
 }
 
 export function createGoogleOAuthState(input: {

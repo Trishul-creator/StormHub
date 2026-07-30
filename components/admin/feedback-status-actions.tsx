@@ -10,10 +10,12 @@ import type { FeedbackStatus } from "@/types/database";
 
 export function FeedbackStatusActions({
   id,
+  schoolId,
   status,
   canReply,
 }: {
   id: string;
+  schoolId: string;
   status: FeedbackStatus;
   canReply: boolean;
 }) {
@@ -22,7 +24,7 @@ export function FeedbackStatusActions({
 
   function setStatus(nextStatus: FeedbackStatus) {
     startTransition(async () => {
-      const result = await updateFeedbackStatus(id, nextStatus);
+      const result = await updateFeedbackStatus(id, nextStatus, schoolId);
       if (result.success) {
         toast({ title: "Feedback updated", description: `Marked as ${nextStatus}.` });
         router.refresh();
@@ -35,7 +37,7 @@ export function FeedbackStatusActions({
   function respond(formData: FormData) {
     const message = String(formData.get("response") ?? "");
     startTransition(async () => {
-      const result = await respondToFeedback(id, message);
+      const result = await respondToFeedback(id, message, schoolId);
       if (result.success) {
         toast({ title: "Response queued", description: "The reply was added to email delivery and the message was resolved." });
         router.refresh();
@@ -52,6 +54,7 @@ export function FeedbackStatusActions({
           <Textarea
             name="response"
             rows={3}
+            maxLength={5000}
             placeholder="Write a response that will be emailed to the sender..."
             disabled={pending}
           />
