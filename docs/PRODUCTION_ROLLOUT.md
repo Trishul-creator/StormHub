@@ -42,6 +42,7 @@ production. The current release must contain every migration through:
 20260730260000_independent_school_offboarding.sql
 20260730270000_cross_tenant_transition_integrity.sql
 20260730280000_platform_support_access_logging.sql
+20260730290000_admin_step_up_authentication.sql
 ```
 
 Use one linked-project workflow per environment:
@@ -238,7 +239,7 @@ If either `20260710160000` or `20260720120000` is already installed but missing 
 history, repair that exact version only after comparing the hosted schema. Never rerun a guessed repair.
 
 After the push, production `supabase migration list` must include every checked-in migration through
-`20260730280000`. A missing row blocks production acceptance even when the current UI appears to
+`20260730290000`. A missing row blocks production acceptance even when the current UI appears to
 work.
 
 Configure approved signup domains in the application after the migration is applied:
@@ -295,7 +296,15 @@ secret is absent.
 ## 6A. Confirm Privacy Release Controls
 
 Apply every migration through
-`20260730280000_platform_support_access_logging.sql` before performing these checks.
+`20260730290000_admin_step_up_authentication.sql` before performing these checks.
+
+### Administrator identity confirmation
+
+- Role, district, account-status, account-deletion, school-access, tenant-offboarding, organization,
+  and private-support changes require a password or Google confirmation from the same administrator.
+- The confirmation window lasts five minutes. An ordinary access-token refresh does not extend it.
+- Verify both password and Google paths in staging. After the window expires, confirm that a
+  protected change returns to the identity-confirmation flow without applying the mutation.
 
 ### Legal holds and tenant offboarding
 

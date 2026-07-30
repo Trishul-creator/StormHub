@@ -14,6 +14,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import type { PlatformSupportSession } from "@/lib/support-access";
+import {
+  beginAdminReauthentication,
+  needsAdminReauthentication,
+} from "@/lib/admin-step-up-shared";
 
 const MAX_BROWSER_TIMEOUT_MS = 2_147_000_000;
 
@@ -64,6 +68,10 @@ export function PlatformSupportAccess({
         durationMinutes: Number(formData.get("durationMinutes") ?? 30),
       });
       if (!result.success || !result.session) {
+        if (needsAdminReauthentication(result)) {
+          beginAdminReauthentication();
+          return;
+        }
         toast({
           title: "Could not start support access",
           description: result.error,
@@ -84,6 +92,10 @@ export function PlatformSupportAccess({
     startTransition(async () => {
       const result = await endPlatformSupportSession(schoolId);
       if (!result.success) {
+        if (needsAdminReauthentication(result)) {
+          beginAdminReauthentication();
+          return;
+        }
         toast({
           title: "Could not end support access",
           description: result.error,

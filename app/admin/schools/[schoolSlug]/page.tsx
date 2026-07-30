@@ -19,6 +19,7 @@ import {
   getPlatformSupportAvailability,
 } from "@/lib/support-access";
 import { slugify } from "@/lib/utils";
+import { requireRecentAdminAuthenticationOrRedirect } from "@/lib/admin-step-up";
 
 interface AdminSchoolPageProps {
   params: Promise<{ schoolSlug: string }>;
@@ -35,6 +36,11 @@ async function updateSchoolDetailsAction(formData: FormData) {
   if (!school || !canAccessSchoolAdmin(profile, school.id, school.district_id)) {
     redirect("/admin?error=school_scope_required");
   }
+  await requireRecentAdminAuthenticationOrRedirect(
+    `/admin/schools/${currentSlug}`,
+    undefined,
+    profile.id
+  );
 
   const supabase = await createClient();
   if (!supabase) redirect(`/admin/schools/${currentSlug}?error=database_required`);

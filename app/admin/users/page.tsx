@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { RoleBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/lib/auth";
+import { getAllDistricts } from "@/lib/districts";
 import {
   ADMIN_USERS_PAGE_SIZE,
   getAdminUsers,
@@ -72,6 +73,11 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
 
   const clubs = selectedSchool
     ? await getManageableClubs(profile, selectedSchool.id)
+    : [];
+  const assignableDistricts = profile.role === "super_admin"
+    ? (await getAllDistricts()).filter(
+        (district) => district.is_active && !district.access_disabled_at
+      )
     : [];
   const demo = isDemoMode();
   const firstResult = userPage.total === 0
@@ -168,6 +174,8 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
                       clubs={clubs}
                       actorId={profile.id}
                       actorRole={profile.role}
+                      actorEmail={profile.email ?? ""}
+                      districts={assignableDistricts.map(({ id, name }) => ({ id, name }))}
                       accountActionsOnly={!canOpenUserEditor(
                         profile.role,
                         user.role,

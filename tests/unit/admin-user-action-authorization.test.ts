@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   getCurrentProfile: vi.fn(),
   revalidatePath: vi.fn(),
   disconnectGoogleDrive: vi.fn(),
+  createNotification: vi.fn(),
+  requireRecentAdminAuthentication: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({
@@ -16,6 +18,9 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("@/lib/supabase/mode", () => ({
   isDemoMode: () => false,
+}));
+vi.mock("@/lib/admin-step-up", () => ({
+  requireRecentAdminAuthentication: mocks.requireRecentAdminAuthentication,
 }));
 vi.mock("@/lib/auth", () => ({
   createProfileIfMissing: vi.fn(),
@@ -33,8 +38,16 @@ vi.mock("@/lib/google-drive", async (importOriginal) => {
     disconnectGoogleDrive: mocks.disconnectGoogleDrive,
   };
 });
+vi.mock("@/lib/notifications", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/notifications")>();
+  return {
+    ...actual,
+    createNotification: mocks.createNotification,
+  };
+});
 
 import {
+  assignUserToDistrictAdministrator,
   deleteUserAccount,
   updateUserAccountStatus,
   updateUserRoleAndClubs,
@@ -64,6 +77,8 @@ describe("generic user-management action authorization", () => {
       account_status: "active",
     });
     mocks.disconnectGoogleDrive.mockResolvedValue(undefined);
+    mocks.createNotification.mockResolvedValue(undefined);
+    mocks.requireRecentAdminAuthentication.mockResolvedValue(null);
   });
 
   it("does not let a crafted generic request demote an elevated account", async () => {
@@ -78,6 +93,33 @@ describe("generic user-management action authorization", () => {
     })).resolves.toEqual({
       success: false,
       error: "You do not have permission to make this role change.",
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects a sensitive mutation before its RPC when identity confirmation is stale", async () => {
+    const schoolTarget = {
+      ...target,
+      id: "student-step-up",
+      school_id: "school-1",
+      role: "student" as const,
+    };
+    const rpc = vi.fn();
+    mocks.createClient.mockResolvedValue(createTargetLookupClient(schoolTarget, rpc));
+    mocks.createAdminClient.mockReturnValue(createTargetLookupClient(schoolTarget, vi.fn()));
+    mocks.requireRecentAdminAuthentication.mockResolvedValue({
+      success: false,
+      error: "Confirm your identity before making this sensitive administrative change.",
+      reauthRequired: true,
+    });
+
+    await expect(updateUserRoleAndClubs({
+      targetUserId: schoolTarget.id,
+      role: "teacher",
+      clubIds: [],
+    })).resolves.toMatchObject({
+      success: false,
+      reauthRequired: true,
     });
     expect(rpc).not.toHaveBeenCalled();
   });
@@ -134,6 +176,49 @@ describe("generic user-management action authorization", () => {
       target_user_id: schoolTarget.id,
       new_status: "suspended",
     });
+  });
+
+  it("assigns an eligible account to exactly one active district through the dedicated RPC", async () => {
+    const schoolTarget = {
+      ...target,
+      id: "teacher-1",
+      school_id: "school-1",
+      role: "teacher" as const,
+      account_status: "active" as const,
+    };
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    mocks.createClient.mockResolvedValue({ rpc });
+    mocks.createAdminClient.mockReturnValue({
+      from: vi.fn((table: string) => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: table === "profiles"
+                ? schoolTarget
+                : {
+                    id: "district-1",
+                    is_active: true,
+                    access_disabled_at: null,
+                  },
+              error: null,
+            }),
+          })),
+        })),
+      })),
+    });
+
+    await expect(assignUserToDistrictAdministrator({
+      targetUserId: schoolTarget.id,
+      districtId: "district-1",
+    })).resolves.toEqual({ success: true });
+    expect(rpc).toHaveBeenCalledWith("assign_district_administrator", {
+      target_user_id: schoolTarget.id,
+      target_district_id: "district-1",
+    });
+    expect(mocks.createNotification).toHaveBeenCalledWith(expect.objectContaining({
+      recipientUserId: schoolTarget.id,
+      title: "You were promoted to district administrator",
+    }));
   });
 
   it("lets a platform administrator delete a school account after guarded lookup", async () => {

@@ -260,6 +260,10 @@ async function assertRequiredTablesExist(admin: SupabaseAdmin) {
         requested_resource_id: null,
       },
     },
+    {
+      name: "has_recent_admin_authentication",
+      args: { maximum_age_seconds: 300 },
+    },
     { name: "has_any_active_legal_hold", args: {} },
     {
       name: "can_review_account_deletion_request",

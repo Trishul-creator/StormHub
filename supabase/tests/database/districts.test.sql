@@ -123,7 +123,15 @@ SELECT isnt(
 );
 SELECT set_config(
   'request.jwt.claims',
-  '{"sub":"61000000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}',
+  jsonb_build_object(
+    'sub', '61000000-0000-4000-8000-000000000001',
+    'role', 'authenticated',
+    'aal', 'aal1',
+    'amr', jsonb_build_array(jsonb_build_object(
+      'method', 'oauth',
+      'timestamp', EXTRACT(EPOCH FROM NOW())::BIGINT
+    ))
+  )::TEXT,
   TRUE
 );
 SELECT lives_ok(
@@ -199,7 +207,15 @@ SELECT throws_ok(
 );
 SELECT set_config(
   'request.jwt.claims',
-  '{"sub":"61000000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}',
+  jsonb_build_object(
+    'sub', '61000000-0000-4000-8000-000000000001',
+    'role', 'authenticated',
+    'aal', 'aal2',
+    'amr', jsonb_build_array(jsonb_build_object(
+      'method', 'oauth',
+      'timestamp', EXTRACT(EPOCH FROM NOW())::BIGINT
+    ))
+  )::TEXT,
   TRUE
 );
 SELECT is(
@@ -286,7 +302,15 @@ RESET ROLE;
 
 SELECT set_config(
   'request.jwt.claims',
-  '{"sub":"61000000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal1"}',
+  jsonb_build_object(
+    'sub', '61000000-0000-4000-8000-000000000002',
+    'role', 'authenticated',
+    'aal', 'aal1',
+    'amr', jsonb_build_array(jsonb_build_object(
+      'method', 'password',
+      'timestamp', EXTRACT(EPOCH FROM NOW())::BIGINT
+    ))
+  )::TEXT,
   TRUE
 );
 SET LOCAL ROLE authenticated;

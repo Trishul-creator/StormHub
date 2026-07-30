@@ -114,7 +114,7 @@ supabase/migrations/20260730250000_tenant_deletion_integrity.sql
 ```
 
 Do not cherry-pick only these files for the current release. Apply the normal migration chain
-through `20260730280000_platform_support_access_logging.sql` to staging first:
+through `20260730290000_admin_step_up_authentication.sql` to staging first:
 
 ```bash
 supabase link --project-ref <staging-project-ref>

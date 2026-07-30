@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { UserRoleEditor } from "@/components/admin/user-role-editor";
+import { updateUserRoleAndClubs } from "@/lib/actions";
 import type { AdminUser, Club } from "@/types/database";
 
 vi.mock("next/navigation", () => ({
@@ -8,6 +9,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/actions", () => ({
+  assignUserToDistrictAdministrator: vi.fn(),
   deleteUserAccount: vi.fn(),
   updateUserAccountStatus: vi.fn(),
   updateUserRoleAndClubs: vi.fn(),
@@ -48,6 +50,7 @@ describe("UserRoleEditor sponsor choices", () => {
         user={teacher}
         actorId="super-admin"
         actorRole="super_admin"
+        actorEmail="platform@example.edu"
         clubs={[
           club(),
           club(),
@@ -83,6 +86,7 @@ describe("UserRoleEditor sponsor choices", () => {
         }}
         actorId="super-admin"
         actorRole="super_admin"
+        actorEmail="platform@example.edu"
         clubs={[]}
       />
     );
@@ -97,7 +101,9 @@ describe("UserRoleEditor sponsor choices", () => {
         user={{ ...teacher, role: "student" }}
         actorId="super-admin"
         actorRole="super_admin"
+        actorEmail="platform@example.edu"
         clubs={[]}
+        districts={[{ id: "district-1", name: "Elkhorn Public Schools" }]}
         accountActionsOnly
       />
     );
@@ -108,6 +114,30 @@ describe("UserRoleEditor sponsor choices", () => {
       { key: "Enter" }
     );
     expect(await screen.findByText("Ban account")).toBeVisible();
+    expect(screen.getByText("Assign district admin")).toBeVisible();
     expect(screen.getByText("Delete user")).toBeVisible();
+  });
+
+  it("opens identity confirmation when a sensitive role change needs step-up", async () => {
+    vi.mocked(updateUserRoleAndClubs).mockResolvedValueOnce({
+      success: false,
+      error: "Confirm your identity.",
+      reauthRequired: true,
+    } as never);
+    render(
+      <UserRoleEditor
+        user={{ ...teacher, role: "student" }}
+        actorId="school-admin"
+        actorRole="admin"
+        actorEmail="admin@school.edu"
+        clubs={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Save role" }));
+
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    expect(screen.getByText("Confirm your identity")).toBeVisible();
+    expect(screen.getByLabelText(/password for admin@school.edu/i)).toBeVisible();
   });
 });

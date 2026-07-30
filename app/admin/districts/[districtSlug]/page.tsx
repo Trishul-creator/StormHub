@@ -14,6 +14,7 @@ import { getAllSchools } from "@/lib/schools";
 import { slugify } from "@/lib/utils";
 import type { Profile } from "@/types/database";
 import { createClient } from "@/lib/supabase/server";
+import { requireRecentAdminAuthenticationOrRedirect } from "@/lib/admin-step-up";
 
 interface DistrictPageProps {
   params: Promise<{ districtSlug: string }>;
@@ -29,6 +30,11 @@ async function updateDistrictDetailsAction(formData: FormData) {
   if (!canAccessDistrictAdmin(profile, districtId)) {
     redirect("/admin?error=district_scope_required");
   }
+  await requireRecentAdminAuthenticationOrRedirect(
+    `/admin/districts/${currentSlug}`,
+    undefined,
+    profile.id
+  );
 
   const supabase = await createClient();
   if (!supabase) {
@@ -74,6 +80,11 @@ async function createDistrictSchoolAction(formData: FormData) {
   if (!canAccessDistrictAdmin(profile, districtId)) {
     redirect("/admin?error=district_scope_required");
   }
+  await requireRecentAdminAuthenticationOrRedirect(
+    `/admin/districts/${districtSlug}`,
+    undefined,
+    profile.id
+  );
   const admin = createAdminClient();
   if (!admin) redirect(`/admin/districts/${districtSlug}?error=database_required`);
 
@@ -125,6 +136,11 @@ async function assignDistrictAdministratorAction(formData: FormData) {
   const districtId = String(formData.get("district_id") ?? "");
   const districtSlug = String(formData.get("district_slug") ?? "");
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  await requireRecentAdminAuthenticationOrRedirect(
+    `/admin/districts/${districtSlug}`,
+    undefined,
+    profile.id
+  );
   const admin = createAdminClient();
   const supabase = await createClient();
   if (!admin || !supabase || !districtId || !email) {
@@ -162,6 +178,11 @@ async function attachExistingSchoolAction(formData: FormData) {
   const districtId = String(formData.get("district_id") ?? "");
   const districtSlug = String(formData.get("district_slug") ?? "");
   const schoolId = String(formData.get("school_id") ?? "");
+  await requireRecentAdminAuthenticationOrRedirect(
+    `/admin/districts/${districtSlug}`,
+    undefined,
+    profile.id
+  );
   const admin = createAdminClient();
   if (!admin || !districtId || !schoolId) {
     redirect(`/admin/districts/${districtSlug}?error=missing_school_assignment`);
