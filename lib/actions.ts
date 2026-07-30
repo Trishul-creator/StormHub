@@ -26,6 +26,7 @@ import {
   canPublishClubContent,
   canPublishClubCoursework,
   canCreateClub,
+  canAccessSchoolAdmin,
   isAdminRole,
 } from "@/lib/permissions";
 import { clubRoleLabel, clubRoleRank } from "@/lib/club-roles";
@@ -40,7 +41,10 @@ import type {
   AssignmentStatus,
   ClubAssignment,
   ClubAssignmentSubmission,
+  ContentStatus,
   FeedbackStatus,
+  TenantOffboardingScope,
+  TenantOffboardingStatus,
 } from "@/types/database";
 import { slugify } from "@/lib/utils";
 import { DEFAULT_SCHOOL_ID, SUPPORT_EMAIL, getCurrentSchool, getSchoolById } from "@/lib/schools";
@@ -91,6 +95,23 @@ import {
   isGoogleDriveReconnectError,
   isGoogleWorkspaceFile,
 } from "@/lib/google-drive";
+import {
+  ACCEPTABLE_USE_VERSION,
+  HIGH_SCHOOL_AGE_ASSURANCE,
+  PILOT_MAXIMUM_GRADE,
+  PILOT_MINIMUM_GRADE,
+  POLICY_ACCEPTANCE_METADATA,
+  PRIVACY_POLICY_VERSION,
+  TERMS_VERSION,
+} from "@/lib/policy";
+import {
+  courseworkUploadMimeType,
+  safeCourseworkFileName,
+  validateCourseworkFile,
+  validateCourseworkFileSignature,
+  validateStoredCourseworkFile,
+} from "@/lib/coursework-files";
+import { feedbackResponseDedupeKey } from "@/lib/support-feedback";
 
 const DEMO_USER_COOKIE = "stormhub_demo_user";
 const DEMO_EMAIL_COOKIE = "stormhub_demo_email";
@@ -99,6 +120,57 @@ const DEMO_BOOKMARKS_COOKIE = "stormhub_demo_bookmarks";
 const DEMO_RSVPS_COOKIE = "stormhub_demo_rsvps";
 const DEMO_OPPORTUNITY_SIGNUPS_COOKIE = "stormhub_demo_opportunity_signups";
 const DEMO_READ_NOTIFICATIONS_COOKIE = "stormhub_demo_read_notifications";
+
+async function recordPolicyAcceptance(input: {
+  admin: NonNullable<ReturnType<typeof createAdminClient>>;
+  userId: string;
+  schoolId?: string | null;
+  source: "password_signup" | "google_onboarding" | "existing_user";
+  existingMetadata?: Record<string, unknown>;
+}): Promise<boolean> {
+  const metadata = {
+    ...(input.existingMetadata ?? {}),
+    [POLICY_ACCEPTANCE_METADATA.privacy]: PRIVACY_POLICY_VERSION,
+    [POLICY_ACCEPTANCE_METADATA.terms]: TERMS_VERSION,
+    [POLICY_ACCEPTANCE_METADATA.acceptableUse]: ACCEPTABLE_USE_VERSION,
+    [POLICY_ACCEPTANCE_METADATA.ageAssurance]: HIGH_SCHOOL_AGE_ASSURANCE,
+  };
+  const { error: metadataError } = await input.admin.auth.admin.updateUserById(input.userId, {
+    user_metadata: metadata,
+  });
+  if (metadataError) {
+    console.warn("[recordPolicyAcceptance] Could not preserve policy versions in auth metadata.");
+  }
+
+  const { error } = await input.admin
+    .from("policy_acceptances")
+    .upsert(
+      {
+        user_id: input.userId,
+        school_id: input.schoolId ?? null,
+        privacy_version: PRIVACY_POLICY_VERSION,
+        terms_version: TERMS_VERSION,
+        acceptable_use_version: ACCEPTABLE_USE_VERSION,
+        age_assurance: HIGH_SCHOOL_AGE_ASSURANCE,
+        source: input.source,
+      },
+      {
+        onConflict: "user_id,privacy_version,terms_version,acceptable_use_version",
+        ignoreDuplicates: true,
+      }
+    );
+  if (error) {
+    const schemaMissing = error.code === "42P01"
+      || error.code === "PGRST205"
+      || error.message.includes("policy_acceptances");
+    console.warn(
+      schemaMissing
+        ? "[recordPolicyAcceptance] Policy acceptance table is not deployed yet; auth metadata remains the audit fallback."
+        : `[recordPolicyAcceptance] Could not write policy acceptance record: ${error.message}`
+    );
+  }
+  return !error;
+}
 
 function formatMembershipRole(role: MembershipRole): string {
   return clubRoleLabel(role);
@@ -137,6 +209,7 @@ async function notifySchoolStudentsAboutPublishedClub(input: { club: Club }) {
       .select("id,email,full_name")
       .eq("school_id", input.club.school_id)
       .eq("role", "student")
+      .eq("account_status", "active")
       .not("email", "is", null),
   ]);
 
@@ -165,28 +238,32 @@ async function notifySchoolStudentsAboutPublishedClub(input: { club: Club }) {
     `Open in StormHub: ${absoluteLink}`,
   ].filter(Boolean).join("\n\n");
 
-  await Promise.all(
-    ((students ?? []) as Array<{ id: string; email: string | null }>).map(async (student) => {
-      await createNotification({
-        recipientUserId: student.id,
-        type: "system_message",
-        importance: "important",
-        title,
-        message,
-        link: relativeLink,
-        clubId: input.club.id,
-      });
-      if (student.email) {
-        await createEmailOutboxItem({
+  const recipients = (students ?? []) as Array<{ id: string; email: string | null }>;
+  const batchSize = 20;
+  for (let offset = 0; offset < recipients.length; offset += batchSize) {
+    await Promise.all(
+      recipients.slice(offset, offset + batchSize).map(async (student) => {
+        await createNotification({
           recipientUserId: student.id,
-          recipientEmail: student.email,
-          subject: `[StormHub] ${input.club.name} is now open`,
-          body: emailBody,
-          type: "club_published",
+          type: "system_message",
+          importance: "important",
+          title,
+          message,
+          link: relativeLink,
+          clubId: input.club.id,
         });
-      }
-    })
-  );
+        if (student.email) {
+          await createEmailOutboxItem({
+            recipientUserId: student.id,
+            recipientEmail: student.email,
+            subject: `[StormHub] ${input.club.name} is now open`,
+            body: emailBody,
+            type: "club_published",
+          });
+        }
+      })
+    );
+  }
 }
 
 async function getValidTeacherSponsor(input: {
@@ -203,6 +280,7 @@ async function getValidTeacherSponsor(input: {
     .eq("id", sponsorUserId)
     .eq("school_id", input.schoolId)
     .eq("role", "teacher")
+    .eq("account_status", "active")
     .maybeSingle();
   if (error) {
     console.error("[getValidTeacherSponsor]", error.message);
@@ -609,7 +687,7 @@ export async function registerForOpportunity(
 
   const { data: opportunity, error: opportunityError } = await supabase
     .from("opportunities")
-    .select("id,slug,school_id,status,visibility")
+    .select("id,slug,school_id,status,visibility,deadline")
     .eq("id", opportunityId)
     .maybeSingle();
   if (
@@ -618,6 +696,7 @@ export async function registerForOpportunity(
     || opportunity.school_id !== profile.school_id
     || opportunity.status !== "approved"
     || opportunity.visibility !== "public"
+    || (opportunity.deadline && new Date(opportunity.deadline).getTime() <= Date.now())
   ) {
     return { success: false, error: "This opportunity is not available for your account." };
   }
@@ -689,6 +768,7 @@ export async function cancelOpportunitySignup(
 export async function submitFeedback(data: {
   name?: string;
   email?: string;
+  schoolId?: string | null;
   category: string;
   message: string;
   captchaToken?: string | null;
@@ -701,8 +781,24 @@ export async function submitFeedback(data: {
 
   const { data: { user } } = await supabase.auth.getUser();
   const profile = user ? await getCurrentProfile() : null;
-  const school = profile?.school_id ? await getSchoolById(profile.school_id) : await getCurrentSchool();
-  if (!school) return { success: false, error: "Choose a school workspace before contacting support." };
+  let supportSchoolId = profile?.school_id ?? null;
+  if (!supportSchoolId) {
+    const requestedSchoolId = data.schoolId?.trim() || null;
+    if (!requestedSchoolId) {
+      return { success: false, error: "Choose your school before contacting support." };
+    }
+    const { data: publicSchool, error: schoolError } = await admin
+      .from("schools")
+      .select("id")
+      .eq("id", requestedSchoolId)
+      .eq("is_active", true)
+      .eq("is_public", true)
+      .maybeSingle();
+    if (schoolError || !publicSchool) {
+      return { success: false, error: "Choose a valid active school before contacting support." };
+    }
+    supportSchoolId = publicSchool.id;
+  }
 
   const name = data.name?.trim().replace(/\s+/g, " ") || null;
   const email = data.email?.trim().toLowerCase() || user?.email || null;
@@ -741,8 +837,8 @@ export async function submitFeedback(data: {
   if (!senderLimit.allowed) return { success: false, error: senderLimit.error };
 
   const { error: insertError } = await admin.from("feedback").insert({
-    school_id: school.id,
-    user_id: user?.id ?? null,
+    school_id: supportSchoolId,
+    user_id: profile?.id ?? null,
     name,
     email,
     category: normalizedCategory,
@@ -757,22 +853,12 @@ export async function submitFeedback(data: {
 
   await createEmailOutboxItem({
     recipientEmail: SUPPORT_EMAIL,
-    subject: `[StormHub Support] ${
-      normalizedCategory === "bug"
-        ? "Bug report"
-        : normalizedCategory === "feature"
-          ? "Feature request"
-          : normalizedCategory === "club"
-            ? "Club-related message"
-            : "App feedback"
-    }`,
+    subject: "[StormHub Support] New request",
     body: [
-      `Category: ${data.category}`,
-      `School: ${school.name}`,
-      `From: ${name || "Anonymous"}`,
-      `Reply email: ${email || "Not provided"}`,
+      "A new support request is ready for authorized review.",
       "",
-      message,
+      "Sign in to StormHub to view it inside the scoped administration workspace.",
+      "Open in StormHub: /admin/feedback",
     ].join("\n"),
     type: "support_message",
   });
@@ -782,7 +868,8 @@ export async function submitFeedback(data: {
 
 export async function updateFeedbackStatus(
   id: string,
-  status: FeedbackStatus
+  status: FeedbackStatus,
+  schoolId: string
 ): Promise<{ success: boolean; error?: string }> {
   if (isDemoMode()) return { success: false, error: "Feedback updates are unavailable in demo mode." };
   if (!["open", "reviewed", "resolved"].includes(status)) {
@@ -793,8 +880,20 @@ export async function updateFeedbackStatus(
   if (!supabase || !profile || !isAdminRole(profile.role)) {
     return { success: false, error: "Administrator access required." };
   }
-  const { error } = await supabase.from("feedback").update({ status }).eq("id", id);
+  if (profile.role === "super_admin") {
+    return { success: false, error: "Platform support access is read-only." };
+  }
+  const school = await getSchoolById(schoolId.trim());
+  if (!school || !canAccessSchoolAdmin(profile, school.id, school.district_id)) {
+    return { success: false, error: "You cannot manage support requests for that school." };
+  }
+  const { data: updated, error } = await supabase.rpc("review_feedback_status", {
+    target_feedback_id: id,
+    target_school_id: school.id,
+    next_status: status,
+  });
   if (error) return { success: false, error: friendlyError(error, "Could not update feedback.") };
+  if (!updated) return { success: false, error: "Support request not found in that school." };
   revalidatePath("/admin");
   revalidatePath("/admin/feedback");
   return { success: true };
@@ -802,21 +901,33 @@ export async function updateFeedbackStatus(
 
 export async function respondToFeedback(
   id: string,
-  response: string
+  response: string,
+  schoolId: string
 ): Promise<{ success: boolean; error?: string }> {
   if (isDemoMode()) return { success: false, error: "Feedback replies are unavailable in demo mode." };
   const trimmed = response.trim();
   if (!trimmed) return { success: false, error: "Response message is required." };
+  if (trimmed.length > 5000) {
+    return { success: false, error: "Keep the response under 5,000 characters." };
+  }
   const supabase = await createClient();
   const profile = await getCurrentProfile();
   if (!supabase || !profile || !isAdminRole(profile.role)) {
     return { success: false, error: "Administrator access required." };
+  }
+  if (profile.role === "super_admin") {
+    return { success: false, error: "Platform support access is read-only." };
+  }
+  const school = await getSchoolById(schoolId.trim());
+  if (!school || !canAccessSchoolAdmin(profile, school.id, school.district_id)) {
+    return { success: false, error: "You cannot manage support requests for that school." };
   }
 
   const { data: feedback, error: feedbackError } = await supabase
     .from("feedback")
     .select("*, profile:profiles(id,email,full_name)")
     .eq("id", id)
+    .eq("school_id", school.id)
     .maybeSingle();
   if (feedbackError) return { success: false, error: friendlyError(feedbackError, "Could not load feedback.") };
   if (!feedback) return { success: false, error: "Feedback message not found." };
@@ -824,13 +935,28 @@ export async function respondToFeedback(
   const recipientEmail = feedback.email || feedback.profile?.email;
   if (!recipientEmail) return { success: false, error: "This feedback message does not have a reply email." };
 
-  await createEmailOutboxItem({
+  const outboxId = await createEmailOutboxItem({
     recipientUserId: feedback.user_id ?? feedback.profile?.id ?? null,
     recipientEmail,
     subject: "[StormHub] Response to your feedback",
-    body: `Hi ${feedback.name || feedback.profile?.full_name || "there"},\n\nThanks for contacting StormHub. Here is the response from the admin team:\n\n${trimmed}\n\nOriginal message:\n${feedback.message}\n\nStatus: Resolved`,
+    body: `Hi ${feedback.name || feedback.profile?.full_name || "there"},\n\nThanks for contacting StormHub. Here is the response from the admin team:\n\n${trimmed}\n\nStatus: Resolved`,
     type: "feedback_response",
+    dedupeKey: feedbackResponseDedupeKey(id, trimmed),
   });
+  if (!outboxId) {
+    return {
+      success: false,
+      error: "The response could not be added to email delivery, so this request was not resolved.",
+    };
+  }
+
+  const { data: updated, error } = await supabase.rpc("review_feedback_status", {
+    target_feedback_id: id,
+    target_school_id: school.id,
+    next_status: "resolved",
+  });
+  if (error) return { success: false, error: friendlyError(error, "Could not mark feedback resolved.") };
+  if (!updated) return { success: false, error: "Support request not found in that school." };
 
   if (feedback.user_id) {
     await createNotification({
@@ -843,9 +969,6 @@ export async function respondToFeedback(
       sendEmail: false,
     });
   }
-
-  const { error } = await supabase.from("feedback").update({ status: "resolved" }).eq("id", id);
-  if (error) return { success: false, error: friendlyError(error, "Could not mark feedback resolved.") };
   revalidatePath("/admin");
   revalidatePath("/admin/feedback");
   return { success: true };
@@ -903,7 +1026,11 @@ export async function submitClubProposal(data: {
   const supabase = await createClient();
   const admin = createAdminClient();
   const profile = await getCurrentProfile();
-  if (!supabase || !admin || !profile) return { success: false, error: "Please sign in." };
+  if (!supabase || !profile) return { success: false, error: "Please sign in." };
+  if (profile.role === "super_admin") {
+    return { success: false, error: "Platform support access is read-only." };
+  }
+  if (!admin) return { success: false, error: "Administrator configuration is incomplete." };
   if (profile.role !== "teacher" && !isAdminRole(profile.role)) {
     return { success: false, error: "Only teachers and administrators can propose clubs." };
   }
@@ -917,7 +1044,7 @@ export async function submitClubProposal(data: {
   const schoolId = school.id;
   const canSubmitForSchool = profile.role === "teacher"
     ? profile.school_id === schoolId
-    : canCreateClub(profile, schoolId);
+    : canCreateClub(profile, schoolId, school.district_id);
   if (!canSubmitForSchool) {
     return { success: false, error: "You cannot create a club for this school." };
   }
@@ -992,6 +1119,7 @@ export async function submitServiceHours(data: {
 export async function submitContent(data: {
   type: "announcement" | "event" | "resource" | "opportunity";
   clubSlug?: string;
+  schoolId?: string;
   title: string;
   body: string;
   starts_at?: string;
@@ -1013,6 +1141,60 @@ export async function submitContent(data: {
   const supabase = await createClient();
   const profile = await getCurrentProfile();
   if (!supabase || !profile) return { success: false, error: "Please sign in." };
+  if (profile.role === "super_admin") {
+    return { success: false, error: "Platform support access is read-only." };
+  }
+
+  const contentTitle = data.title.trim().replace(/\s+/g, " ");
+  const contentBody = data.body.trim();
+  if (contentTitle.length < 3 || contentTitle.length > 160) {
+    return {
+      success: false,
+      error: `Use a ${data.type} title between 3 and 160 characters.`,
+    };
+  }
+  const minimumBodyLength = data.type === "opportunity" ? 3 : 1;
+  if (contentBody.length < minimumBodyLength || contentBody.length > 20_000) {
+    return {
+      success: false,
+      error: `Use ${data.type === "opportunity" ? "an opportunity description" : "content"} between ${minimumBodyLength} and 20,000 characters.`,
+    };
+  }
+  const suppliedResourceUrl = data.type === "resource" ? data.resource_url?.trim() : undefined;
+  const normalizedResourceUrl = data.type === "resource"
+    ? normalizeHttpUrl(suppliedResourceUrl)
+    : null;
+  if (suppliedResourceUrl && !normalizedResourceUrl) {
+    return {
+      success: false,
+      error: "The resource link must start with http:// or https://.",
+    };
+  }
+
+  let opportunitySchool: Awaited<ReturnType<typeof getSchoolById>> = null;
+  if (data.type === "opportunity") {
+    if (!isAdminRole(profile.role)) {
+      return { success: false, error: "Only administrators can publish school-wide opportunities." };
+    }
+    const requestedSchoolId = data.schoolId?.trim() || profile.school_id;
+    if (!requestedSchoolId) {
+      return {
+        success: false,
+        error: "Choose the school that should receive this opportunity.",
+      };
+    }
+    opportunitySchool = await getSchoolById(requestedSchoolId);
+    if (
+      !opportunitySchool
+      || !canAccessSchoolAdmin(
+        profile,
+        opportunitySchool.id,
+        opportunitySchool.district_id
+      )
+    ) {
+      return { success: false, error: "You cannot manage opportunities for that school." };
+    }
+  }
 
   const club = data.clubSlug ? await getManagedClubBySlug(data.clubSlug) : null;
   let membership: Pick<ClubMembership, "club_id" | "status" | "role"> | null = null;
@@ -1068,8 +1250,8 @@ export async function submitContent(data: {
     insert = {
       club_id: club.id,
       author_id: profile.id,
-      title: data.title,
-      body: data.body,
+      title: contentTitle,
+      body: contentBody,
       visibility: "members",
       status: contentStatus,
       importance: data.importance ?? "normal",
@@ -1096,8 +1278,8 @@ export async function submitContent(data: {
       school_id: club.school_id,
       club_id: club.id,
       created_by: profile.id,
-      title: data.title,
-      description: data.body,
+      title: contentTitle,
+      description: contentBody,
       starts_at: startsAt.toISOString(),
       ends_at: endsAt ? endsAt.toISOString() : null,
       location: data.location || null,
@@ -1108,49 +1290,53 @@ export async function submitContent(data: {
     };
   } else if (data.type === "resource") {
     if (!club) return { success: false, error: "A club is required." };
-    const resourceUrl = data.resource_url?.trim();
     const resourceLabel = data.resource_label?.trim();
+    if (resourceLabel && resourceLabel.length > 160) {
+      return { success: false, error: "Resource link text must be 160 characters or fewer." };
+    }
     table = "club_resources";
     insert = {
       club_id: club.id,
       author_id: profile.id,
-      title: data.title,
-      description: data.body,
-      resource_type: resourceUrl ? "link" : "text",
-      url: resourceUrl || null,
-      content: resourceUrl ? resourceLabel || "Open resource" : data.body,
+      title: contentTitle,
+      description: contentBody,
+      resource_type: normalizedResourceUrl ? "link" : "text",
+      url: normalizedResourceUrl,
+      content: normalizedResourceUrl ? resourceLabel || "Open resource" : contentBody,
       visibility: "members",
       status: contentStatus,
     };
   } else {
-    if (!isAdminRole(profile.role)) {
-      return { success: false, error: "Only administrators can publish school-wide opportunities." };
+    const deadline = parseOptionalDateTime(data.deadline);
+    const eventDate = parseOptionalDateTime(data.event_date);
+    if (deadline === undefined || eventDate === undefined) {
+      return { success: false, error: "Choose valid opportunity dates and times." };
+    }
+    const externalUrl = normalizeHttpUrl(data.external_url);
+    if (data.external_url?.trim() && !externalUrl) {
+      return { success: false, error: "The sign-up link must start with http:// or https://." };
     }
     table = "opportunities";
     insert = {
-      school_id: profile.school_id,
+      school_id: opportunitySchool?.id,
       club_id: null,
       author_id: profile.id,
-      title: data.title,
-      slug: `${slugify(data.title)}-${Date.now().toString(36)}`,
-      summary: data.body.slice(0, 240),
-      description: data.body,
-      category: data.category || "Other",
-      deadline: data.deadline ? new Date(data.deadline).toISOString() : null,
-      event_date: data.event_date ? new Date(data.event_date).toISOString() : null,
-      location: data.location || null,
-      external_url: data.external_url || null,
-      action_label: data.action_label || "Sign Up",
+      title: contentTitle,
+      slug: `${slugify(contentTitle)}-${Date.now().toString(36)}`,
+      summary: contentBody.slice(0, 240),
+      description: contentBody,
+      category: data.category?.trim() || "Other",
+      deadline,
+      event_date: eventDate,
+      location: data.location?.trim() || null,
+      external_url: externalUrl,
+      action_label: data.action_label?.trim() || "Sign Up",
       visibility: "public",
       status: contentStatus,
       importance: data.importance ?? "normal",
       send_email_to_members: trustedPost && Boolean(data.send_email_to_members),
       deadline_reminder_enabled: Boolean(data.deadline_reminder_enabled),
     };
-  }
-
-  if (!insert.school_id && data.type === "opportunity") {
-    return { success: false, error: "Your profile is missing a school. Run the Supabase database patch." };
   }
 
   const contentWriter = trustedPost && club ? (createAdminClient() ?? supabase) : supabase;
@@ -1173,7 +1359,7 @@ export async function submitContent(data: {
         club && ["announcement", "resource"].includes(data.type)
           ? ["sponsor", "president"]
           : ["sponsor"],
-      title: `${data.title} needs approval`,
+      title: `${contentTitle} needs approval`,
       message: `${profile.full_name ?? profile.email ?? "A student"} submitted a ${data.type} and is waiting for review.`,
       link: "/manage/approvals",
     });
@@ -1193,7 +1379,7 @@ export async function submitContent(data: {
             ? "club_event_created"
             : "system_message",
       importance: data.importance ?? "normal",
-      title: data.title,
+      title: contentTitle,
       message:
         data.type === "announcement"
           ? `A new announcement was posted in ${club.name}.`
@@ -1219,6 +1405,11 @@ export async function submitContent(data: {
   revalidatePath("/events");
   revalidatePath("/calendar");
   revalidatePath("/opportunities");
+  if (opportunitySchool?.slug) {
+    revalidatePath(`/s/${opportunitySchool.slug}/opportunities`);
+    revalidatePath(`/admin/schools/${opportunitySchool.slug}/opportunities`);
+  }
+  revalidatePath("/manage/opportunities");
   return { success: true, approved: trustedPost, scheduled: isScheduledAnnouncement };
 }
 
@@ -1233,60 +1424,335 @@ function normalizeHttpUrl(value?: string | null): string | null {
   }
 }
 
-const COURSEWORK_BUCKET = "coursework-private";
-const MAX_COURSEWORK_FILE_SIZE = 20 * 1024 * 1024;
-const BLOCKED_COURSEWORK_EXTENSIONS = new Set([
-  "app",
-  "bat",
-  "cmd",
-  "com",
-  "dll",
-  "dmg",
-  "exe",
-  "html",
-  "htm",
-  "jar",
-  "js",
-  "msi",
-  "ps1",
-  "scr",
-  "sh",
-  "svg",
-]);
-
-function safeCourseworkFileName(value: string): string {
-  const normalized = value
-    .normalize("NFKC")
-    .replace(/[/\\\u0000-\u001f\u007f]/g, "-")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 180);
-  return normalized || "attachment";
+function parseOptionalDateTime(value?: string | null): string | null | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
 }
 
-function validateCourseworkFile(input: {
-  fileName: string;
-  fileSize: number;
-  mimeType?: string | null;
-}): string | null {
-  if (!Number.isFinite(input.fileSize) || input.fileSize <= 0) {
-    return "Choose a non-empty file.";
+type ManagedOpportunityStatus = Extract<ContentStatus, "approved" | "closed" | "archived">;
+
+async function getOpportunityManagementContext(schoolId: string): Promise<
+  | {
+      school: NonNullable<Awaited<ReturnType<typeof getSchoolById>>>;
+      supabase: NonNullable<Awaited<ReturnType<typeof createClient>>>;
+    }
+  | { error: string }
+> {
+  if (isDemoMode()) return { error: "Opportunity management is unavailable in demo mode." };
+  const [profile, supabase] = await Promise.all([getCurrentProfile(), createClient()]);
+  if (!profile || !supabase) return { error: "Please sign in." };
+  if (profile.role === "super_admin") {
+    return { error: "Platform support access is read-only." };
   }
-  if (input.fileSize > MAX_COURSEWORK_FILE_SIZE) {
-    return "Files must be 20 MB or smaller.";
+  if (!isAdminRole(profile.role)) {
+    return { error: "Only administrators can manage school-wide opportunities." };
   }
-  const extension = input.fileName.split(".").pop()?.toLowerCase() ?? "";
-  const mimeType = input.mimeType?.toLowerCase() ?? "";
+
+  const school = await getSchoolById(schoolId.trim());
   if (
-    BLOCKED_COURSEWORK_EXTENSIONS.has(extension)
-    || mimeType.includes("javascript")
-    || mimeType === "text/html"
-    || mimeType === "image/svg+xml"
-    || mimeType.startsWith("application/x-")
+    !school
+    || !canAccessSchoolAdmin(profile, school.id, school.district_id)
   ) {
-    return "That file type is not allowed. Upload a document, image, spreadsheet, presentation, text file, or archive.";
+    return { error: "You cannot manage opportunities for that school." };
+  }
+  return { school, supabase };
+}
+
+function revalidateOpportunityManagementPaths(
+  school: NonNullable<Awaited<ReturnType<typeof getSchoolById>>>,
+  slug?: string | null
+) {
+  revalidatePath("/opportunities");
+  revalidatePath("/manage/opportunities");
+  revalidatePath(`/s/${school.slug}/opportunities`);
+  revalidatePath(`/admin/schools/${school.slug}/opportunities`);
+  if (slug) revalidatePath(`/opportunities/${slug}`);
+}
+
+export async function updateOpportunity(data: {
+  id: string;
+  schoolId: string;
+  title: string;
+  description: string;
+  category: string;
+  actionLabel: string;
+  deadline?: string;
+  eventDate?: string;
+  location?: string;
+  externalUrl?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const context = await getOpportunityManagementContext(data.schoolId);
+  if ("error" in context) return { success: false, error: context.error };
+
+  const { data: opportunity, error: readError } = await context.supabase
+    .from("opportunities")
+    .select("*")
+    .eq("id", data.id)
+    .eq("school_id", context.school.id)
+    .maybeSingle();
+  if (readError || !opportunity) {
+    return { success: false, error: "Opportunity not found in this school." };
+  }
+
+  const title = data.title.trim();
+  const description = data.description.trim();
+  const category = data.category.trim();
+  const actionLabel = data.actionLabel.trim();
+  if (title.length < 3 || title.length > 160) {
+    return { success: false, error: "Use an opportunity title between 3 and 160 characters." };
+  }
+  if (description.length < 3 || description.length > 20_000) {
+    return { success: false, error: "Use an opportunity description between 3 and 20,000 characters." };
+  }
+  if (!category || category.length > 80) {
+    return { success: false, error: "Use a category between 1 and 80 characters." };
+  }
+  if (!actionLabel || actionLabel.length > 40) {
+    return { success: false, error: "Use a button label between 1 and 40 characters." };
+  }
+
+  const deadline = parseOptionalDateTime(data.deadline);
+  const eventDate = parseOptionalDateTime(data.eventDate);
+  if (deadline === undefined || eventDate === undefined) {
+    return { success: false, error: "Choose valid opportunity dates and times." };
+  }
+  const externalUrl = normalizeHttpUrl(data.externalUrl);
+  if (data.externalUrl?.trim() && !externalUrl) {
+    return { success: false, error: "The sign-up link must start with http:// or https://." };
+  }
+
+  const { error } = await context.supabase
+    .from("opportunities")
+    .update({
+      title,
+      summary: description.slice(0, 240),
+      description,
+      category,
+      action_label: actionLabel,
+      deadline,
+      event_date: eventDate,
+      location: data.location?.trim() || null,
+      external_url: externalUrl,
+    })
+    .eq("id", opportunity.id)
+    .eq("school_id", context.school.id);
+  if (error) {
+    return { success: false, error: friendlyError(error, "Could not update the opportunity.") };
+  }
+
+  revalidateOpportunityManagementPaths(context.school, opportunity.slug);
+  return { success: true };
+}
+
+export async function setOpportunityStatus(data: {
+  id: string;
+  schoolId: string;
+  status: ManagedOpportunityStatus;
+}): Promise<{ success: boolean; error?: string }> {
+  const context = await getOpportunityManagementContext(data.schoolId);
+  if ("error" in context) return { success: false, error: context.error };
+  if (!["approved", "closed", "archived"].includes(data.status)) {
+    return { success: false, error: "Unknown opportunity status." };
+  }
+
+  const { data: opportunity, error: readError } = await context.supabase
+    .from("opportunities")
+    .select("id,slug,status,deadline")
+    .eq("id", data.id)
+    .eq("school_id", context.school.id)
+    .maybeSingle();
+  if (readError || !opportunity) {
+    return { success: false, error: "Opportunity not found in this school." };
+  }
+  if (opportunity.status === data.status) return { success: true };
+  if (data.status === "closed" && opportunity.status !== "approved") {
+    return { success: false, error: "Only a published opportunity can be closed." };
+  }
+  if (
+    data.status === "approved"
+    && opportunity.deadline
+    && new Date(opportunity.deadline).getTime() <= Date.now()
+  ) {
+    return { success: false, error: "Move the deadline into the future before publishing this opportunity." };
+  }
+
+  const { error } = await context.supabase
+    .from("opportunities")
+    .update({
+      status: data.status,
+      visibility: "public",
+    })
+    .eq("id", opportunity.id)
+    .eq("school_id", context.school.id);
+  if (error) {
+    return { success: false, error: friendlyError(error, "Could not change the opportunity status.") };
+  }
+
+  revalidateOpportunityManagementPaths(context.school, opportunity.slug);
+  return { success: true };
+}
+
+export async function deleteOpportunity(data: {
+  id: string;
+  schoolId: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const context = await getOpportunityManagementContext(data.schoolId);
+  if ("error" in context) return { success: false, error: context.error };
+
+  const { data: opportunity, error: readError } = await context.supabase
+    .from("opportunities")
+    .select("id,slug,status")
+    .eq("id", data.id)
+    .eq("school_id", context.school.id)
+    .maybeSingle();
+  if (readError || !opportunity) {
+    return { success: false, error: "Opportunity not found in this school." };
+  }
+  if (!["draft", "pending", "rejected"].includes(opportunity.status)) {
+    return {
+      success: false,
+      error: "Published opportunities must be archived so student participation history is retained.",
+    };
+  }
+
+  const { error } = await context.supabase.rpc("delete_unused_opportunity", {
+    target_opportunity_id: opportunity.id,
+  });
+  if (error) {
+    const normalized = error.message.toLowerCase();
+    const reason = normalized.includes("student activity")
+      ? "This opportunity has student activity and must be archived instead of deleted."
+      : normalized.includes("must be archived")
+        ? "Published opportunities must be archived so student participation history is retained."
+        : normalized.includes("authorized school")
+          ? "Opportunity not found in this school."
+          : "Could not safely delete the opportunity. Apply the latest database migration and try again.";
+    return { success: false, error: reason };
+  }
+
+  revalidateOpportunityManagementPaths(context.school, opportunity.slug);
+  return { success: true };
+}
+
+const COURSEWORK_BUCKET = "coursework-private";
+const COURSEWORK_STORAGE_DELETE_BATCH_SIZE = 100;
+const COURSEWORK_RECORD_READ_BATCH_SIZE = 500;
+
+type CourseworkIntentCleanupRow = {
+  id: string;
+  storage_path: string;
+};
+
+async function getUnregisteredCourseworkUploadIntents(
+  admin: NonNullable<ReturnType<typeof createAdminClient>>,
+  userId: string
+): Promise<{ rows: CourseworkIntentCleanupRow[]; error?: string }> {
+  const rows: CourseworkIntentCleanupRow[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await admin
+      .from("coursework_upload_intents")
+      .select("id,storage_path")
+      .eq("user_id", userId)
+      .neq("status", "registered")
+      .order("id", { ascending: true })
+      .range(offset, offset + COURSEWORK_RECORD_READ_BATCH_SIZE - 1);
+    if (error) {
+      return {
+        rows: [],
+        error: friendlyError(
+          error,
+          "Could not verify the account's unfinished private coursework uploads. Apply the latest database migration and try again."
+        ),
+      };
+    }
+    const batch = (data ?? []) as CourseworkIntentCleanupRow[];
+    rows.push(...batch);
+    if (batch.length < COURSEWORK_RECORD_READ_BATCH_SIZE) break;
+    offset += batch.length;
+  }
+
+  return { rows };
+}
+
+async function getUploadedSubmissionStoragePaths(
+  admin: NonNullable<ReturnType<typeof createAdminClient>>,
+  userId: string
+): Promise<{ paths: string[]; error?: string }> {
+  const paths: string[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await admin
+      .from("club_submission_attachments")
+      .select("id,storage_path")
+      .eq("student_id", userId)
+      .eq("source_type", "upload")
+      .order("id", { ascending: true })
+      .range(offset, offset + COURSEWORK_RECORD_READ_BATCH_SIZE - 1);
+    if (error) {
+      return {
+        paths: [],
+        error: friendlyError(error, "Could not list the account's private coursework files."),
+      };
+    }
+    const batch = (data ?? []) as Array<{ storage_path: string | null }>;
+    paths.push(
+      ...batch
+        .map((row) => row.storage_path)
+        .filter((path): path is string => Boolean(path))
+    );
+    if (batch.length < COURSEWORK_RECORD_READ_BATCH_SIZE) break;
+    offset += batch.length;
+  }
+
+  return { paths };
+}
+
+async function removePrivateCourseworkStoragePaths(
+  admin: NonNullable<ReturnType<typeof createAdminClient>>,
+  paths: string[]
+): Promise<string | null> {
+  const uniquePaths = [...new Set(paths.filter(Boolean))];
+  for (let index = 0; index < uniquePaths.length; index += COURSEWORK_STORAGE_DELETE_BATCH_SIZE) {
+    const { error } = await admin.storage
+      .from(COURSEWORK_BUCKET)
+      .remove(uniquePaths.slice(index, index + COURSEWORK_STORAGE_DELETE_BATCH_SIZE));
+    if (error) return error.message || "Private coursework storage cleanup failed.";
   }
   return null;
+}
+
+async function finalizeUserAccountDeletion(
+  admin: NonNullable<ReturnType<typeof createAdminClient>>,
+  executionId: string,
+  status: "failed" | "completed",
+  errorMessage?: string
+): Promise<boolean> {
+  const payload = {
+    target_execution_id: executionId,
+    requested_status: status,
+    requested_error: status === "failed"
+      ? (errorMessage || "Account deletion failed outside the database.").slice(0, 500)
+      : null,
+  };
+
+  // The RPC is idempotent. One immediate retry covers a lost response without
+  // risking an invalid state transition or leaving the prepared hold barrier
+  // behind after a transient API failure.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const { data, error } = await admin.rpc("finalize_user_account_deletion", payload);
+      if (!error && data === true) return true;
+    } catch {
+      // Retry once, then surface the operational barrier warning to the caller.
+    }
+  }
+
+  return false;
 }
 
 async function getStudentAssignmentContext(clubSlug: string, assignmentId: string) {
@@ -1531,7 +1997,15 @@ export async function prepareCourseworkFileUpload(data: {
   fileName: string;
   fileSize: number;
   mimeType?: string | null;
-}): Promise<{ success: boolean; error?: string; path?: string; token?: string }> {
+}): Promise<{
+  success: boolean;
+  error?: string;
+  intentId?: string;
+  path?: string;
+  token?: string;
+  fileName?: string;
+  mimeType?: string;
+}> {
   if (isDemoMode()) {
     return { success: false, error: "File uploads are unavailable in demo mode." };
   }
@@ -1543,6 +2017,9 @@ export async function prepareCourseworkFileUpload(data: {
     : await getStudentAssignmentContext(data.clubSlug, data.assignmentId);
   if ("error" in context) return { success: false, error: context.error };
 
+  const admin = createAdminClient();
+  if (!admin) return { success: false, error: "Private file storage is not configured." };
+
   if (data.target === "assignment") {
     const { data: assignment } = await context.supabase
       .from("club_assignments")
@@ -1553,23 +2030,99 @@ export async function prepareCourseworkFileUpload(data: {
     if (!assignment) return { success: false, error: "Assignment not found." };
   }
 
-  const admin = createAdminClient();
-  if (!admin) return { success: false, error: "Private file storage is not configured." };
+  const attachmentQuery = data.target === "assignment"
+    ? admin
+      .from("club_assignment_attachments")
+      .select("file_size")
+      .eq("assignment_id", data.assignmentId)
+    : admin
+      .from("club_submission_attachments")
+      .select("file_size")
+      .eq("assignment_id", data.assignmentId)
+      .eq("student_id", context.profile.id);
+  const { data: existingAttachments, error: attachmentError } = await attachmentQuery;
+  if (attachmentError) {
+    return { success: false, error: "Could not verify the attachment limit. Please try again." };
+  }
+  const attachmentLimit = data.target === "assignment" ? 20 : 10;
+  const byteLimit = data.target === "assignment" ? 200 * 1024 * 1024 : 100 * 1024 * 1024;
+  const usedBytes = (existingAttachments ?? []).reduce(
+    (total, attachment) => total + Number(attachment.file_size ?? 0),
+    0
+  );
+  if ((existingAttachments?.length ?? 0) >= attachmentLimit) {
+    return {
+      success: false,
+      error: data.target === "assignment"
+        ? "An assignment may have at most 20 attached materials."
+        : "A submission may have at most 10 attachments.",
+    };
+  }
+  if (usedBytes + data.fileSize > byteLimit) {
+    return {
+      success: false,
+      error: data.target === "assignment"
+        ? "Assignment materials may use at most 200 MB."
+        : "Submission attachments may use at most 100 MB.",
+    };
+  }
+
   const fileName = safeCourseworkFileName(data.fileName);
+  const mimeType = courseworkUploadMimeType(fileName, data.mimeType);
+  if (!mimeType) {
+    return {
+      success: false,
+      error: "The uploaded file content type does not match an approved school document format.",
+    };
+  }
   const section = data.target === "assignment" ? "materials" : "submissions";
   const path = `${data.assignmentId}/${section}/${context.profile.id}/${randomUUID()}-${fileName}`;
+  const { data: intentId, error: intentError } = await admin.rpc(
+    "create_coursework_upload_intent",
+    {
+      actor_user_uuid: context.profile.id,
+      assignment_uuid: data.assignmentId,
+      upload_target: data.target,
+      object_path: path,
+      expected_file_name: fileName,
+      expected_mime_type: mimeType,
+      expected_file_size: data.fileSize,
+    }
+  );
+  if (intentError || !intentId) {
+    return {
+      success: false,
+      error: friendlyError(
+        intentError,
+        "Could not safely prepare the private upload. Apply the latest database migration and try again."
+      ),
+    };
+  }
   const { data: signedUpload, error } = await admin.storage
     .from(COURSEWORK_BUCKET)
     .createSignedUploadUrl(path);
   if (error || !signedUpload?.token) {
+    await admin.rpc("reject_coursework_upload_intent", {
+      intent_uuid: intentId,
+      actor_user_uuid: context.profile.id,
+      rejection_text: "Could not issue signed Storage upload token",
+    });
     return { success: false, error: friendlyError(error, "Could not prepare the private upload.") };
   }
-  return { success: true, path, token: signedUpload.token };
+  return {
+    success: true,
+    intentId,
+    path,
+    token: signedUpload.token,
+    fileName,
+    mimeType,
+  };
 }
 
 async function getStoredCourseworkObject(path: string): Promise<{
   size?: number | null;
   mimetype?: string | null;
+  bytes?: Uint8Array | null;
 } | null> {
   const admin = createAdminClient();
   if (!admin) return null;
@@ -1584,9 +2137,15 @@ async function getStoredCourseworkObject(path: string): Promise<{
   const object = data?.find((item) => item.name === fileName);
   if (!object) return null;
   const metadata = object.metadata as { size?: number; mimetype?: string } | null;
+  const { data: storedBlob, error: downloadError } = await admin.storage
+    .from(COURSEWORK_BUCKET)
+    .download(path);
+  if (downloadError || !storedBlob) return null;
+  const bytes = new Uint8Array(await storedBlob.arrayBuffer());
   return {
     size: metadata?.size ?? null,
     mimetype: metadata?.mimetype ?? null,
+    bytes,
   };
 }
 
@@ -1594,6 +2153,7 @@ export async function registerCourseworkFileUpload(data: {
   clubSlug: string;
   assignmentId: string;
   target: "assignment" | "submission";
+  intentId: string;
   storagePath: string;
   fileName: string;
   fileSize: number;
@@ -1625,58 +2185,154 @@ export async function registerCourseworkFileUpload(data: {
   if (!data.storagePath.startsWith(requiredPrefix) || data.storagePath.includes("..")) {
     return { success: false, error: "The uploaded file path is invalid." };
   }
+  const admin = createAdminClient();
+  if (!admin) return { success: false, error: "Private file storage is not configured." };
+  const { data: intent, error: intentError } = await admin
+    .from("coursework_upload_intents")
+    .select(
+      "id,user_id,assignment_id,target,storage_path,file_name,mime_type,expected_size,status,expires_at,attachment_id"
+    )
+    .eq("id", data.intentId)
+    .maybeSingle();
+  if (intentError) {
+    return {
+      success: false,
+      error: "Could not verify the private upload. Apply the latest database migration and try again.",
+    };
+  }
+  if (!intent || intent.user_id !== context.profile.id) {
+    return { success: false, error: "The private upload authorization was not found." };
+  }
+
+  const fileName = safeCourseworkFileName(data.fileName);
+  const mimeType = courseworkUploadMimeType(fileName, data.mimeType);
+  const exactIntentMatch =
+    intent.assignment_id === data.assignmentId
+    && intent.target === data.target
+    && intent.storage_path === data.storagePath
+    && intent.file_name === fileName
+    && intent.mime_type === mimeType
+    && Number(intent.expected_size) === data.fileSize;
+  if (!exactIntentMatch) {
+    if (intent.status === "pending") {
+      await Promise.all([
+        admin.storage.from(COURSEWORK_BUCKET).remove([intent.storage_path]),
+        admin.rpc("reject_coursework_upload_intent", {
+          intent_uuid: intent.id,
+          actor_user_uuid: context.profile.id,
+          rejection_text: "Client upload metadata did not match prepared intent",
+        }),
+      ]);
+    }
+    return { success: false, error: "The uploaded file does not match the prepared private upload." };
+  }
+  if (intent.status === "registered" && intent.attachment_id) {
+    return { success: true, attachmentId: intent.attachment_id };
+  }
+  if (intent.status !== "pending" || new Date(intent.expires_at).getTime() <= Date.now()) {
+    await admin.storage.from(COURSEWORK_BUCKET).remove([intent.storage_path]);
+    return {
+      success: false,
+      error: "This private upload expired or was already rejected. Upload the file again.",
+    };
+  }
+
   const storedObject = await getStoredCourseworkObject(data.storagePath);
   if (!storedObject) {
     return { success: false, error: "The private upload did not finish. Please try again." };
   }
-  const storedSize = Number(storedObject.size ?? data.fileSize);
-  const storedValidationError = validateCourseworkFile({
+  const storedValidationError = validateStoredCourseworkFile({
     fileName: data.fileName,
-    fileSize: storedSize,
-    mimeType: storedObject.mimetype ?? data.mimeType,
+    fileSize: storedObject.size,
+    mimeType: storedObject.mimetype,
   });
-  if (storedValidationError) return { success: false, error: storedValidationError };
+  if (storedValidationError) {
+    await Promise.all([
+      admin.storage.from(COURSEWORK_BUCKET).remove([data.storagePath]),
+      admin.rpc("reject_coursework_upload_intent", {
+        intent_uuid: intent.id,
+        actor_user_uuid: context.profile.id,
+        rejection_text: storedValidationError,
+      }),
+    ]);
+    return { success: false, error: storedValidationError };
+  }
+  const storedSize = Number(storedObject.size);
+  const storedMimeType = storedObject.mimetype!.trim().toLowerCase();
 
-  const admin = createAdminClient();
-  if (!admin) return { success: false, error: "Private file storage is not configured." };
-  const insertResult = data.target === "assignment"
-    ? await admin
-      .from("club_assignment_attachments")
-      .insert({
-        assignment_id: data.assignmentId,
-        uploaded_by: context.profile.id,
-        source_type: "upload",
-        copy_mode: "reference",
-        file_name: safeCourseworkFileName(data.fileName),
-        mime_type: storedObject.mimetype ?? data.mimeType?.slice(0, 255) ?? null,
-        file_size: storedSize,
-        storage_path: data.storagePath,
-      })
-      .select("id")
-      .single()
-    : await admin
-      .from("club_submission_attachments")
-      .insert({
-        assignment_id: data.assignmentId,
-        submission_id: null,
-        student_id: context.profile.id,
-        source_type: "upload",
-        file_name: safeCourseworkFileName(data.fileName),
-        mime_type: storedObject.mimetype ?? data.mimeType?.slice(0, 255) ?? null,
-        file_size: storedSize,
-        storage_path: data.storagePath,
-      })
-      .select("id")
-      .single();
-  const { data: attachment, error } = insertResult;
-  if (error || !attachment) {
-    await admin.storage.from(COURSEWORK_BUCKET).remove([data.storagePath]);
+  const storageMatchesIntent =
+    storedSize === Number(intent.expected_size)
+    && storedMimeType === intent.mime_type
+    && storedObject.bytes?.byteLength === storedSize;
+  const signatureError = storedObject.bytes
+    ? validateCourseworkFileSignature({
+      fileName: intent.file_name,
+      mimeType: storedMimeType,
+      bytes: storedObject.bytes,
+    })
+    : "The private upload could not be inspected. Upload the file again.";
+  if (!storageMatchesIntent || signatureError) {
+    const errorMessage = signatureError
+      || "The stored file size or content type does not match the prepared upload.";
+    await Promise.all([
+      admin.storage.from(COURSEWORK_BUCKET).remove([data.storagePath]),
+      admin.rpc("reject_coursework_upload_intent", {
+        intent_uuid: intent.id,
+        actor_user_uuid: context.profile.id,
+        rejection_text: errorMessage,
+      }),
+    ]);
+    return { success: false, error: errorMessage };
+  }
+
+  const { data: attachmentId, error } = await admin.rpc(
+    "register_coursework_upload_intent",
+    {
+      intent_uuid: intent.id,
+      actor_user_uuid: context.profile.id,
+      assignment_uuid: data.assignmentId,
+      upload_target: data.target,
+      object_path: data.storagePath,
+      actual_file_name: intent.file_name,
+      actual_mime_type: storedMimeType,
+      actual_file_size: storedSize,
+    }
+  );
+  if (error || !attachmentId) {
+    // A dropped response can make a committed RPC look like a failure. Re-read
+    // the locked intent before deleting the object so a successful attachment
+    // can never be orphaned by an ambiguous network result.
+    const { data: finalIntent, error: finalIntentError } = await admin
+      .from("coursework_upload_intents")
+      .select("status,attachment_id")
+      .eq("id", intent.id)
+      .maybeSingle();
+    if (!finalIntentError && finalIntent?.status === "registered" && finalIntent.attachment_id) {
+      revalidatePath(`/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`);
+      revalidatePath(`/manage/clubs/${context.club.slug}/coursework/${data.assignmentId}`);
+      return { success: true, attachmentId: finalIntent.attachment_id };
+    }
+    if (!finalIntentError && finalIntent?.status === "pending") {
+      await Promise.all([
+        admin.storage.from(COURSEWORK_BUCKET).remove([data.storagePath]),
+        admin.rpc("reject_coursework_upload_intent", {
+          intent_uuid: intent.id,
+          actor_user_uuid: context.profile.id,
+          rejection_text: error?.message || "Attachment registration failed",
+        }),
+      ]);
+    } else if (
+      !finalIntentError
+      && (finalIntent?.status === "rejected" || finalIntent?.status === "expired")
+    ) {
+      await admin.storage.from(COURSEWORK_BUCKET).remove([data.storagePath]);
+    }
     return { success: false, error: friendlyError(error, "Could not attach the uploaded file.") };
   }
 
   revalidatePath(`/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`);
   revalidatePath(`/manage/clubs/${context.club.slug}/coursework/${data.assignmentId}`);
-  return { success: true, attachmentId: attachment.id };
+  return { success: true, attachmentId };
 }
 
 export async function registerAssignmentGoogleDriveAttachment(data: {
@@ -1882,10 +2538,32 @@ export async function removeCourseworkAttachment(data: {
   if (data.target === "submission") query = query.eq("student_id", context.profile.id);
   const { data: attachment } = await query.maybeSingle();
   if (!attachment) return { success: false, error: "Attachment not found." };
-  const { error } = await admin.from(table).delete().eq("id", data.attachmentId);
-  if (error) return { success: false, error: friendlyError(error, "Could not remove the attachment.") };
+
+  // Keep the database row as the durable cleanup reference until the private
+  // object is confirmed removed. Deleting metadata first can permanently
+  // orphan a file when Storage has a transient failure.
   if (attachment.source_type === "upload" && attachment.storage_path) {
-    await admin.storage.from(COURSEWORK_BUCKET).remove([attachment.storage_path]);
+    const { error: storageError } = await admin.storage
+      .from(COURSEWORK_BUCKET)
+      .remove([attachment.storage_path]);
+    if (storageError) {
+      return {
+        success: false,
+        error: "Could not remove the private file. The attachment was kept so cleanup can be retried.",
+      };
+    }
+  }
+  const { data: finalized, error } = await admin.rpc(
+    "finalize_coursework_attachment_removal",
+    {
+      target_attachment_id: data.attachmentId,
+      target_assignment_id: data.assignmentId,
+      target_attachment_kind: data.target,
+      expected_storage_path: attachment.storage_path ?? null,
+    }
+  );
+  if (error || finalized !== true) {
+    return { success: false, error: friendlyError(error, "Could not remove the attachment.") };
   }
   revalidatePath(`/clubs/${context.club.slug}/member/assignments/${data.assignmentId}`);
   revalidatePath(`/manage/clubs/${context.club.slug}/coursework/${data.assignmentId}`);
@@ -2104,9 +2782,13 @@ export async function updateUserRoleAndClubs(data: {
   const actor = await getCurrentProfile();
   if (!supabase || !actor) return { success: false, error: "Please sign in." };
 
-  const { data: targetData, error: targetError } = await supabase
+  const targetReader = actor.role === "super_admin" ? createAdminClient() : supabase;
+  if (!targetReader) {
+    return { success: false, error: "Administrator configuration is incomplete." };
+  }
+  const { data: targetData, error: targetError } = await targetReader
     .from("profiles")
-    .select("*")
+    .select("id,role,school_id,district_id,full_name,email,account_status")
     .eq("id", data.targetUserId)
     .maybeSingle();
   if (targetError || !targetData) return { success: false, error: "User not found." };
@@ -2176,7 +2858,10 @@ export async function updateUserRoleAndClubs(data: {
   return { success: true };
 }
 
-export async function deleteUserAccount(targetUserId: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteUserAccount(
+  targetUserId: string,
+  approvedRequestId?: string
+): Promise<{ success: boolean; error?: string }> {
   if (isDemoMode()) return { success: false, error: "User deletion is unavailable in demo mode." };
   const supabase = await createClient();
   const admin = createAdminClient();
@@ -2186,63 +2871,173 @@ export async function deleteUserAccount(targetUserId: string): Promise<{ success
   }
   if (!isAdminRole(actor.role)) return { success: false, error: "Administrator access required." };
 
-  const { data: targetData, error: targetError } = await supabase
+  const targetReader = actor.role === "super_admin" ? admin : supabase;
+  const { data: targetData, error: targetError } = await targetReader
     .from("profiles")
-    .select("*")
+    .select("id,role,school_id,district_id,full_name,email,account_status")
     .eq("id", targetUserId)
     .maybeSingle();
   if (targetError || !targetData) return { success: false, error: "User not found." };
 
   const target = targetData as Profile;
-  if (!canDeleteUser(actor, target)) {
+  if (approvedRequestId) {
+    const { data: approvedRequest, error: approvedRequestError } = await supabase
+      .from("account_deletion_requests")
+      .select("id,target_user_id_snapshot,status")
+      .eq("id", approvedRequestId)
+      .maybeSingle();
+    const { data: canReview, error: reviewAccessError } = await supabase.rpc(
+      "can_review_account_deletion_request",
+      { target_request_id: approvedRequestId }
+    );
+    if (
+      approvedRequestError
+      || reviewAccessError
+      || !approvedRequest
+      || approvedRequest.status !== "approved"
+      || approvedRequest.target_user_id_snapshot !== targetUserId
+      || actor.id === targetUserId
+      || canReview !== true
+    ) {
+      return {
+        success: false,
+        error: "A matching independently approved deletion request is required.",
+      };
+    }
+  } else if (!canDeleteUser(actor, target)) {
     return { success: false, error: "You do not have permission to delete this account." };
   }
-
-  const [{ data: authoredFiles }, { data: submittedFiles }] = await Promise.all([
-    admin
-      .from("club_assignment_attachments")
-      .select("storage_path")
-      .eq("uploaded_by", targetUserId)
-      .eq("source_type", "upload"),
-    admin
-      .from("club_submission_attachments")
-      .select("storage_path")
-      .eq("student_id", targetUserId)
-      .eq("source_type", "upload"),
-  ]);
-  const storagePaths = [...(authoredFiles ?? []), ...(submittedFiles ?? [])]
-    .map((row) => row.storage_path)
-    .filter((path): path is string => Boolean(path));
-  if (storagePaths.length) {
-    const { error: storageError } = await admin.storage
-      .from(COURSEWORK_BUCKET)
-      .remove(storagePaths);
-    if (storageError) {
-      return { success: false, error: "Could not remove the account's private coursework files." };
+  const { data: deletionHeld, error: holdCheckError } = await admin.rpc(
+    "has_active_legal_hold",
+    {
+      target_district_id: target.district_id ?? null,
+      target_school_id: target.school_id ?? null,
     }
+  );
+  if (holdCheckError) {
+    return { success: false, error: "Could not verify the legal-hold registry. No data was deleted." };
   }
-  await disconnectGoogleDrive(targetUserId).catch(() => undefined);
-
-  const cleanupSteps = [
-    admin.from("opportunities").update({ author_id: null }).eq("author_id", targetUserId),
-    admin.from("events").update({ created_by: null }).eq("created_by", targetUserId),
-    admin.from("workshops").update({ host_user_id: null }).eq("host_user_id", targetUserId),
-    admin.from("service_hours").update({ approved_by: null }).eq("approved_by", targetUserId),
-    admin.from("approval_requests").update({ reviewed_by: null }).eq("reviewed_by", targetUserId),
-    admin.from("analytics_events").update({ user_id: null }).eq("user_id", targetUserId),
-    admin.from("feedback").update({ user_id: null }).eq("user_id", targetUserId),
-    admin.from("approval_requests").delete().eq("submitted_by", targetUserId),
-  ];
-
-  const cleanupResults = await Promise.all(cleanupSteps);
-  const cleanupError = cleanupResults.find((result) => result.error)?.error;
-  if (cleanupError) {
-    return { success: false, error: friendlyError(cleanupError, "Could not clean up user references.") };
+  if (deletionHeld === true) {
+    return { success: false, error: "An active legal hold blocks deletion of this account." };
   }
 
-  const { error: authError } = await admin.auth.admin.deleteUser(targetUserId);
+  // The transactional database phase repeats the legal-hold check while the
+  // target profile is locked, deactivates access, anonymizes references, and
+  // records a durable execution before any external data is removed.
+  const { data: executionId, error: preparationError } = await admin.rpc(
+    "prepare_user_account_deletion",
+    approvedRequestId
+      ? {
+          target_user_id: targetUserId,
+          approved_request_id: approvedRequestId,
+        }
+      : { target_user_id: targetUserId }
+  );
+  if (preparationError || !executionId) {
+    return {
+      success: false,
+      error: friendlyError(
+        preparationError,
+        "Could not safely prepare this account for deletion. Apply the latest database migration and try again."
+      ),
+    };
+  }
+
+  const failPreparedDeletion = async (
+    userMessage: string,
+    executionError: string = userMessage
+  ): Promise<{ success: false; error: string }> => {
+    const barrierReleased = await finalizeUserAccountDeletion(
+      admin,
+      executionId,
+      "failed",
+      executionError
+    );
+    return {
+      success: false,
+      error: barrierReleased
+        ? userMessage
+        : `${userMessage} The prepared deletion barrier could not be finalized; review the operational log before placing a legal hold in this scope.`,
+    };
+  };
+
+  // Assignment materials remain school records after an author leaves. Their
+  // uploaded_by reference becomes null through the FK, but the attachment and
+  // object stay usable. Only the departing student's private submission files
+  // are removed.
+  let submittedFiles: Awaited<ReturnType<typeof getUploadedSubmissionStoragePaths>>;
+  let unfinishedUploads: Awaited<ReturnType<typeof getUnregisteredCourseworkUploadIntents>>;
+  try {
+    [submittedFiles, unfinishedUploads] = await Promise.all([
+      getUploadedSubmissionStoragePaths(admin, targetUserId),
+      getUnregisteredCourseworkUploadIntents(admin, targetUserId),
+    ]);
+  } catch (error) {
+    const message = error instanceof Error
+      ? error.message
+      : "Could not list the account's private coursework files.";
+    return failPreparedDeletion(message, `Coursework cleanup read failed: ${message}`);
+  }
+  if (submittedFiles.error) {
+    return failPreparedDeletion(
+      submittedFiles.error,
+      `Coursework attachment read failed: ${submittedFiles.error}`
+    );
+  }
+  if (unfinishedUploads.error) {
+    return failPreparedDeletion(
+      unfinishedUploads.error,
+      `Coursework upload-intent read failed: ${unfinishedUploads.error}`
+    );
+  }
+
+  let storageCleanupError: string | null;
+  try {
+    storageCleanupError = await removePrivateCourseworkStoragePaths(admin, [
+      ...submittedFiles.paths,
+      ...unfinishedUploads.rows.map((intent) => intent.storage_path),
+    ]);
+  } catch (error) {
+    storageCleanupError = error instanceof Error
+      ? error.message
+      : "Private coursework storage cleanup failed.";
+  }
+  if (storageCleanupError) {
+    return failPreparedDeletion(
+      "Could not remove the account's private coursework files.",
+      `Private coursework storage cleanup failed: ${storageCleanupError}`
+    );
+  }
+
+  try {
+    await disconnectGoogleDrive(targetUserId);
+  } catch (error) {
+    const message = error instanceof Error
+      ? error.message
+      : "Could not disconnect the account's Google Drive connection.";
+    return failPreparedDeletion(message, `Google Drive disconnect failed: ${message}`);
+  }
+
+  let authError: { message?: string } | null;
+  try {
+    ({ error: authError } = await admin.auth.admin.deleteUser(targetUserId));
+  } catch (error) {
+    const message = error instanceof Error
+      ? error.message
+      : "Could not delete the authentication account.";
+    return failPreparedDeletion(message, `Authentication deletion failed: ${message}`);
+  }
   if (authError) {
-    return { success: false, error: authError.message || "Could not delete the authentication account." };
+    const message = authError.message || "Could not delete the authentication account.";
+    return failPreparedDeletion(message, `Authentication deletion failed: ${message}`);
+  }
+
+  const completed = await finalizeUserAccountDeletion(admin, executionId, "completed");
+  if (!completed) {
+    return {
+      success: false,
+      error: "The account was deleted, but its deletion record could not be finalized. Review the operational log before placing a legal hold in this scope.",
+    };
   }
 
   revalidatePath("/admin/users");
@@ -2262,9 +3057,10 @@ export async function updateUserAccountStatus(
   if (!supabase || !admin || !actor) return { success: false, error: "Administrator configuration is incomplete." };
   if (!isAdminRole(actor.role)) return { success: false, error: "Administrator access required." };
 
-  const { data: targetData, error: targetError } = await supabase
+  const targetReader = actor.role === "super_admin" ? admin : supabase;
+  const { data: targetData, error: targetError } = await targetReader
     .from("profiles")
-    .select("*")
+    .select("id,role,school_id,district_id,account_status")
     .eq("id", targetUserId)
     .maybeSingle();
   if (targetError || !targetData) return { success: false, error: "User not found." };
@@ -2346,10 +3142,8 @@ export async function requestAccountDeletion(
   const profile = await getCurrentProfile();
   if (!supabase || !profile) return { success: false, error: "Please sign in." };
   const normalizedReason = reason?.trim().slice(0, 1000) || null;
-  const { error } = await supabase.from("account_deletion_requests").insert({
-    user_id: profile.id,
-    school_id: profile.school_id ?? null,
-    reason: normalizedReason,
+  const { error } = await supabase.rpc("submit_account_deletion_request", {
+    requested_reason: normalizedReason,
   });
   if (error?.code === "23505") return { success: false, error: "You already have a pending deletion request." };
   if (error) return { success: false, error: friendlyError(error, "Could not submit deletion request.") };
@@ -2372,45 +3166,70 @@ export async function reviewAccountDeletionRequest(data: {
 
   const { data: request, error: requestError } = await supabase
     .from("account_deletion_requests")
-    .select("id,user_id,status")
+    .select("id,target_user_id_snapshot,status")
     .eq("id", data.requestId)
     .maybeSingle();
   if (requestError || !request) return { success: false, error: "Deletion request not found." };
-  if (request.status !== "pending") return { success: false, error: "This request has already been reviewed." };
+  if (!request.target_user_id_snapshot) {
+    return { success: false, error: "The requested account no longer exists." };
+  }
+  if (request.target_user_id_snapshot === actor.id) {
+    return {
+      success: false,
+      error: "Account deletion requests require an independent reviewer.",
+    };
+  }
 
   const reviewerNotes = data.reviewerNotes?.trim().slice(0, 2000) || null;
   if (data.decision === "reject") {
-    const { error } = await supabase
-      .from("account_deletion_requests")
-      .update({
-        status: "rejected",
-        reviewed_by: actor.id,
-        reviewed_at: new Date().toISOString(),
-        reviewer_notes: reviewerNotes,
-      })
-      .eq("id", request.id)
-      .eq("status", "pending");
+    if (request.status !== "pending") {
+      return { success: false, error: "This request has already been reviewed." };
+    }
+    const { error } = await supabase.rpc("review_account_deletion_request", {
+      target_request_id: request.id,
+      requested_decision: "reject",
+      requested_notes: reviewerNotes,
+    });
     if (error) return { success: false, error: friendlyError(error, "Could not reject this request.") };
     revalidatePath("/admin/deletion-requests");
     return { success: true };
   }
 
-  if (!request.user_id) return { success: false, error: "The requested account no longer exists." };
-  const { error: approvalError } = await supabase
-    .from("account_deletion_requests")
-    .update({
-      status: "approved",
-      reviewed_by: actor.id,
-      reviewed_at: new Date().toISOString(),
-      reviewer_notes: reviewerNotes,
-    })
-    .eq("id", request.id)
-    .eq("status", "pending");
-  if (approvalError) return { success: false, error: friendlyError(approvalError, "Could not approve this request.") };
+  if (request.status === "pending") {
+    const { error: approvalError } = await supabase.rpc(
+      "review_account_deletion_request",
+      {
+        target_request_id: request.id,
+        requested_decision: "approve",
+        requested_notes: reviewerNotes,
+      }
+    );
+    if (approvalError) {
+      return {
+        success: false,
+        error: friendlyError(approvalError, "Could not approve this request."),
+      };
+    }
+  } else if (request.status === "approved") {
+    const { data: canRetry, error: retryAccessError } = await supabase.rpc(
+      "can_review_account_deletion_request",
+      { target_request_id: request.id }
+    );
+    if (retryAccessError || canRetry !== true) {
+      return {
+        success: false,
+        error: "A higher-scope administrator must complete this deletion.",
+      };
+    }
+  } else {
+    return { success: false, error: "This request has already been reviewed." };
+  }
 
-  const deletion = await deleteUserAccount(request.user_id);
+  const deletion = await deleteUserAccount(
+    request.target_user_id_snapshot,
+    request.id
+  );
   if (!deletion.success) {
-    await admin.from("account_deletion_requests").update({ status: "pending" }).eq("id", request.id);
     return deletion;
   }
 
@@ -2427,6 +3246,180 @@ export async function reviewAccountDeletionRequest(data: {
   return { success: true };
 }
 
+function friendlyTenantOffboardingError(error: unknown, fallback: string): string {
+  const message =
+    typeof error === "object"
+    && error !== null
+    && "message" in error
+    && typeof (error as { message?: unknown }).message === "string"
+      ? (error as { message: string }).message
+      : "";
+  const safeMessages = [
+    "Active administrator access required",
+    "Choose a school or district scope",
+    "Provide an offboarding reason between 10 and 2,000 characters",
+    "The selected school must belong to a district",
+    "School administrators can only request offboarding for their own school",
+    "District administrators can only request offboarding inside their district",
+    "Only district or platform administrators can request district offboarding",
+    "District administrators can only request offboarding for their own district",
+    "An active district offboarding request already covers this school",
+    "Resolve active school offboarding requests before requesting district offboarding",
+    "An active offboarding request already exists for this tenant",
+    "Offboarding request not found",
+    "A higher-scope administrator must review this request",
+    "The requester cannot review their own offboarding request",
+    "Invalid offboarding status transition",
+    "Only a platform administrator can approve or schedule tenant deletion",
+    "Explain the rejection in at least 10 characters",
+    "Record the protected export or preservation reference first",
+    "Choose a future deletion window",
+    "The scheduled deletion window has not been reached",
+    "Record the deletion evidence reference before completion",
+    "Record a meaningful deletion evidence reference",
+    "Only a platform administrator can restore an approved tenant",
+    "Only the requester or a platform administrator can cancel this request",
+    "This offboarding request can no longer be cancelled",
+    "Explain the cancellation in at least 10 characters",
+    "The recorded tenant state is unavailable",
+  ];
+  if (safeMessages.some((safeMessage) => message.includes(safeMessage))) return message;
+  return friendlyError(error, fallback);
+}
+
+export async function submitTenantOffboardingRequest(data: {
+  scopeType: TenantOffboardingScope;
+  scopeId: string;
+  reason: string;
+}): Promise<{ success: boolean; requestId?: string; error?: string }> {
+  if (isDemoMode()) {
+    return { success: false, error: "Tenant offboarding is unavailable in demo mode." };
+  }
+  const supabase = await createClient();
+  const actor = await getCurrentProfile();
+  if (!supabase || !actor || !isAdminRole(actor.role)) {
+    return { success: false, error: "Active administrator access is required." };
+  }
+  if (!["school", "district"].includes(data.scopeType)) {
+    return { success: false, error: "Choose a school or district." };
+  }
+  const scopeId = data.scopeId.trim();
+  const reason = data.reason.trim();
+  if (!scopeId) return { success: false, error: "Choose the tenant to offboard." };
+  if (reason.length < 10 || reason.length > 2000) {
+    return { success: false, error: "Provide a reason between 10 and 2,000 characters." };
+  }
+
+  const { data: requestId, error } = await supabase.rpc("submit_tenant_offboarding_request", {
+    requested_scope_type: data.scopeType,
+    requested_scope_id: scopeId,
+    requested_reason: reason,
+  });
+  if (error) {
+    return {
+      success: false,
+      error: friendlyTenantOffboardingError(
+        error,
+        "Could not submit the tenant offboarding request."
+      ),
+    };
+  }
+
+  revalidatePath("/admin/offboarding");
+  return { success: true, requestId: requestId as string };
+}
+
+export async function reviewTenantOffboardingRequest(data: {
+  requestId: string;
+  nextStatus: Exclude<TenantOffboardingStatus, "requested" | "cancelled">;
+  reviewerNotes?: string;
+  exportReference?: string;
+  scheduledPurgeAt?: string;
+  completionReference?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) {
+    return { success: false, error: "Tenant offboarding review is unavailable in demo mode." };
+  }
+  const supabase = await createClient();
+  const actor = await getCurrentProfile();
+  if (!supabase || !actor || !isAdminRole(actor.role)) {
+    return { success: false, error: "Active administrator access is required." };
+  }
+  const validStatuses: TenantOffboardingStatus[] = [
+    "under_review",
+    "export_ready",
+    "approved",
+    "scheduled",
+    "completed",
+    "rejected",
+  ];
+  if (!validStatuses.includes(data.nextStatus)) {
+    return { success: false, error: "Choose a valid review status." };
+  }
+  const reviewerNotes = data.reviewerNotes?.trim().slice(0, 2000) || null;
+  const exportReference = data.exportReference?.trim().slice(0, 1000) || null;
+  const completionReference = data.completionReference?.trim().slice(0, 1000) || null;
+  const scheduledPurgeAt = data.scheduledPurgeAt?.trim() || null;
+
+  const { data: updated, error } = await supabase.rpc("review_tenant_offboarding_request", {
+    target_request_id: data.requestId,
+    next_status: data.nextStatus,
+    requested_reviewer_notes: reviewerNotes,
+    requested_export_reference: exportReference,
+    requested_scheduled_purge_at: scheduledPurgeAt,
+    requested_completion_reference: completionReference,
+  });
+  if (error) {
+    return {
+      success: false,
+      error: friendlyTenantOffboardingError(
+        error,
+        "Could not update the tenant offboarding request."
+      ),
+    };
+  }
+  if (!updated) return { success: false, error: "Tenant offboarding request not found." };
+
+  revalidatePath("/admin/offboarding");
+  revalidatePath("/admin/audit");
+  return { success: true };
+}
+
+export async function cancelTenantOffboardingRequest(data: {
+  requestId: string;
+  reason: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) {
+    return { success: false, error: "Tenant offboarding cancellation is unavailable in demo mode." };
+  }
+  const supabase = await createClient();
+  const actor = await getCurrentProfile();
+  if (!supabase || !actor || !isAdminRole(actor.role)) {
+    return { success: false, error: "Active administrator access is required." };
+  }
+  const reason = data.reason.trim();
+  if (reason.length < 10 || reason.length > 2000) {
+    return { success: false, error: "Explain the cancellation in at least 10 characters." };
+  }
+  const { data: cancelled, error } = await supabase.rpc("cancel_tenant_offboarding_request", {
+    target_request_id: data.requestId,
+    cancellation_reason: reason,
+  });
+  if (error) {
+    return {
+      success: false,
+      error: friendlyTenantOffboardingError(
+        error,
+        "Could not cancel the tenant offboarding request."
+      ),
+    };
+  }
+  if (!cancelled) return { success: false, error: "Tenant offboarding request not found." };
+
+  revalidatePath("/admin/offboarding");
+  return { success: true };
+}
+
 export async function updateClubMember(data: {
   clubId: string;
   userId: string;
@@ -2438,6 +3431,12 @@ export async function updateClubMember(data: {
   const supabase = await createClient();
   const actor = await getCurrentProfile();
   if (!supabase || !actor) return { success: false, error: "Please sign in." };
+  if (actor.role === "super_admin") {
+    return {
+      success: false,
+      error: "Platform support access is read-only. A school or district administrator must manage club rosters.",
+    };
+  }
 
   const { data: club } = await supabase.from("clubs").select("*").eq("id", data.clubId).maybeSingle();
   if (!club) return { success: false, error: "Club not found." };
@@ -2599,6 +3598,9 @@ export async function archiveClubWorkspace(data: {
   const supabase = await createClient();
   const actor = await getCurrentProfile();
   if (!supabase || !actor) return { success: false, error: "Please sign in." };
+  if (actor.role === "super_admin") {
+    return { success: false, error: "Platform support access is read-only." };
+  }
 
   const { data: club } = await supabase.from("clubs").select("*").eq("id", data.clubId).maybeSingle();
   if (!club) return { success: false, error: "Club not found." };
@@ -2663,6 +3665,9 @@ export async function updateClubSettings(data: {
   const supabase = await createClient();
   const profile = await getCurrentProfile();
   if (!supabase || !profile) return { success: false, error: "Please sign in." };
+  if (profile.role === "super_admin") {
+    return { success: false, error: "Platform support access is read-only." };
+  }
   const { data: club } = await supabase.from("clubs").select("*").eq("id", data.clubId).maybeSingle();
   if (!club) return { success: false, error: "Club not found." };
   const { data: membership } = await supabase
@@ -2833,6 +3838,8 @@ export async function completeGoogleOnboarding(input: {
   fullName: string;
   gradeLevel?: string;
   accessCode?: string;
+  acceptedPolicies?: boolean;
+  ageAssurance?: "13_or_older";
   next?: string;
 }): Promise<{ success: true; redirectTo: string } | { success: false; error: string }> {
   const supabase = await createClient();
@@ -2859,6 +3866,12 @@ export async function completeGoogleOnboarding(input: {
   }
   if (!input.schoolId) {
     return { success: false, error: "Choose your school." };
+  }
+  if (!input.acceptedPolicies) {
+    return { success: false, error: "Accept the Terms, Privacy Notice, and Acceptable Use Policy to continue." };
+  }
+  if (input.ageAssurance !== HIGH_SCHOOL_AGE_ASSURANCE) {
+    return { success: false, error: "StormHub's current high-school rollout is limited to people age 13 or older." };
   }
 
   const { data: existingProfile, error: profileError } = await admin
@@ -2914,9 +3927,17 @@ export async function completeGoogleOnboarding(input: {
   if (domainError) return { success: false, error: domainError };
 
   const parsedGrade = Number(input.gradeLevel);
-  const gradeLevel = Number.isInteger(parsedGrade) && parsedGrade >= 9 && parsedGrade <= 12
-    ? parsedGrade
-    : null;
+  if (
+    input.gradeLevel
+    && (
+      !Number.isInteger(parsedGrade)
+      || parsedGrade < PILOT_MINIMUM_GRADE
+      || parsedGrade > PILOT_MAXIMUM_GRADE
+    )
+  ) {
+    return { success: false, error: "Choose a high-school grade from 9 through 12." };
+  }
+  const gradeLevel = input.gradeLevel ? parsedGrade : null;
   const profileValues = {
     email: user.email.trim().toLowerCase(),
     full_name: normalizedFullName,
@@ -2925,6 +3946,20 @@ export async function completeGoogleOnboarding(input: {
     role: "student" as const,
     account_status: "active" as const,
   };
+
+  const acceptanceRecorded = await recordPolicyAcceptance({
+    admin,
+    userId: user.id,
+    schoolId: school.id,
+    source: "google_onboarding",
+    existingMetadata: user.user_metadata as Record<string, unknown>,
+  });
+  if (!acceptanceRecorded) {
+    return {
+      success: false,
+      error: "We couldn't save your policy acceptance. Please try again after the latest database migration is applied.",
+    };
+  }
 
   const profileMutation = existingProfile
     ? admin
@@ -2948,6 +3983,66 @@ export async function completeGoogleOnboarding(input: {
   return {
     success: true,
     redirectTo: safeAuthRedirectPath(input.next, defaultPathForProfile(completedProfile as Profile)),
+  };
+}
+
+export async function acceptCurrentPolicies(input: {
+  acceptedPolicies?: boolean;
+  ageAssurance?: "13_or_older";
+  next?: string;
+}): Promise<{ success: true; redirectTo: string } | { success: false; error: string }> {
+  if (!input.acceptedPolicies) {
+    return {
+      success: false,
+      error: "Accept the Terms, Privacy Notice, and Acceptable Use Policy to continue.",
+    };
+  }
+  if (input.ageAssurance !== HIGH_SCHOOL_AGE_ASSURANCE) {
+    return {
+      success: false,
+      error: "StormHub's current high-school rollout is limited to people age 13 or older.",
+    };
+  }
+
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  if (!supabase || !admin) {
+    return { success: false, error: "Policy acceptance is not configured for this deployment." };
+  }
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { success: false, error: "Your session expired. Sign in again." };
+  }
+  const { data: profile, error: profileError } = await admin
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profileError || !profile) {
+    return { success: false, error: "We couldn't load your account. Please try again." };
+  }
+  if (profile.account_status && profile.account_status !== "active") {
+    return { success: false, error: "This account is not currently active." };
+  }
+
+  const recorded = await recordPolicyAcceptance({
+    admin,
+    userId: user.id,
+    schoolId: profile.school_id,
+    source: "existing_user",
+    existingMetadata: user.user_metadata as Record<string, unknown>,
+  });
+  if (!recorded) {
+    return {
+      success: false,
+      error: "We couldn't save your policy acceptance. Please try again after the latest database migration is applied.",
+    };
+  }
+
+  revalidatePath("/", "layout");
+  return {
+    success: true,
+    redirectTo: safeAuthRedirectPath(input.next, defaultPathForProfile(profile as Profile)),
   };
 }
 
@@ -3063,9 +4158,17 @@ export async function supabaseSignUp(
     );
   }
 
-  const normalizedGrade = typeof gradeLevel === "number" && gradeLevel >= 6 && gradeLevel <= 12
-    ? gradeLevel
-    : null;
+  if (
+    gradeLevel != null
+    && (
+      !Number.isInteger(gradeLevel)
+      || gradeLevel < PILOT_MINIMUM_GRADE
+      || gradeLevel > PILOT_MAXIMUM_GRADE
+    )
+  ) {
+    return { success: false, error: "Choose a high-school grade from 9 through 12." };
+  }
+  const normalizedGrade = gradeLevel ?? null;
   const allowedDomains = getAllowedSignupDomains(
     schoolSignupConfig?.allowed_email_domains,
     process.env.ALLOWED_SIGNUP_EMAIL_DOMAINS
@@ -3089,6 +4192,10 @@ export async function supabaseSignUp(
         grade_level: normalizedGrade,
         school_id: schoolId,
         school_access_code: accessCode?.trim().toUpperCase(),
+        [POLICY_ACCEPTANCE_METADATA.privacy]: PRIVACY_POLICY_VERSION,
+        [POLICY_ACCEPTANCE_METADATA.terms]: TERMS_VERSION,
+        [POLICY_ACCEPTANCE_METADATA.acceptableUse]: ACCEPTABLE_USE_VERSION,
+        [POLICY_ACCEPTANCE_METADATA.ageAssurance]: HIGH_SCHOOL_AGE_ASSURANCE,
       },
       emailRedirectTo: getAuthCallbackUrl(),
       ...(botProof?.captchaToken ? { captchaToken: botProof.captchaToken } : {}),
@@ -3117,15 +4224,26 @@ export async function supabaseSignUp(
     };
   }
   if (admin && data.user) {
-    const { error: scrubError } = await admin.auth.admin.updateUserById(data.user.id, {
-      user_metadata: {
+    const acceptanceRecorded = await recordPolicyAcceptance({
+      admin,
+      userId: data.user.id,
+      schoolId,
+      source: "password_signup",
+      existingMetadata: {
         full_name: normalizedFullName,
         grade_level: normalizedGrade,
         school_id: schoolId,
       },
     });
-    if (scrubError) {
-      console.warn("[supabaseSignUp] Could not remove the one-time school code from auth metadata.");
+    if (!acceptanceRecorded) {
+      const { error: rollbackError } = await admin.auth.admin.deleteUser(data.user.id);
+      if (rollbackError) {
+        console.error("[supabaseSignUp] Could not roll back signup without policy acceptance:", rollbackError.message);
+      }
+      return {
+        success: false,
+        error: "Account creation requires the latest privacy database migration. Please contact your administrator.",
+      };
     }
   }
   if (admin && signupAttemptId) {
@@ -3388,9 +4506,20 @@ export async function updateProfileSettings(data: {
   if (!supabase || !profile) return { success: false, error: "Please sign in." };
   const fullName = data.fullName.trim().replace(/\s+/g, " ");
   if (fullName.length < 3 || fullName.length > 120) return { success: false, error: "Enter your full name." };
-  const gradeLevel = typeof data.gradeLevel === "number" && data.gradeLevel >= 6 && data.gradeLevel <= 12
-    ? data.gradeLevel
-    : null;
+  const gradeLevel = data.gradeLevel ?? null;
+  if (
+    gradeLevel !== null
+    && (
+      !Number.isInteger(gradeLevel)
+      || gradeLevel < PILOT_MINIMUM_GRADE
+      || gradeLevel > PILOT_MAXIMUM_GRADE
+    )
+  ) {
+    return {
+      success: false,
+      error: `Grade must be between ${PILOT_MINIMUM_GRADE} and ${PILOT_MAXIMUM_GRADE}, or left blank.`,
+    };
+  }
   const { error } = await supabase
     .from("profiles")
     .update({ full_name: fullName, grade_level: gradeLevel })
@@ -3517,6 +4646,9 @@ export async function archiveClubContent(
   const supabase = await createClient();
   const profile = await getCurrentProfile();
   if (!supabase || !profile) return { success: false, error: "Please sign in." };
+  if (profile.role === "super_admin") {
+    return { success: false, error: "Platform support access is read-only." };
+  }
   const table = CLUB_CONTENT_TABLES[contentType];
   if (!table) return { success: false, error: "Unknown content type." };
 
@@ -3576,6 +4708,9 @@ export async function approveContent(
 
   const profile = await getCurrentProfile();
   if (!profile) return { success: false, error: "Please sign in." };
+  if (profile.role === "super_admin") {
+    return { success: false, error: "Platform support access is read-only." };
+  }
 
   const table = APPROVAL_TABLES[contentType];
   if (!table) return { success: false, error: "Unknown content type." };
@@ -3677,6 +4812,9 @@ export async function rejectContent(
 
   const profile = await getCurrentProfile();
   if (!profile) return { success: false, error: "Please sign in." };
+  if (profile.role === "super_admin") {
+    return { success: false, error: "Platform support access is read-only." };
+  }
 
   const table = APPROVAL_TABLES[contentType];
   if (!table) return { success: false, error: "Unknown content type." };
@@ -3806,10 +4944,12 @@ export async function updateNotificationPreferences(
   return { success: true };
 }
 
-export async function generateOpportunityDeadlineReminders(): Promise<{ success: boolean; count?: number; error?: string }> {
-  const profile = await getCurrentProfile();
-  if (!profile || !isAdminRole(profile.role)) return { success: false, error: "Administrator access required." };
-  const count = await createOpportunityDeadlineReminders();
+export async function generateOpportunityDeadlineReminders(
+  schoolId: string
+): Promise<{ success: boolean; count?: number; error?: string }> {
+  const context = await getOpportunityManagementContext(schoolId);
+  if ("error" in context) return { success: false, error: context.error };
+  const count = await createOpportunityDeadlineReminders(context.school.id);
   revalidatePath("/notifications");
   return { success: true, count };
 }

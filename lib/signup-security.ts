@@ -4,6 +4,8 @@ export interface SignupBotProof {
   website?: string;
   loadedAt?: number;
   captchaToken?: string | null;
+  acceptedPolicies?: boolean;
+  ageAssurance?: "13_or_older";
 }
 
 export function isMissingAllowedEmailDomainsColumn(error: unknown): boolean {
@@ -78,6 +80,12 @@ export function validateSignupBotProof(
   const loadedAt = Number(proof.loadedAt);
   if (!Number.isFinite(loadedAt) || loadedAt <= 0 || loadedAt > now || now - loadedAt < 1500) {
     return "Please reload the signup page and try again.";
+  }
+  if (!proof.acceptedPolicies) {
+    return "Accept the Terms, Privacy Notice, and Acceptable Use Policy to continue.";
+  }
+  if (proof.ageAssurance !== "13_or_older") {
+    return "StormHub's current high-school rollout is limited to people age 13 or older.";
   }
   return null;
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { CategoryBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,9 @@ import { isAdminRole } from "@/lib/permissions";
 
 export default async function ManageClubsPage() {
   const { profile } = await requireManager();
+  if (profile.role === "super_admin") {
+    redirect("/admin/schools?error=choose_support_school");
+  }
   const clubs = (await getManageableClubs(profile)).filter(
     (club) => club.status !== "draft" && club.status !== "archived" && club.is_listed
   );

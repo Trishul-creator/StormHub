@@ -158,6 +158,7 @@ export async function createEmailOutboxItem(input: {
   subject: string;
   body: string;
   type: string;
+  dedupeKey?: string | null;
 }): Promise<string | null> {
   if (isDemoMode()) return null;
   if (!isEmailOutboxEnabled()) return null;
@@ -175,10 +176,21 @@ export async function createEmailOutboxItem(input: {
       body: input.body,
       type: input.type,
       status: "pending",
+      ...(input.dedupeKey
+        ? { dedupe_key: input.dedupeKey.trim().slice(0, 255) }
+        : {}),
     })
     .select("id,recipient_email,subject,body")
     .single();
   if (error) {
+    if (error.code === "23505" && input.dedupeKey) {
+      const { data: existing, error: existingError } = await admin
+        .from("email_outbox")
+        .select("id")
+        .eq("dedupe_key", input.dedupeKey.trim().slice(0, 255))
+        .maybeSingle();
+      if (!existingError && existing?.id) return existing.id;
+    }
     console.error("[createEmailOutboxItem]", error.message);
     return null;
   }
@@ -216,10 +228,14 @@ export async function createNotification(input: CreateNotificationInput): Promis
     return;
   }
   const [{ data: profile }, { data: preferenceRow }] = await Promise.all([
-    admin.from("profiles").select("email,role").eq("id", input.recipientUserId).maybeSingle(),
+    admin
+      .from("profiles")
+      .select("email,role,account_status")
+      .eq("id", input.recipientUserId)
+      .maybeSingle(),
     admin.from("notification_preferences").select("*").eq("user_id", input.recipientUserId).maybeSingle(),
   ]);
-  if (!profile) return;
+  if (!profile || profile.account_status !== "active") return;
   const preferences = (preferenceRow as NotificationPreferences | null) ?? defaultPreferences(input.recipientUserId);
   if (input.clubId && isClubUpdateNotification(input.type) && !preferences.club_updates_enabled) return;
   if (input.type === "opportunity_deadline_soon" && !preferences.opportunity_deadlines_enabled) return;
@@ -260,10 +276,11 @@ export async function createNotificationsForClubMembers(input: {
   if (!admin) return;
   const { data, error } = await admin
     .from("club_memberships")
-    .select("user_id, profiles!inner(role)")
+    .select("user_id, profiles!inner(role,account_status)")
     .eq("club_id", input.clubId)
     .eq("status", "active")
-    .eq("profiles.role", "student");
+    .eq("profiles.role", "student")
+    .eq("profiles.account_status", "active");
   if (error) {
     console.error("[createNotificationsForClubMembers]", error.message);
     return;
@@ -302,11 +319,12 @@ export async function createNotificationsForClubSponsors(input: {
   if (!admin) return;
   const { data, error } = await admin
     .from("club_memberships")
-    .select("user_id,profiles!inner(role)")
+    .select("user_id,profiles!inner(role,account_status)")
     .eq("club_id", input.clubId)
     .eq("status", "active")
     .eq("role", "sponsor")
-    .eq("profiles.role", "teacher");
+    .eq("profiles.role", "teacher")
+    .eq("profiles.account_status", "active");
 
   if (error) {
     console.error("[createNotificationsForClubSponsors]", error.message);
@@ -375,7 +393,11 @@ export async function createAdminAttentionNotification(input: {
   if (isDemoMode()) return;
   const admin = createAdminClient();
   if (!admin) return;
-  let query = admin.from("profiles").select("id").eq("role", "admin");
+  let query = admin
+    .from("profiles")
+    .select("id")
+    .eq("role", "admin")
+    .eq("account_status", "active");
   if (input.schoolId) query = query.eq("school_id", input.schoolId);
   const { data } = await query;
   await Promise.all(
@@ -411,7 +433,8 @@ export async function createApprovalNeededNotifications(input: {
     .from("profiles")
     .select("id")
     .eq("school_id", input.schoolId)
-    .eq("role", "admin");
+    .eq("role", "admin")
+    .eq("account_status", "active");
 
   if (adminError) {
     console.error("[createApprovalNeededNotifications admins]", adminError.message);
@@ -449,15 +472,18 @@ export async function createApprovalNeededNotifications(input: {
   );
 }
 
-export async function createOpportunityDeadlineReminders(): Promise<number> {
+export async function createOpportunityDeadlineReminders(schoolId: string): Promise<number> {
   if (isDemoMode()) return 0;
   const admin = createAdminClient();
   if (!admin) return 0;
   const now = new Date();
   const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const reminderWindowStart = new Date(now);
+  reminderWindowStart.setUTCHours(0, 0, 0, 0);
   const { data: opportunities } = await admin
     .from("opportunities")
     .select("id,title,slug,deadline")
+    .eq("school_id", schoolId)
     .eq("status", "approved")
     .eq("deadline_reminder_enabled", true)
     .gte("deadline", now.toISOString())
@@ -466,10 +492,21 @@ export async function createOpportunityDeadlineReminders(): Promise<number> {
   for (const opportunity of opportunities ?? []) {
     const { data: bookmarks } = await admin
       .from("bookmarks")
-      .select("user_id,profiles!inner(role)")
+      .select("user_id,profiles!inner(role,account_status)")
       .eq("opportunity_id", opportunity.id)
-      .eq("profiles.role", "student");
+      .eq("profiles.role", "student")
+      .eq("profiles.account_status", "active");
     for (const bookmark of bookmarks ?? []) {
+      const { data: existingReminder } = await admin
+        .from("notifications")
+        .select("id")
+        .eq("recipient_user_id", bookmark.user_id)
+        .eq("opportunity_id", opportunity.id)
+        .eq("type", "opportunity_deadline_soon")
+        .gte("created_at", reminderWindowStart.toISOString())
+        .limit(1)
+        .maybeSingle();
+      if (existingReminder) continue;
       await createNotification({
         recipientUserId: bookmark.user_id,
         type: "opportunity_deadline_soon",

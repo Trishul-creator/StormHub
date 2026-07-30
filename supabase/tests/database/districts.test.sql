@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(23);
+SELECT plan(25);
 
 SELECT is(
   (SELECT name FROM public.districts WHERE slug = 'elkhorn-public-schools'),
@@ -206,6 +206,20 @@ SELECT is(
   (SELECT count(*) FROM public.districts),
   1::BIGINT,
   'district administrators can read only their assigned district'
+);
+SELECT is(
+  (SELECT count(*) FROM public.schools),
+  1::BIGINT,
+  'district administrators can read only schools assigned to their district'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.schools
+    WHERE id = 'b1000000-0000-4000-8000-000000000099'
+  ),
+  0::BIGINT,
+  'district administrators cannot resolve a school outside their district'
 );
 SELECT is(
   (

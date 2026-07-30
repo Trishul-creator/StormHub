@@ -44,14 +44,21 @@ export function AssignmentAttachmentsManager({
         fileSize: file.size,
         mimeType: file.type || null,
       });
-      if (!prepared.success || !prepared.path || !prepared.token) {
+      if (
+        !prepared.success
+        || !prepared.intentId
+        || !prepared.path
+        || !prepared.token
+        || !prepared.fileName
+        || !prepared.mimeType
+      ) {
         errors.push(`${file.name}: ${prepared.error || "could not prepare upload"}`);
         continue;
       }
       const { error: uploadError } = await supabase.storage
         .from("coursework-private")
         .uploadToSignedUrl(prepared.path, prepared.token, file, {
-          contentType: file.type || "application/octet-stream",
+          contentType: prepared.mimeType,
         });
       if (uploadError) {
         errors.push(`${file.name}: ${uploadError.message}`);
@@ -61,10 +68,11 @@ export function AssignmentAttachmentsManager({
         clubSlug,
         assignmentId,
         target: "assignment",
+        intentId: prepared.intentId,
         storagePath: prepared.path,
-        fileName: file.name,
+        fileName: prepared.fileName,
         fileSize: file.size,
-        mimeType: file.type || null,
+        mimeType: prepared.mimeType,
       });
       if (!registered.success) errors.push(`${file.name}: ${registered.error || "could not attach file"}`);
     }
@@ -184,6 +192,7 @@ export function AssignmentAttachmentsManager({
                 <input
                   type="file"
                   multiple
+                  accept=".pdf,.txt,.png,.jpg,.jpeg,.gif,.webp,.heic,.heif"
                   className="sr-only"
                   disabled={working}
                   onChange={(event) => {
@@ -209,6 +218,9 @@ export function AssignmentAttachmentsManager({
           </div>
           <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
             <Copy className="h-3.5 w-3.5" /> Student copies support Google Docs, Sheets, Slides, Drawings, and Forms.
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Up to 20 approved school-document materials, 20 MB per file and 200 MB total.
           </p>
         </>
       )}

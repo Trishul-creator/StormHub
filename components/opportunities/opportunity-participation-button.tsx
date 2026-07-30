@@ -16,6 +16,7 @@ interface OpportunityParticipationButtonProps {
   externalUrl?: string | null;
   isLoggedIn?: boolean;
   isSignedUp?: boolean;
+  isClosed?: boolean;
   compact?: boolean;
   className?: string;
 }
@@ -27,6 +28,7 @@ export function OpportunityParticipationButton({
   externalUrl,
   isLoggedIn,
   isSignedUp,
+  isClosed = false,
   compact = false,
   className,
 }: OpportunityParticipationButtonProps) {
@@ -35,6 +37,15 @@ export function OpportunityParticipationButton({
   const router = useRouter();
   const isRsvp = actionLabel.trim().toLowerCase() === "rsvp";
   const completeLabel = isRsvp ? "RSVP confirmed" : "Signed up";
+
+  if (isClosed && !registered) {
+    return (
+      <Button type="button" size={compact ? "sm" : "default"} variant="secondary" disabled className={className}>
+        <CalendarCheck2 className="h-4 w-4" />
+        Closed
+      </Button>
+    );
+  }
 
   if (!isLoggedIn) {
     return (

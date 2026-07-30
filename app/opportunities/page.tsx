@@ -9,7 +9,7 @@ import { getAuthContext } from "@/lib/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { buildEmptyStateActions } from "@/lib/product";
-import { isAdminRole } from "@/lib/permissions";
+import { canAccessSchoolAdmin, isAdminRole } from "@/lib/permissions";
 import { SchoolFilter } from "@/components/layout/school-filter";
 import { getSchoolFilterContext } from "@/lib/schools";
 import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
@@ -40,6 +40,15 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
         return selectedGrade! >= min && selectedGrade! <= max;
       })
     : allOpportunities;
+  const canManageSelectedSchool = Boolean(
+    selectedSchool
+    && canAccessSchoolAdmin(profile, selectedSchool.id, selectedSchool.district_id)
+  );
+  const managementHref = selectedSchool
+    ? profile?.role === "admin"
+      ? "/manage/opportunities"
+      : `/admin/schools/${selectedSchool.slug}/opportunities`
+    : null;
 
   const canParticipate = profile?.role === "student" || !profile;
   const [bookmarkedIds, signedUpIds] = canParticipate
@@ -69,16 +78,16 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
       <PageHeader
         title="Opportunities"
         description={
-          profile && ["admin", "super_admin"].includes(profile.role)
+          profile && isAdminRole(profile.role)
             ? "Review all school-wide opportunities. Administrator accounts can create and manage listings but cannot participate."
             : profile?.role === "teacher"
               ? "Browse school-wide opportunities in read-only mode. Teacher accounts cannot save, RSVP, or sign up."
             : "Signups, applications, tryouts, auditions, competitions, interest forms, and deadlines."
         }
       >
-        {profile && ["admin", "super_admin"].includes(profile.role) && (
+        {canManageSelectedSchool && managementHref && (
           <Button asChild>
-            <Link href="/manage/opportunities">Create opportunity</Link>
+            <Link href={managementHref}>Manage opportunities</Link>
           </Button>
         )}
       </PageHeader>

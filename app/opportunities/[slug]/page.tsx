@@ -8,7 +8,7 @@ import { OpportunityParticipationButton } from "@/components/opportunities/oppor
 import { getOpportunityBySlug } from "@/lib/data";
 import { getUserBookmarkIds, getUserOpportunitySignupIds } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
-import { formatDate, isDeadlineSoon, opportunityActionLabel } from "@/lib/utils";
+import { formatDate, isDeadlineSoon, isOverdue, opportunityActionLabel } from "@/lib/utils";
 import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
 
 interface OpportunityPageProps {
@@ -28,6 +28,7 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
   const isBookmarked = bookmarkIds.has(opportunity.id);
   const isSignedUp = signedUpIds.has(opportunity.id);
   const actionLabel = opportunityActionLabel(opportunity.action_label);
+  const isClosed = isOverdue(opportunity.deadline);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -118,6 +119,7 @@ export default async function OpportunityPage({ params }: OpportunityPageProps) 
               externalUrl={opportunity.external_url}
               isLoggedIn={isLoggedIn}
               isSignedUp={isSignedUp}
+              isClosed={isClosed}
               className="w-full"
             />
           )}

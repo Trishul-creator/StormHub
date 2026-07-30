@@ -11,6 +11,7 @@ import { getUserBookmarkIds, getUserOpportunitySignupIds } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
 import { getSchoolBySlugForViewer } from "@/lib/schools";
 import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
+import { canAccessSchoolAdmin } from "@/lib/permissions";
 
 interface SchoolOpportunitiesPageProps {
   params: Promise<{ schoolSlug: string }>;
@@ -44,7 +45,10 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
   const [bookmarkedIds, signedUpIds] = canParticipate
     ? await Promise.all([getUserBookmarkIds(userId), getUserOpportunitySignupIds(userId)])
     : [new Set<string>(), new Set<string>()];
-  const canManage = profile?.role === "super_admin" || (profile?.role === "admin" && profile.school_id === school.id);
+  const canManage = canAccessSchoolAdmin(profile, school.id, school.district_id);
+  const managementHref = profile?.role === "admin"
+    ? "/manage/opportunities"
+    : `/admin/schools/${school.slug}/opportunities`;
   const filterOptions = categories.map((category) => ({ label: category, value: category }));
   const closingParams = new URLSearchParams({
     ...(query.q ? { q: query.q } : {}),
@@ -66,7 +70,7 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
       >
         {canManage && (
           <Button asChild>
-            <Link href="/manage/opportunities">Create opportunity</Link>
+            <Link href={managementHref}>Manage opportunities</Link>
           </Button>
         )}
       </PageHeader>

@@ -5,6 +5,13 @@ import { maybeGetSupabaseAnonKey, maybeGetSupabaseUrl } from "@/lib/env";
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
+  // Health probes are intentionally public and do not need a Supabase session
+  // refresh. Skipping Auth avoids turning every uptime check into an additional
+  // remote authentication request.
+  if (request.nextUrl.pathname === "/api/health") {
+    return supabaseResponse;
+  }
+
   const url = maybeGetSupabaseUrl();
   const key = maybeGetSupabaseAnonKey();
 

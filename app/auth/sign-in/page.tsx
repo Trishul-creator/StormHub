@@ -13,6 +13,7 @@ import { Zap } from "lucide-react";
 import { Captcha } from "@/components/auth/captcha";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { PasswordInput } from "@/components/auth/password-input";
+import { safeAuthRedirectPath } from "@/lib/auth-redirect";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -68,7 +69,7 @@ export default function SignInPage() {
       toast({ title: "Welcome back!", description: "You're signed in to StormHub." });
       const params = new URLSearchParams(window.location.search);
       const redirectTo = "redirectTo" in result && typeof result.redirectTo === "string" ? result.redirectTo : undefined;
-      router.push(params.get("redirect") || redirectTo || "/dashboard");
+      router.push(safeAuthRedirectPath(params.get("redirect"), redirectTo || "/dashboard"));
       router.refresh();
     } else {
       setCaptchaToken(null);

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types/database";
 
 export interface PlatformSupportSession {
@@ -92,21 +93,18 @@ export async function recordPlatformSupportAccess(input: {
   resourceType: string;
   resourceId?: string | null;
 }): Promise<boolean> {
-  const session = await getActivePlatformSupportSession(input.actor, input.schoolId);
-  if (!session) return false;
-  const admin = createAdminClient();
-  if (!admin) return false;
-  const { error } = await admin.from("platform_support_access_log").insert({
-    session_id: session.id,
-    actor_user_id: input.actor.id,
-    school_id: input.schoolId,
-    action: input.action,
-    resource_type: input.resourceType.slice(0, 80),
-    resource_id: input.resourceId ?? null,
+  if (input.actor.role !== "super_admin") return false;
+  const supabase = await createClient();
+  if (!supabase) return false;
+  const { data, error } = await supabase.rpc("record_platform_support_access", {
+    target_school_id: input.schoolId,
+    requested_action: input.action,
+    requested_resource_type: input.resourceType.slice(0, 80),
+    requested_resource_id: input.resourceId ?? null,
   });
   if (error) {
     console.error("[recordPlatformSupportAccess]", error.message);
     return false;
   }
-  return true;
+  return Boolean(data);
 }

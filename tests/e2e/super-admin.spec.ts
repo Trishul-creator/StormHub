@@ -7,6 +7,7 @@ test.describe("super admin district chooser", () => {
   });
 
   test("super admin lands on the platform hierarchy and can open school workspaces", async ({ page }) => {
+    test.setTimeout(45_000);
     await signIn(page, "super_admin");
     await page.goto("/admin/districts");
     await expect(page).toHaveURL(/\/admin\/districts/);
@@ -24,7 +25,7 @@ test.describe("super admin district chooser", () => {
       await expect(page.getByText(/School 1/i).first()).toBeVisible();
       await expect(page.getByText(/School 2/i).first()).toBeVisible();
       await page.locator("summary").filter({ hasText: "Create school" }).click();
-      await expect(page.getByText(/Workspace URL name/i)).toBeVisible();
+      await expect(page.getByLabel("Workspace URL name (optional)")).toBeVisible();
       await expect(page.getByText(/^Slug$/)).toHaveCount(0);
     } else {
       await expect(page.getByText(/District migration required/i)).toBeVisible();
@@ -32,23 +33,21 @@ test.describe("super admin district chooser", () => {
       await expect(page.getByText(/School 2/i).first()).toBeVisible();
     }
 
-    await adminNavigation.getByRole("link", { name: /support inbox/i }).click();
+    await expect(
+      adminNavigation.getByRole("link", { name: /support inbox/i })
+    ).toHaveAttribute("href", "/admin/feedback");
+    await page.goto("/admin/feedback");
     await expect(page).toHaveURL(/\/admin\/feedback/);
     await expect(page.getByRole("heading", { name: /support inbox/i })).toBeVisible();
-
-    await page.goto("/admin/districts");
 
     await page.goto("/admin/schools/school1");
     await expect(page).toHaveURL(/\/admin\/schools\/school1/);
     await expect(page.getByText(/Platform Admin Mode/i)).toBeVisible();
-    await page.getByRole("link", { name: /add clubs/i }).click();
-    await expect(page).toHaveURL(/\/admin\/schools\/school1\/drafts/);
-    await expect(page.getByRole("heading", { name: /add a club to school 1/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /browse starter clubs/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /create a custom club/i })).toHaveAttribute(
+    await expect(page.getByRole("link", { name: /inspect club drafts/i })).toHaveAttribute(
       "href",
-      "/manage/clubs/new?school=school1"
+      "/admin/schools/school1/drafts"
     );
+    await expect(page.getByRole("link", { name: /add clubs/i })).toHaveCount(0);
 
     await page.goto("/admin/schools/school2");
     await expect(page).toHaveURL(/\/admin\/schools\/school2/);

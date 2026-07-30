@@ -22,6 +22,7 @@ export default async function ManageEventsPage({ params }: PageProps) {
   const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
   const auth = await requireClubManager(club);
+  const readOnlySupport = auth.readOnlySupport;
   const events = (await getClubManagedContent(club.id, "event")) as Event[];
   const canDelete = canApproveClubContent(auth.profile, club, auth.membership);
   const canPublish = canPublishClubContent(auth.profile, club, auth.membership, "event");
@@ -34,10 +35,21 @@ export default async function ManageEventsPage({ params }: PageProps) {
   const courseworkEnabled = canManageClubCoursework(auth.profile, club, auth.membership);
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
-      <PageHeader title="Create event" description={`Schedule a meeting, practice, deadline, or activity for ${club.name}.`} />
-      <ClubCreateNavigation clubSlug={slug} activeType="event" courseworkEnabled={courseworkEnabled} />
-      <ContentForm type="event" clubSlug={slug} canPublish={canPublish} />
-      <section className="mt-8 rounded-xl border bg-card p-5 shadow-sm">
+      <PageHeader
+        title={readOnlySupport ? "Events — read only" : "Create event"}
+        description={
+          readOnlySupport
+            ? `Inspect ${club.name} events during this recorded support session.`
+            : `Schedule a meeting, practice, deadline, or activity for ${club.name}.`
+        }
+      />
+      {!readOnlySupport && (
+        <>
+          <ClubCreateNavigation clubSlug={slug} activeType="event" courseworkEnabled={courseworkEnabled} />
+          <ContentForm type="event" clubSlug={slug} canPublish={canPublish} />
+        </>
+      )}
+      <section className={`${readOnlySupport ? "mt-2" : "mt-8"} rounded-xl border bg-card p-5 shadow-sm`}>
         <h2 className="font-semibold text-storm-navy">Previous events</h2>
         <div className="mt-4 space-y-3">
           {events.map((event) => (

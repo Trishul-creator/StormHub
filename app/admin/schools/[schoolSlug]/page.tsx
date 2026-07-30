@@ -235,17 +235,31 @@ export default async function AdminSchoolPage({ params, searchParams }: AdminSch
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {profile.role === "super_admin" && (
-          <ActionCard href={`/admin/schools/${school.slug}/drafts`} icon={Users} title="Add clubs" description="Use a prepared starter or create a custom club for this school." />
+        {(profile.role === "super_admin" || profile.role === "district_admin") && (
+          <ActionCard
+            href={`/admin/schools/${school.slug}/drafts`}
+            icon={Users}
+            title={profile.role === "super_admin" ? "Inspect club drafts" : "Add clubs"}
+            description={
+              profile.role === "super_admin"
+                ? "Open the recorded, read-only draft inventory during an active support session."
+                : "Use a prepared starter or create a custom club for this school."
+            }
+          />
         )}
         {profile.role === "admin" && (
           <ActionCard href="/manage/clubs/drafts" icon={Users} title="Add clubs" description="Use a prepared starter or create a custom club for your school." />
         )}
-        {profile.role === "admin" ? (
-          <ActionCard href="/manage/opportunities" icon={Zap} title="Manage opportunities" description="Create and review school opportunities." />
-        ) : (
-          <ActionCard href={`/s/${school.slug}/opportunities`} icon={Zap} title="Preview opportunities" description="View the opportunities visible in this school." />
-        )}
+        <ActionCard
+          href={`/admin/schools/${school.slug}/opportunities`}
+          icon={Zap}
+          title={profile.role === "super_admin" ? "Inspect opportunities" : "Manage opportunities"}
+          description={
+            profile.role === "super_admin"
+              ? "Open the recorded, read-only opportunity inventory during an active support session."
+              : "Create, edit, close, archive, or preview this school’s opportunities."
+          }
+        />
         <ActionCard href={`/s/${school.slug}/calendar`} icon={Calendar} title="Preview calendar" description="View this school’s calendar entries." />
         <ActionCard href={`/admin/users?school=${school.slug}`} icon={Settings} title="Users and roles" description="Assign school admins, teachers, and students for this school." />
         <ActionCard href={`/admin/statistics?school=${school.slug}`} icon={BarChart3} title="Statistics" description="Review school participation and active-club trends." />

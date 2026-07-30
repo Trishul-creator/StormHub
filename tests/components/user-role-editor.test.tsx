@@ -64,4 +64,24 @@ describe("UserRoleEditor sponsor choices", () => {
     expect(screen.queryByText("Paused Club")).not.toBeInTheDocument();
     expect(screen.queryByText("Unlisted Club")).not.toBeInTheDocument();
   });
+
+  it("renders elevated accounts read-only without an invalid role selector", () => {
+    render(
+      <UserRoleEditor
+        user={{
+          ...teacher,
+          id: "district-admin",
+          role: "district_admin",
+          school_id: null,
+          district_id: "district-1",
+        }}
+        actorId="super-admin"
+        actorRole="super_admin"
+        clubs={[]}
+      />
+    );
+
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getByText(/manage this elevated assignment/i)).toBeVisible();
+  });
 });

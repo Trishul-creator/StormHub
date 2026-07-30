@@ -48,6 +48,8 @@ describe("completeGoogleOnboarding", () => {
       fullName: "Google Student",
       gradeLevel: "10",
       accessCode: "SH-1234-ABCD-5678",
+      acceptedPolicies: true,
+      ageAssurance: "13_or_older",
       next: "/opportunities",
     });
 
@@ -73,6 +75,8 @@ describe("completeGoogleOnboarding", () => {
       fullName: "Google Student",
       gradeLevel: "",
       accessCode: "SH-1234-ABCD-5678",
+      acceptedPolicies: true,
+      ageAssurance: "13_or_older",
       next: "/dashboard",
     });
 
@@ -95,6 +99,8 @@ describe("completeGoogleOnboarding", () => {
       fullName: "Google Student",
       gradeLevel: "10",
       accessCode: "SH-WRNG-CODE-0000",
+      acceptedPolicies: true,
+      ageAssurance: "13_or_older",
       next: "/dashboard",
     });
 
@@ -104,16 +110,42 @@ describe("completeGoogleOnboarding", () => {
     });
     expect(update).not.toHaveBeenCalled();
   });
+
+  it("does not assign a Google user when policy acceptance cannot be recorded", async () => {
+    const { update } = setupClients({
+      email: "student@gmail.com",
+      allowedDomains: ["*"],
+      acceptanceError: { code: "42P01", message: "policy_acceptances is missing" },
+    });
+
+    const result = await completeGoogleOnboarding({
+      schoolId: "school-1",
+      fullName: "Google Student",
+      gradeLevel: "10",
+      accessCode: "SH-1234-ABCD-5678",
+      acceptedPolicies: true,
+      ageAssurance: "13_or_older",
+      next: "/dashboard",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "We couldn't save your policy acceptance. Please try again after the latest database migration is applied.",
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
 });
 
 function setupClients({
   email,
   allowedDomains,
   accessCodeValid = true,
+  acceptanceError = null,
 }: {
   email: string;
   allowedDomains: string[];
   accessCodeValid?: boolean;
+  acceptanceError?: { code?: string; message: string } | null;
 }) {
   const getUser = vi.fn().mockResolvedValue({
     data: {
@@ -179,9 +211,17 @@ function setupClients({
   };
   mocks.createAdminClient.mockReturnValue({
     rpc: vi.fn().mockResolvedValue({ data: accessCodeValid, error: null }),
+    auth: {
+      admin: {
+        updateUserById: vi.fn().mockResolvedValue({ error: null }),
+      },
+    },
     from: vi.fn((table: string) => {
       if (table === "profiles") return profiles;
       if (table === "schools") return schools;
+      if (table === "policy_acceptances") {
+        return { upsert: vi.fn().mockResolvedValue({ error: acceptanceError }) };
+      }
       throw new Error(`Unexpected table: ${table}`);
     }),
   });

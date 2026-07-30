@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runDataRetention } from "@/lib/data-retention";
+import { processEmailOutbox } from "@/lib/email";
+import { logEvent } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -11,8 +13,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const startedAt = Date.now();
+    // Recover messages that could not be delivered by their immediate request.
+    // The queue claim is lease-based, so this is safe alongside live sends.
+    const email = await processEmailOutbox(24);
     const deleted = await runDataRetention();
-    return NextResponse.json({ ok: true, deleted });
+    logEvent("info", "data_retention_completed", {
+      durationMs: Date.now() - startedAt,
+      emailAttempted: email.attempted,
+      emailSent: email.sent,
+      emailFailed: email.failed,
+      deleted,
+    });
+    return NextResponse.json({ ok: true, email, deleted });
   } catch (error) {
     console.error(JSON.stringify({
       level: "error",

@@ -11,6 +11,12 @@ import {
   canManageClub,
 } from "@/lib/permissions";
 import type { Club, ClubMembership } from "@/types/database";
+import {
+  ACCEPTABLE_USE_VERSION,
+  PRIVACY_POLICY_VERSION,
+  TERMS_VERSION,
+} from "@/lib/policy";
+import { recordPlatformSupportAccess } from "@/lib/support-access";
 
 const DEMO_USER_COOKIE = "stormhub_demo_user";
 const DEMO_EMAIL_COOKIE = "stormhub_demo_email";
@@ -175,6 +181,34 @@ export async function requireAuth(redirectTo?: string): Promise<AuthContext & { 
   if (auth.profile.account_status && auth.profile.account_status !== "active" && redirectTo !== "/account-status") {
     redirect("/account-status");
   }
+  if (
+    !auth.isDemo
+    && (!auth.profile.account_status || auth.profile.account_status === "active")
+    && redirectTo !== "/auth/accept-policies"
+    && redirectTo !== "/account-status"
+  ) {
+    const supabase = await createClient();
+    if (supabase) {
+      const { data: acceptance, error } = await supabase
+        .from("policy_acceptances")
+        .select("id")
+        .eq("user_id", auth.userId)
+        .eq("privacy_version", PRIVACY_POLICY_VERSION)
+        .eq("terms_version", TERMS_VERSION)
+        .eq("acceptable_use_version", ACCEPTABLE_USE_VERSION)
+        .eq("age_assurance", "13_or_older")
+        .maybeSingle();
+      if (!error && !acceptance) {
+        const next = redirectTo && redirectTo.startsWith("/") ? redirectTo : defaultPathForProfile(auth.profile);
+        redirect(`/auth/accept-policies?next=${encodeURIComponent(next)}`);
+      }
+      if (error) {
+        console.warn("[requireAuth] Policy acceptance gate is unavailable:", error.message);
+        const next = redirectTo && redirectTo.startsWith("/") ? redirectTo : defaultPathForProfile(auth.profile);
+        redirect(`/auth/accept-policies?next=${encodeURIComponent(next)}&setup=required`);
+      }
+    }
+  }
   return auth as AuthContext & { userId: string; profile: Profile };
 }
 
@@ -216,8 +250,26 @@ export async function requireApprover(): Promise<AuthContext & { userId: string;
 export async function requireClubManager(
   club: Club,
   redirectTo = "/manage/clubs"
-): Promise<AuthContext & { userId: string; profile: Profile; membership: ClubMembership | null }> {
+): Promise<AuthContext & {
+  userId: string;
+  profile: Profile;
+  membership: ClubMembership | null;
+  readOnlySupport: boolean;
+}> {
   const auth = await requireManager();
+  const readOnlySupport = auth.profile.role === "super_admin";
+  if (readOnlySupport) {
+    const recorded = await recordPlatformSupportAccess({
+      actor: auth.profile,
+      schoolId: club.school_id,
+      action: "view",
+      resourceType: "club_management_workspace",
+      resourceId: club.id,
+    });
+    if (!recorded) {
+      redirect("/admin/schools?error=platform_support_session_required");
+    }
+  }
   const supabase = await createClient();
   let membership: ClubMembership | null = null;
   if (supabase) {
@@ -230,8 +282,8 @@ export async function requireClubManager(
       .maybeSingle();
     membership = data as ClubMembership | null;
   }
-  if (!canManageClub(auth.profile, club, membership)) {
+  if (!readOnlySupport && !canManageClub(auth.profile, club, membership)) {
     redirect(`${redirectTo}?error=club_permission_required`);
   }
-  return { ...auth, membership };
+  return { ...auth, membership, readOnlySupport };
 }

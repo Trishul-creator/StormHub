@@ -46,6 +46,9 @@ export default async function ManageMembersPage({ params }: PageProps) {
     && canAssignClubLeadership(profile, club, membership);
   const canBan = profile.role !== "super_admin"
     && canBanClubMember(profile, club, membership);
+  const canViewRosterEmail =
+    (profile.role === "admin" && profile.school_id === club.school_id)
+    || (profile.role === "teacher" && membership?.role === "sponsor");
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -97,7 +100,7 @@ export default async function ManageMembersPage({ params }: PageProps) {
           <thead className="bg-storm-light/50">
             <tr>
               <th className="p-4 text-left">Name</th>
-              <th className="p-4 text-left">Email</th>
+              {canViewRosterEmail && <th className="p-4 text-left">Email</th>}
               <th className="p-4 text-left">Club role</th>
               <th className="p-4 text-right">Actions</th>
             </tr>
@@ -106,7 +109,9 @@ export default async function ManageMembersPage({ params }: PageProps) {
             {roster.map((member) => (
               <tr key={member.id} className="border-t">
                 <td className="p-4">{member.profile?.full_name || "Unnamed user"}</td>
-                <td className="p-4 text-muted-foreground">{member.profile?.email || "—"}</td>
+                {canViewRosterEmail && (
+                  <td className="p-4 text-muted-foreground">{member.profile?.email || "—"}</td>
+                )}
                 <td className="p-4"><RoleBadge role={member.role} /></td>
                 <td className="p-4">
                   {member.role === "sponsor" ? (

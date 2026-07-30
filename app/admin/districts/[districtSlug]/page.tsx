@@ -126,7 +126,8 @@ async function assignDistrictAdministratorAction(formData: FormData) {
   const districtSlug = String(formData.get("district_slug") ?? "");
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const admin = createAdminClient();
-  if (!admin || !districtId || !email) {
+  const supabase = await createClient();
+  if (!admin || !supabase || !districtId || !email) {
     redirect(`/admin/districts/${districtSlug}?error=missing_district_admin`);
   }
 
@@ -140,14 +141,10 @@ async function assignDistrictAdministratorAction(formData: FormData) {
     redirect(`/admin/districts/${districtSlug}?error=protected_platform_admin`);
   }
 
-  const { error } = await admin
-    .from("profiles")
-    .update({
-      role: "district_admin",
-      district_id: districtId,
-      school_id: null,
-    })
-    .eq("id", target.id);
+  const { error } = await supabase.rpc("assign_district_administrator", {
+    target_user_id: target.id,
+    target_district_id: districtId,
+  });
   if (error) {
     console.error("[assignDistrictAdministratorAction]", error.message);
     redirect(`/admin/districts/${districtSlug}?error=assign_failed`);

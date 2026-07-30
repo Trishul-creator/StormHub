@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { FilePenLine, Rocket, Search, Settings, X } from "lucide-react";
+import { Eye, FilePenLine, Rocket, Search, Settings, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CategoryBadge } from "@/components/ui/badge";
@@ -19,9 +19,11 @@ export interface DraftClubCatalogItem {
 export function DraftClubCatalog({
   clubs,
   mode,
+  readOnly = false,
 }: {
   clubs: DraftClubCatalogItem[];
   mode: "platform-admin" | "admin" | "teacher";
+  readOnly?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
@@ -129,22 +131,24 @@ export function DraftClubCatalog({
             <div className="flex flex-wrap justify-end gap-2">
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/manage/clubs/${club.slug}`}>
-                  {mode === "platform-admin" && <Settings className="h-4 w-4" />}
-                  {mode === "platform-admin" ? "Dashboard" : "Open workspace"}
+                  {mode === "platform-admin" && (
+                    readOnly ? <Eye className="h-4 w-4" /> : <Settings className="h-4 w-4" />
+                  )}
+                  {readOnly ? "Inspect" : mode === "platform-admin" ? "Dashboard" : "Open workspace"}
                 </Link>
               </Button>
-              {mode !== "teacher" ? (
+              {!readOnly && mode !== "teacher" ? (
                 <Button size="sm" asChild>
                   <Link href={`/manage/clubs/${club.slug}/edit?publish=1`}>
                     <Rocket className="h-4 w-4" />
                     Use this club
                   </Link>
                 </Button>
-              ) : (
+              ) : !readOnly ? (
                 <Button variant="secondary" size="sm" asChild>
                   <Link href={`/manage/clubs/${club.slug}/edit`}>Awaiting admin review</Link>
                 </Button>
-              )}
+              ) : null}
             </div>
           </article>
         ))}

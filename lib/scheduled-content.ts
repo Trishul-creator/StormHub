@@ -26,6 +26,20 @@ interface ClubSummary {
   slug: string;
 }
 
+async function isClubTenantActive(
+  admin: NonNullable<ReturnType<typeof createAdminClient>>,
+  clubId: string,
+) {
+  const { data, error } = await admin.rpc("is_club_tenant_active", {
+    club_uuid: clubId,
+  });
+  if (error) {
+    console.error("[scheduled content tenant gate]", error.message);
+    return false;
+  }
+  return data === true;
+}
+
 async function getClub(clubId: string): Promise<ClubSummary | null> {
   const admin = createAdminClient();
   if (!admin) return null;
@@ -74,6 +88,7 @@ export async function publishScheduledClubContent(now = new Date()): Promise<{
   let announcementsPublished = 0;
 
   for (const candidate of (assignmentRows ?? []) as ScheduledAssignment[]) {
+    if (!await isClubTenantActive(admin, candidate.club_id)) continue;
     const { data: claimed, error } = await admin
       .from("club_assignments")
       .update({
@@ -108,6 +123,7 @@ export async function publishScheduledClubContent(now = new Date()): Promise<{
   }
 
   for (const candidate of (announcementRows ?? []) as ScheduledAnnouncement[]) {
+    if (!await isClubTenantActive(admin, candidate.club_id)) continue;
     const { data: claimed, error } = await admin
       .from("club_announcements")
       .update({

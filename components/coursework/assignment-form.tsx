@@ -93,14 +93,21 @@ export function AssignmentForm({
         fileSize: file.size,
         mimeType: file.type || null,
       });
-      if (!prepared.success || !prepared.path || !prepared.token) {
+      if (
+        !prepared.success
+        || !prepared.intentId
+        || !prepared.path
+        || !prepared.token
+        || !prepared.fileName
+        || !prepared.mimeType
+      ) {
         errors.push(`${file.name}: ${prepared.error || "could not prepare upload"}`);
         continue;
       }
       const { error: uploadError } = await supabase.storage
         .from("coursework-private")
         .uploadToSignedUrl(prepared.path, prepared.token, file, {
-          contentType: file.type || "application/octet-stream",
+          contentType: prepared.mimeType,
         });
       if (uploadError) {
         errors.push(`${file.name}: ${uploadError.message}`);
@@ -110,10 +117,11 @@ export function AssignmentForm({
         clubSlug,
         assignmentId,
         target: "assignment",
+        intentId: prepared.intentId,
         storagePath: prepared.path,
-        fileName: file.name,
+        fileName: prepared.fileName,
         fileSize: file.size,
-        mimeType: file.type || null,
+        mimeType: prepared.mimeType,
       });
       if (!registered.success) {
         errors.push(`${file.name}: ${registered.error || "could not attach file"}`);
@@ -318,6 +326,7 @@ export function AssignmentForm({
               <input
                 type="file"
                 multiple
+                accept=".pdf,.txt,.png,.jpg,.jpeg,.gif,.webp,.heic,.heif"
                 className="sr-only"
                 onChange={(event) => {
                   const selected = Array.from(event.target.files ?? []);

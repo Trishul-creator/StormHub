@@ -103,14 +103,18 @@ Do not paste their values into logs or support messages.
 
 ## 6. Apply the database migration
 
-The private bucket, attachment records, encrypted connection records, and per-student
-copy records are created by:
+The private bucket, attachment records, encrypted connection records, per-student
+copy records, and server-bound direct-upload controls depend on:
 
 ```text
 supabase/migrations/20260726150000_coursework_attachments_and_drive.sql
+supabase/migrations/20260730220000_coursework_upload_intents.sql
+supabase/migrations/20260730230000_legal_hold_execution_barriers.sql
+supabase/migrations/20260730250000_tenant_deletion_integrity.sql
 ```
 
-Apply the normal migration chain to staging first:
+Do not cherry-pick only these files for the current release. Apply the normal migration chain
+through `20260730280000_platform_support_access_logging.sql` to staging first:
 
 ```bash
 supabase link --project-ref <staging-project-ref>
@@ -138,7 +142,18 @@ Repeat against production only after the PR is merged and the migration is appro
 ## Ownership and privacy behavior
 
 - Private uploads are stored in the non-public `coursework-private` Supabase bucket.
-  Downloads use short-lived signed URLs after StormHub rechecks authorization.
+  Each signed upload is bound to a ten-minute, server-only database intent containing the exact
+  user, assignment, target, storage path, normalized filename, MIME type, and expected byte size.
+  Per-user active and rolling count/byte quotas limit abandoned-object abuse. Registration
+  rechecks account, tenant, assignment, and membership/management access before atomically
+  consuming the intent.
+- Registration downloads the stored object (maximum 20 MB), compares its actual Storage metadata
+  with the intent, and validates the format signature for supported PDF, image, HEIF, and plain-text
+  files. Direct Office, OpenDocument, RTF, and CSV uploads stay disabled; users attach those through
+  Google Drive so district Workspace controls remain in the path. Rejected objects are deleted.
+  Expired abandoned objects and old terminal intent records are removed by the data-retention worker.
+- Downloads use short-lived signed URLs after StormHub rechecks authorization and force a private
+  attachment response rather than rendering untrusted content inline.
 - A student-copy template is copied by the teacher's connected account. The teacher
   owns the generated copy, and the intended student receives private editor access.
   This keeps the copy available to the teacher for grading without requesting full
@@ -147,3 +162,10 @@ Repeat against production only after the PR is merged and the migration is appro
   managers when Google permits the share.
 - OAuth access and refresh tokens are encrypted before database storage. Disconnecting
   Drive revokes the connection and deletes the stored credentials.
+
+These controls validate the declared file format and reduce exposure, but they are not an
+antivirus or content-disarm service. Before enabling direct uploads for a broad district rollout
+with untrusted external users, the district security acceptance record must either require an
+approved malware-scanning service in the upload pipeline or explicitly accept the residual risk
+of private, forced-download, signature-validated files. Google Drive attachments remain subject to
+the district's Google Workspace security controls.

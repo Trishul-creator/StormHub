@@ -26,7 +26,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         getClubs({ search: query }),
         getEvents(),
         getOpportunities({ search: query }),
-        canSearchPeople ? getAdminUsers() : Promise.resolve([]),
+        canSearchPeople
+          ? getAdminUsers({ search: query, page: 1, pageSize: 20 }).then((result) => result.users)
+          : Promise.resolve([]),
       ])
     : [[], [], [], []];
 

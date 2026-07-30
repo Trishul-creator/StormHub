@@ -58,4 +58,19 @@ describe("OpportunityParticipationButton", () => {
     expect(screen.getByText("Signed up")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sign Up" })).not.toBeInTheDocument();
   });
+
+  it("does not allow a new signup after the deadline closes", () => {
+    render(
+      <OpportunityParticipationButton
+        opportunityId="opp-1"
+        opportunitySlug="science-night"
+        actionLabel="Sign Up"
+        isLoggedIn
+        isClosed
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Closed" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Sign Up" })).not.toBeInTheDocument();
+  });
 });

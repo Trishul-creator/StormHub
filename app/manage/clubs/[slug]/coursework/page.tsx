@@ -26,13 +26,13 @@ export default async function ManageCourseworkPage({ params }: CourseworkPagePro
   const { slug } = await params;
   const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
-  const { profile, membership } = await requireClubManager(club);
-  if (!canManageClubCoursework(profile, club, membership)) {
+  const { profile, membership, readOnlySupport } = await requireClubManager(club);
+  if (!readOnlySupport && !canManageClubCoursework(profile, club, membership)) {
     redirect(`/manage/clubs/${slug}?error=coursework_permission_required`);
   }
   const canPublish = canPublishClubCoursework(profile, club, membership);
   const canGrade = canGradeClubCoursework(profile, club, membership);
-  const isPlatformSupport = profile.role === "super_admin";
+  const isPlatformSupport = readOnlySupport;
   const [supportSession, supportSchool] = isPlatformSupport
     ? await Promise.all([
       getActivePlatformSupportSession(profile, club.school_id),

@@ -1,5 +1,5 @@
 import { SignUpForm } from "@/components/auth/sign-up-form";
-import { getAllSchools } from "@/lib/schools";
+import { getSignupSchools } from "@/lib/schools";
 
 interface SignUpPageProps {
   searchParams: Promise<{ school?: string }>;
@@ -7,7 +7,7 @@ interface SignUpPageProps {
 
 export default async function SignUpPage({ searchParams }: SignUpPageProps) {
   const params = await searchParams;
-  const schools = (await getAllSchools()).filter((school) => school.is_active !== false && school.is_public !== false);
+  const schools = await getSignupSchools();
   const preselectedSchool = schools.find((school) => school.slug === params.school);
 
   return (

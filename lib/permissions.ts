@@ -10,7 +10,7 @@ const CLUB_LEADER_ROLES: MembershipRole[] = ["officer", "president", "sponsor"];
 
 const ADMIN_ROLES: UserRole[] = ["admin", "district_admin", "super_admin"];
 const MANAGER_ROLES: UserRole[] = ["teacher", "admin", "super_admin"];
-const APPROVER_ROLES: UserRole[] = ["teacher", "admin", "district_admin", "super_admin"];
+const APPROVER_ROLES: UserRole[] = ["teacher", "admin", "district_admin"];
 
 export function isStudent(user: Profile | null | undefined): boolean {
   return user?.role === "student";
@@ -40,6 +40,25 @@ export function isAdminRole(role?: string | null): boolean {
   return !!role && ADMIN_ROLES.includes(role as UserRole);
 }
 
+export function canOpenUserEditor(
+  actorRole: UserRole,
+  targetRole: UserRole,
+  hasExplicitSchoolScope: boolean
+): boolean {
+  if (targetRole === "district_admin" || targetRole === "super_admin") return false;
+  if (
+    (actorRole === "district_admin" || actorRole === "super_admin")
+    && !hasExplicitSchoolScope
+  ) {
+    return false;
+  }
+  if (actorRole === "admin") return targetRole === "student" || targetRole === "teacher";
+  if (actorRole === "district_admin" || actorRole === "super_admin") {
+    return ["student", "teacher", "admin"].includes(targetRole);
+  }
+  return false;
+}
+
 export function isManagerRole(role?: string | null): boolean {
   return !!role && MANAGER_ROLES.includes(role as UserRole);
 }
@@ -50,7 +69,7 @@ export function canManageClub(
   membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
 ): boolean {
   if (!user) return false;
-  if (user.role === "super_admin") return true;
+  if (user.role === "super_admin") return false;
   if (user.role === "admin" && typeof clubOrId !== "string") {
     return !!user.school_id && user.school_id === clubOrId.school_id;
   }
@@ -73,7 +92,7 @@ export function canManageClubPublication(
   club: Club
 ): boolean {
   if (!user) return false;
-  if (user.role === "super_admin") return true;
+  if (user.role === "super_admin") return false;
   return user.role === "admin" && !!user.school_id && user.school_id === club.school_id;
 }
 
@@ -83,7 +102,7 @@ export function canApproveClubContent(
   membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
 ): boolean {
   if (!user) return false;
-  if (user.role === "super_admin") return true;
+  if (user.role === "super_admin") return false;
   if (user.role === "admin" && typeof club !== "string") {
     return !!user.school_id && user.school_id === club.school_id;
   }
@@ -99,7 +118,7 @@ export function canPublishClubContent(
   contentType: "announcement" | "event" | "resource"
 ): boolean {
   if (!user) return false;
-  if (user.role === "super_admin") return true;
+  if (user.role === "super_admin") return false;
   if (user.role === "admin") {
     return typeof club === "string" || (!!user.school_id && user.school_id === club.school_id);
   }
@@ -184,6 +203,12 @@ export function canEditRole(
   newRole: UserRole
 ): boolean {
   if (!actor || !isAdminRole(actor.role) || actor.id === target.id) return false;
+  if (
+    ["district_admin", "super_admin"].includes(target.role)
+    || ["district_admin", "super_admin"].includes(newRole)
+  ) {
+    return false;
+  }
   if (actor.role === "district_admin") {
     return !!actor.district_id
       && actor.district_id === target.district_id
@@ -200,6 +225,7 @@ export function canEditRole(
 
 export function canDeleteUser(actor: Profile | null, target: Profile): boolean {
   if (!actor || !isAdminRole(actor.role) || actor.id === target.id) return false;
+  if (["district_admin", "super_admin"].includes(target.role)) return false;
   if (actor.role === "district_admin") {
     return !!actor.district_id
       && actor.district_id === target.district_id
@@ -238,7 +264,7 @@ export function canManageClubRoster(
   membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
 ): boolean {
   if (!user) return false;
-  if (user.role === "super_admin") return true;
+  if (user.role === "super_admin") return false;
   if (user.role === "admin") {
     return typeof club !== "string" && !!user.school_id && user.school_id === club.school_id;
   }
@@ -256,7 +282,7 @@ export function canAssignClubLeadership(
   membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
 ): boolean {
   if (!user) return false;
-  if (user.role === "super_admin") return true;
+  if (user.role === "super_admin") return false;
   if (user.role === "admin") {
     return typeof club !== "string" && !!user.school_id && user.school_id === club.school_id;
   }
@@ -351,7 +377,7 @@ export function canArchiveClub(
 }
 
 export function canCreateOpportunity(user: Profile | null): boolean {
-  return canAccessAdmin(user);
+  return user?.role === "admin" || user?.role === "district_admin";
 }
 
 export function canParticipate(user: Profile | null): boolean {
@@ -372,8 +398,7 @@ export function canCreateClub(
   schoolDistrictId?: string | null
 ): boolean {
   if (!user || !schoolId) return false;
-  return user.role === "super_admin"
-    || (user.role === "district_admin"
+  return (user.role === "district_admin"
       && !!schoolDistrictId
       && user.district_id === schoolDistrictId)
     || (user.role === "admin" && user.school_id === schoolId);

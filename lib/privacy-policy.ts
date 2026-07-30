@@ -1,4 +1,6 @@
-export const PRIVACY_NOTICE_EFFECTIVE_DATE = "July 28, 2026";
+import { POLICY_EFFECTIVE_DATE } from "@/lib/policy";
+
+export const PRIVACY_NOTICE_EFFECTIVE_DATE = POLICY_EFFECTIVE_DATE;
 
 export const RETENTION_DAYS = {
   signupAttempts: 30,
@@ -11,6 +13,8 @@ export const RETENTION_DAYS = {
   analyticsEvents: 395,
   adminAudit: 730,
   platformSupportSessions: 730,
+  platformSupportAccessLog: 730,
+  accountDeletionExecutions: 730,
   retentionRunHistory: 730,
 } as const;
 
@@ -19,6 +23,16 @@ export const RETENTION_SCHEDULE = [
     data: "Active account and profile",
     period: "While the person is enrolled, employed, or otherwise authorized by the school",
     handling: "Deleted on an approved account request or school instruction, subject to required school records.",
+  },
+  {
+    data: "Policy acceptance and age-eligibility assurance",
+    period: "While the account remains active",
+    handling: "Stored with the accepted policy versions and deleted with the authentication account. A birth date is not collected.",
+  },
+  {
+    data: "Google Drive connection credentials",
+    period: "Until the user disconnects Drive or the account is deleted",
+    handling: "Encrypted tokens are deleted. Files already created in Google Drive remain under the user's or school's Google controls.",
   },
   {
     data: "Club memberships, RSVPs, attendance, coursework, grades, and submissions",
@@ -59,5 +73,10 @@ export const RETENTION_SCHEDULE = [
     data: "Administrative audit and platform support-access records",
     period: "24 months",
     handling: "Automatically deleted unless a security investigation or legal hold requires temporary preservation.",
+  },
+  {
+    data: "Account-deletion execution records",
+    period: "24 months",
+    handling: "A pseudonymous execution identifier and outcome are retained for deletion verification, then automatically deleted unless a legal hold applies.",
   },
 ] as const;

@@ -15,11 +15,12 @@ import { cn } from "@/lib/cn";
 interface ContentFormProps {
   type: "announcement" | "event" | "resource" | "opportunity";
   clubSlug?: string;
+  schoolId?: string;
   canPublish?: boolean;
   className?: string;
 }
 
-export function ContentForm({ type, clubSlug, canPublish = true, className }: ContentFormProps) {
+export function ContentForm({ type, clubSlug, schoolId, canPublish = true, className }: ContentFormProps) {
   const [loading, setLoading] = useState(false);
   const [importance, setImportance] = useState<NotificationImportance>("normal");
   const [sendEmail, setSendEmail] = useState(false);
@@ -33,6 +34,7 @@ export function ContentForm({ type, clubSlug, canPublish = true, className }: Co
     const result = await submitContent({
       type,
       clubSlug,
+      schoolId,
       title: String(form.get("title") ?? ""),
       body: String(form.get("body") ?? ""),
       starts_at: String(form.get("starts_at") ?? "") || undefined,
@@ -84,11 +86,19 @@ export function ContentForm({ type, clubSlug, canPublish = true, className }: Co
       )}
       <div>
         <Label htmlFor="title">Title</Label>
-        <Input id="title" name="title" required className="mt-1" />
+        <Input id="title" name="title" required minLength={3} maxLength={160} className="mt-1" />
       </div>
       <div>
         <Label htmlFor="body">{type === "resource" ? "Description or notes" : "Content"}</Label>
-        <Textarea id="body" name="body" required rows={5} className="mt-1" />
+        <Textarea
+          id="body"
+          name="body"
+          required
+          minLength={type === "opportunity" ? 3 : 1}
+          maxLength={20_000}
+          rows={5}
+          className="mt-1"
+        />
       </div>
       {type === "resource" && (
         <div className="rounded-xl border bg-storm-light/20 p-4 space-y-4">
@@ -111,6 +121,7 @@ export function ContentForm({ type, clubSlug, canPublish = true, className }: Co
               id="resource_label"
               name="resource_label"
               placeholder="Open study guide"
+              maxLength={160}
               className="mt-1"
             />
             <p className="mt-1 text-xs text-muted-foreground">

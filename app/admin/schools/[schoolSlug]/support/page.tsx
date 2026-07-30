@@ -20,6 +20,7 @@ import { getSchoolBySlug } from "@/lib/schools";
 import {
   getActivePlatformSupportSession,
   getPlatformSupportAvailability,
+  recordPlatformSupportAccess,
 } from "@/lib/support-access";
 import { PlatformSupportExpiryGuard } from "@/components/admin/platform-support-expiry-guard";
 
@@ -84,6 +85,37 @@ export default async function SupportWorkspacePage({ params }: SupportWorkspaceP
             </p>
             <Button asChild>
               <Link href={schoolAdminHref}>Start support for {school.name}</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </SupportPageShell>
+    );
+  }
+
+  const supportAccessRecorded = await recordPlatformSupportAccess({
+    actor: profile,
+    schoolId: school.id,
+    action: "view",
+    resourceType: "school_support_workspace",
+    resourceId: school.id,
+  });
+  if (!supportAccessRecorded) {
+    return (
+      <SupportPageShell schoolName={school.name} schoolAdminHref={schoolAdminHref}>
+        <Card className="border-amber-300 dark:border-amber-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-amber-600 dark:text-amber-300" />
+              Private support data stayed locked
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <p>
+              The required access-log entry could not be recorded. No private club,
+              roster, attendance, coursework, or opportunity data was loaded.
+            </p>
+            <Button asChild>
+              <Link href={schoolAdminHref}>Return to school administration</Link>
             </Button>
           </CardContent>
         </Card>

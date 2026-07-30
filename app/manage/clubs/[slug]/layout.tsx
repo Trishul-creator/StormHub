@@ -13,7 +13,7 @@ export default async function ClubManageLayout({ children, params }: ClubManageL
   const { slug } = await params;
   const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
-  const { profile, membership } = await requireClubManager(club);
+  const { profile, membership, readOnlySupport } = await requireClubManager(club);
 
   return (
     <>
@@ -22,6 +22,7 @@ export default async function ClubManageLayout({ children, params }: ClubManageL
         slug={slug}
         canManageRoster={canManageClubRoster(profile, club, membership)}
         membershipRole={membership?.role ?? null}
+        readOnlySupport={readOnlySupport}
       />
       {children}
     </>

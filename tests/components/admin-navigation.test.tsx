@@ -15,6 +15,10 @@ describe("AdminNavigation", () => {
     expect(screen.getByRole("link", { name: "Support inbox" })).toHaveAttribute("href", "/admin/feedback");
     expect(screen.getByRole("link", { name: "Statistics" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Deletion requests" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Tenant offboarding" })).toHaveAttribute(
+      "href",
+      "/admin/offboarding"
+    );
     expect(screen.getByRole("link", { name: "Audit log" })).toBeInTheDocument();
   });
 
@@ -23,13 +27,15 @@ describe("AdminNavigation", () => {
 
     expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/admin");
     expect(screen.queryByRole("link", { name: "Districts" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Support inbox" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Support inbox" })).toHaveAttribute("href", "/admin/feedback");
+    expect(screen.getByRole("link", { name: "Tenant offboarding" })).toBeInTheDocument();
   });
 
-  it("gives district administrators their district workspace without platform support", () => {
+  it("gives district administrators their district workspace and scoped support inbox", () => {
     render(<AdminNavigation role="district_admin" />);
 
     expect(screen.getByRole("link", { name: "District" })).toHaveAttribute("href", "/admin/districts");
-    expect(screen.queryByRole("link", { name: "Support inbox" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Support inbox" })).toHaveAttribute("href", "/admin/feedback");
+    expect(screen.getByRole("link", { name: "Tenant offboarding" })).toBeInTheDocument();
   });
 });

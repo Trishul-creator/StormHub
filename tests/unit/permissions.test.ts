@@ -15,6 +15,7 @@ import {
   canInspectClubCoursework,
   canPublishClubCoursework,
   canManageSchool,
+  canOpenUserEditor,
   canUseStudentFeatures,
   canViewMemberContent,
   getSponsorAssignableClubs,
@@ -175,6 +176,23 @@ describe("school admin permissions", () => {
     expect(canDeleteUser(superAdmin, profile("teacher", { school_id: schoolB }))).toBe(true);
   });
 
+  it("keeps elevated account assignment and removal out of generic user management", () => {
+    const superAdmin = profile("super_admin");
+    const districtAdmin = profile("district_admin", {
+      district_id: "district-a",
+      school_id: null,
+    });
+    const otherSuperAdmin = profile("super_admin", { id: "super-admin-2" });
+    const schoolAdmin = profile("admin", { school_id: schoolA });
+
+    expect(canEditRole(superAdmin, districtAdmin, "admin")).toBe(false);
+    expect(canEditRole(superAdmin, otherSuperAdmin, "admin")).toBe(false);
+    expect(canDeleteUser(superAdmin, districtAdmin)).toBe(false);
+    expect(canDeleteUser(superAdmin, otherSuperAdmin)).toBe(false);
+    expect(canEditRole(superAdmin, schoolAdmin, "district_admin")).toBe(false);
+    expect(canEditRole(superAdmin, schoolAdmin, "super_admin")).toBe(false);
+  });
+
   it("offers sponsors one copy of each published, active club in their school", () => {
     const publishedClub = club();
     const choices = getSponsorAssignableClubs([
@@ -189,6 +207,22 @@ describe("school admin permissions", () => {
 
     expect(choices.map((choice) => choice.id)).toEqual([publishedClub.id]);
     expect(getSponsorAssignableClubs([publishedClub], null)).toEqual([]);
+  });
+});
+
+describe("administrative inventory editing", () => {
+  it("keeps aggregate and elevated inventory rows read-only", () => {
+    expect(canOpenUserEditor("super_admin", "teacher", false)).toBe(false);
+    expect(canOpenUserEditor("district_admin", "admin", false)).toBe(false);
+    expect(canOpenUserEditor("super_admin", "district_admin", true)).toBe(false);
+    expect(canOpenUserEditor("super_admin", "super_admin", true)).toBe(false);
+  });
+
+  it("allows only supported school-scoped targets to open the editor", () => {
+    expect(canOpenUserEditor("super_admin", "teacher", true)).toBe(true);
+    expect(canOpenUserEditor("district_admin", "admin", true)).toBe(true);
+    expect(canOpenUserEditor("admin", "student", true)).toBe(true);
+    expect(canOpenUserEditor("admin", "admin", true)).toBe(false);
   });
 });
 
@@ -213,16 +247,16 @@ describe("club permissions", () => {
     expect(canManageClub(teacher, club({ id: "club-b" }), membership("sponsor", "club-a"))).toBe(false);
   });
 
-  it("allows school admins only for clubs in their school and super admins for any club", () => {
+  it("allows school admins only for clubs in their school and keeps platform support read-only", () => {
     expect(canManageClub(profile("admin", { school_id: schoolA }), club({ school_id: schoolA }))).toBe(true);
     expect(canManageClub(profile("admin", { school_id: schoolA }), club({ school_id: schoolB }))).toBe(false);
-    expect(canManageClub(profile("super_admin"), club({ school_id: schoolB }))).toBe(true);
+    expect(canManageClub(profile("super_admin"), club({ school_id: schoolB }))).toBe(false);
   });
 
   it("lets Vice Presidents coordinate general members while reserving leadership changes for adults", () => {
     expect(canManageClubRoster(profile("admin", { school_id: schoolA }), club({ school_id: schoolA }))).toBe(true);
     expect(canManageClubRoster(profile("admin", { school_id: schoolA }), club({ school_id: schoolB }))).toBe(false);
-    expect(canManageClubRoster(profile("super_admin"), club({ school_id: schoolB }))).toBe(true);
+    expect(canManageClubRoster(profile("super_admin"), club({ school_id: schoolB }))).toBe(false);
     expect(canManageClubRoster(profile("teacher"), club(), membership("sponsor"))).toBe(true);
     expect(canManageClubRoster(profile("student"), club(), membership("president"))).toBe(false);
     expect(canManageClubRoster(profile("student"), club(), membership("officer"))).toBe(true);
@@ -233,7 +267,7 @@ describe("club permissions", () => {
   it("separates assignment creation, publishing, and grading permissions", () => {
     expect(canManageClubCoursework(profile("admin", { school_id: schoolA }), club({ school_id: schoolA }))).toBe(true);
     expect(canManageClubCoursework(profile("admin", { school_id: schoolA }), club({ school_id: schoolB }))).toBe(false);
-    expect(canManageClubCoursework(profile("super_admin"), club({ school_id: schoolB }))).toBe(true);
+    expect(canManageClubCoursework(profile("super_admin"), club({ school_id: schoolB }))).toBe(false);
     expect(canManageClubCoursework(profile("teacher"), club(), membership("sponsor"))).toBe(true);
     expect(canManageClubCoursework(profile("teacher"), club(), membership("member"))).toBe(false);
     expect(canManageClubCoursework(profile("student"), club(), membership("president"))).toBe(true);
@@ -253,13 +287,13 @@ describe("club permissions", () => {
     expect(canManageClubPublication(profile("student"), club())).toBe(false);
     expect(canManageClubPublication(profile("admin", { school_id: schoolA }), club({ school_id: schoolA }))).toBe(true);
     expect(canManageClubPublication(profile("admin", { school_id: schoolA }), club({ school_id: schoolB }))).toBe(false);
-    expect(canManageClubPublication(profile("super_admin"), club({ school_id: schoolB }))).toBe(true);
+    expect(canManageClubPublication(profile("super_admin"), club({ school_id: schoolB }))).toBe(false);
   });
 
-  it("allows admins and super admins to preview/manage but not join through student flow", () => {
+  it("allows school admins to manage while keeping platform support read-only and out of student flows", () => {
     const targetClub = club();
     expect(canManageClub(profile("admin"), targetClub)).toBe(true);
-    expect(canManageClub(profile("super_admin"), targetClub)).toBe(true);
+    expect(canManageClub(profile("super_admin"), targetClub)).toBe(false);
     expect(canJoinClub(profile("admin"), targetClub)).toBe(false);
     expect(canJoinClub(profile("super_admin"), targetClub)).toBe(false);
   });
@@ -274,10 +308,20 @@ describe("opportunity-style school scoping expectations", () => {
     expect(canAccessSchoolAdmin(profile("super_admin"), schoolB)).toBe(true);
   });
 
-  it("allows only admins/super admins to create draft clubs for a selected school", () => {
+  it("allows only scoped school or district admins to create draft clubs", () => {
     expect(canCreateClub(profile("admin", { school_id: schoolA }), schoolA)).toBe(true);
     expect(canCreateClub(profile("admin", { school_id: schoolA }), schoolB)).toBe(false);
-    expect(canCreateClub(profile("super_admin"), schoolB)).toBe(true);
+    expect(canCreateClub(profile("super_admin"), schoolB)).toBe(false);
+    expect(canCreateClub(
+      profile("district_admin", { district_id: "district-a" }),
+      schoolB,
+      "district-a",
+    )).toBe(true);
+    expect(canCreateClub(
+      profile("district_admin", { district_id: "district-a" }),
+      schoolB,
+      "district-b",
+    )).toBe(false);
     expect(canCreateClub(profile("teacher"), schoolA)).toBe(false);
   });
 });

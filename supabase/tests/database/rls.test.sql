@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(112);
+SELECT plan(166);
 
 SELECT is(
   (SELECT public FROM storage.buckets WHERE id = 'coursework-private'),
@@ -90,7 +90,7 @@ INSERT INTO auth.users (
     '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
     'student-a@school-a.edu', crypt('Password123!', gen_salt('bf')), NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Student A","school_id":"a0000000-0000-4000-8000-000000000001","grade_level":"10","school_access_code":"SH-AAAA-AAAA-AAAA"}',
+    '{"full_name":"Student A","school_id":"a0000000-0000-4000-8000-000000000001","grade_level":"10","school_access_code":"SH-AAAA-AAAA-AAAA","stormhub_privacy_version":"2026-07-30","stormhub_terms_version":"2026-07-30","stormhub_acceptable_use_version":"2026-07-30","stormhub_age_assurance":"13_or_older"}',
     NOW(), NOW()
   ),
   (
@@ -98,7 +98,7 @@ INSERT INTO auth.users (
     '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
     'student-b@school-b.edu', crypt('Password123!', gen_salt('bf')), NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Student B","school_id":"b0000000-0000-4000-8000-000000000002","grade_level":"11","school_access_code":"SH-BBBB-BBBB-BBBB"}',
+    '{"full_name":"Student B","school_id":"b0000000-0000-4000-8000-000000000002","grade_level":"11","school_access_code":"SH-BBBB-BBBB-BBBB","stormhub_privacy_version":"2026-07-30","stormhub_terms_version":"2026-07-30","stormhub_acceptable_use_version":"2026-07-30","stormhub_age_assurance":"13_or_older"}',
     NOW(), NOW()
   ),
   (
@@ -106,7 +106,7 @@ INSERT INTO auth.users (
     '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
     'teacher-a@school-a.edu', crypt('Password123!', gen_salt('bf')), NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Teacher A","school_id":"a0000000-0000-4000-8000-000000000001","school_access_code":"SH-AAAA-AAAA-AAAA"}',
+    '{"full_name":"Teacher A","school_id":"a0000000-0000-4000-8000-000000000001","school_access_code":"SH-AAAA-AAAA-AAAA","stormhub_privacy_version":"2026-07-30","stormhub_terms_version":"2026-07-30","stormhub_acceptable_use_version":"2026-07-30","stormhub_age_assurance":"13_or_older"}',
     NOW(), NOW()
   ),
   (
@@ -114,7 +114,7 @@ INSERT INTO auth.users (
     '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
     'admin-a@school-a.edu', crypt('Password123!', gen_salt('bf')), NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Admin A","school_id":"a0000000-0000-4000-8000-000000000001","school_access_code":"SH-AAAA-AAAA-AAAA"}',
+    '{"full_name":"Admin A","school_id":"a0000000-0000-4000-8000-000000000001","school_access_code":"SH-AAAA-AAAA-AAAA","stormhub_privacy_version":"2026-07-30","stormhub_terms_version":"2026-07-30","stormhub_acceptable_use_version":"2026-07-30","stormhub_age_assurance":"13_or_older"}',
     NOW(), NOW()
   ),
   (
@@ -122,7 +122,7 @@ INSERT INTO auth.users (
     '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
     'super@school-a.edu', crypt('Password123!', gen_salt('bf')), NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Super Admin","school_id":"a0000000-0000-4000-8000-000000000001","school_access_code":"SH-AAAA-AAAA-AAAA"}',
+    '{"full_name":"Super Admin","school_id":"a0000000-0000-4000-8000-000000000001","school_access_code":"SH-AAAA-AAAA-AAAA","stormhub_privacy_version":"2026-07-30","stormhub_terms_version":"2026-07-30","stormhub_acceptable_use_version":"2026-07-30","stormhub_age_assurance":"13_or_older"}',
     NOW(), NOW()
   );
 
@@ -158,7 +158,7 @@ SELECT throws_ok(
       '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
       'wrong-code@school-a.edu', crypt('Password123!', gen_salt('bf')), NOW(),
       '{"provider":"email","providers":["email"]}',
-      '{"full_name":"Wrong Code","school_id":"a0000000-0000-4000-8000-000000000001","school_access_code":"SH-WRNG-CODE-0000"}',
+      '{"full_name":"Wrong Code","school_id":"a0000000-0000-4000-8000-000000000001","school_access_code":"SH-WRNG-CODE-0000","stormhub_privacy_version":"2026-07-30","stormhub_terms_version":"2026-07-30","stormhub_acceptable_use_version":"2026-07-30","stormhub_age_assurance":"13_or_older"}',
       NOW(), NOW()
     )
   $$,
@@ -195,17 +195,32 @@ UPDATE public.profiles SET role = 'super_admin', school_id = NULL
 WHERE id = '40000000-0000-4000-8000-000000000001';
 
 INSERT INTO public.clubs (
-  id, school_id, name, slug, status, is_listed, visibility
+  id, school_id, name, slug, status, is_active, is_listed, visibility
 ) VALUES
   (
     'a1000000-0000-4000-8000-000000000001',
     'a0000000-0000-4000-8000-000000000001',
-    'School A Club', 'school-a-club', 'active', TRUE, 'public'
+    'School A Club', 'school-a-club', 'active', TRUE, TRUE, 'public'
   ),
   (
     'b1000000-0000-4000-8000-000000000002',
     'b0000000-0000-4000-8000-000000000002',
-    'School B Club', 'school-b-club', 'active', TRUE, 'public'
+    'School B Club', 'school-b-club', 'active', TRUE, TRUE, 'public'
+  ),
+  (
+    'a1000000-0000-4000-8000-000000000003',
+    'a0000000-0000-4000-8000-000000000001',
+    'School A Private Draft', 'school-a-private-draft', 'draft', FALSE, FALSE, 'unlisted'
+  ),
+  (
+    'a1000000-0000-4000-8000-000000000004',
+    'a0000000-0000-4000-8000-000000000001',
+    'School A Inactive Club', 'school-a-inactive-club', 'active', FALSE, TRUE, 'public'
+  ),
+  (
+    'a1000000-0000-4000-8000-000000000005',
+    'a0000000-0000-4000-8000-000000000001',
+    'School A Second Club', 'school-a-second-club', 'active', TRUE, TRUE, 'public'
   );
 
 INSERT INTO public.club_memberships (club_id, user_id, status, role)
@@ -246,7 +261,53 @@ INSERT INTO public.opportunities (
     'School B Opportunity', 'school-b-opportunity', 'approved', 'public', 'Sign Up'
   );
 
+INSERT INTO public.feedback (
+  id, school_id, user_id, name, email, message, category, status
+) VALUES
+  (
+    'a7000000-0000-4000-8000-000000000001',
+    'a0000000-0000-4000-8000-000000000001',
+    '10000000-0000-4000-8000-000000000001',
+    'Student A',
+    'student-a@school-a.edu',
+    'School A support request',
+    'bug',
+    'open'
+  ),
+  (
+    'b7000000-0000-4000-8000-000000000002',
+    'b0000000-0000-4000-8000-000000000002',
+    '10000000-0000-4000-8000-000000000002',
+    'Student B',
+    'student-b@school-b.edu',
+    'School B support request',
+    'other',
+    'open'
+  );
+
 SET LOCAL ROLE anon;
+SELECT throws_ok(
+  $$SELECT count(*) FROM public.schools$$,
+  '42501',
+  NULL,
+  'anonymous users cannot query the real schools table'
+);
+SELECT throws_ok(
+  $$SELECT count(*) FROM public.school_settings$$,
+  '42501',
+  NULL,
+  'anonymous users cannot enumerate real school configuration'
+);
+SELECT is(
+  (SELECT count(*) FROM public.list_signup_schools()),
+  2::BIGINT,
+  'anonymous signup receives only the limited active-school chooser'
+);
+SELECT is(
+  (SELECT count(*) FROM public.list_signup_schools(0, 1, 'School')),
+  1::BIGINT,
+  'anonymous signup school directory supports bounded pages and search'
+);
 SELECT is((SELECT count(*) FROM public.clubs), 0::BIGINT, 'anonymous users cannot read real school clubs');
 SELECT is((SELECT count(*) FROM public.events), 0::BIGINT, 'anonymous users cannot read real school events');
 SELECT is((SELECT count(*) FROM public.opportunities), 0::BIGINT, 'anonymous users cannot read real school opportunities');
@@ -259,11 +320,100 @@ SELECT set_config(
   TRUE
 );
 SET LOCAL ROLE authenticated;
+SELECT is((SELECT count(*) FROM public.schools), 1::BIGINT, 'students can read only their assigned school');
+SELECT is(
+  (SELECT count(*) FROM public.schools WHERE id = 'b0000000-0000-4000-8000-000000000002'),
+  0::BIGINT,
+  'students cannot resolve another school directly'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.get_visible_club_member_counts(ARRAY[
+      'a1000000-0000-4000-8000-000000000001',
+      'a1000000-0000-4000-8000-000000000004',
+      'b1000000-0000-4000-8000-000000000002'
+    ]::UUID[])
+  ),
+  1::BIGINT,
+  'aggregate club counts omit clubs outside the viewer school'
+);
 SELECT is((SELECT count(*) FROM public.profiles), 1::BIGINT, 'students can read only their own profile');
 SELECT is((SELECT count(*) FROM public.club_memberships), 0::BIGINT, 'students cannot read another user membership');
-SELECT is((SELECT count(*) FROM public.clubs), 1::BIGINT, 'students can read public clubs only in their assigned school');
+SELECT is((SELECT count(*) FROM public.clubs), 2::BIGINT, 'students can read only active public clubs in their assigned school');
 SELECT is((SELECT count(*) FROM public.events), 1::BIGINT, 'students can read public events only in their assigned school');
 SELECT is((SELECT count(*) FROM public.opportunities), 1::BIGINT, 'students can read public opportunities only in their assigned school');
+SELECT throws_ok(
+  $$
+    INSERT INTO public.club_memberships (club_id, user_id, status, role)
+    VALUES (
+      'b1000000-0000-4000-8000-000000000002',
+      '10000000-0000-4000-8000-000000000001',
+      'active',
+      'member'
+    )
+  $$,
+  '42501',
+  NULL,
+  'students cannot join a club in another school by UUID'
+);
+SELECT throws_ok(
+  $$
+    INSERT INTO public.club_memberships (club_id, user_id, status, role)
+    VALUES (
+      'a1000000-0000-4000-8000-000000000003',
+      '10000000-0000-4000-8000-000000000001',
+      'active',
+      'member'
+    )
+  $$,
+  '42501',
+  NULL,
+  'students cannot join a private draft club by UUID'
+);
+INSERT INTO public.club_memberships (club_id, user_id, status, role)
+VALUES (
+  'a1000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
+  'active',
+  'member'
+);
+SELECT throws_ok(
+  $$
+    UPDATE public.club_memberships
+    SET club_id = 'a1000000-0000-4000-8000-000000000005'
+    WHERE club_id = 'a1000000-0000-4000-8000-000000000001'
+      AND user_id = '10000000-0000-4000-8000-000000000001'
+  $$,
+  'P0001',
+  'Membership identity and join time cannot be changed',
+  'students cannot relocate an existing membership row'
+);
+SELECT throws_ok(
+  $$
+    UPDATE public.club_memberships
+    SET user_id = '10000000-0000-4000-8000-000000000002'
+    WHERE club_id = 'a1000000-0000-4000-8000-000000000001'
+      AND user_id = '10000000-0000-4000-8000-000000000001'
+  $$,
+  'P0001',
+  'Membership identity and join time cannot be changed',
+  'students cannot transfer their membership row to another user'
+);
+SELECT throws_ok(
+  $$
+    UPDATE public.club_memberships
+    SET joined_at = NOW() - INTERVAL '1 year'
+    WHERE club_id = 'a1000000-0000-4000-8000-000000000001'
+      AND user_id = '10000000-0000-4000-8000-000000000001'
+  $$,
+  'P0001',
+  'Membership identity and join time cannot be changed',
+  'students cannot falsify their membership join time'
+);
+DELETE FROM public.club_memberships
+WHERE club_id = 'a1000000-0000-4000-8000-000000000001'
+  AND user_id = '10000000-0000-4000-8000-000000000001';
 SELECT throws_ok(
   $$UPDATE public.profiles SET role = 'admin' WHERE id = '10000000-0000-4000-8000-000000000001'$$,
   'P0001',
@@ -275,7 +425,7 @@ SELECT lives_ok(
   'students can update unprotected profile fields'
 );
 SELECT lives_ok(
-  $$INSERT INTO public.account_deletion_requests (user_id, school_id, reason) VALUES ('10000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001', 'No longer needed')$$,
+  $$SELECT public.submit_account_deletion_request('No longer needed')$$,
   'students can request deletion for their own account'
 );
 SELECT throws_ok(
@@ -327,7 +477,7 @@ SELECT set_config(
 );
 SET LOCAL ROLE authenticated;
 SELECT is((SELECT count(*) FROM public.club_memberships), 1::BIGINT, 'teacher sponsors can read their managed roster');
-SELECT is((SELECT count(*) FROM public.clubs), 1::BIGINT, 'teachers can read public clubs only in their assigned school');
+SELECT is((SELECT count(*) FROM public.clubs), 2::BIGINT, 'teachers can read public clubs only in their assigned school');
 SELECT is((SELECT count(*) FROM public.events), 1::BIGINT, 'teachers can read public events only in their assigned school');
 SELECT is((SELECT count(*) FROM public.opportunities), 1::BIGINT, 'teachers can read public opportunities in read-only school scope');
 SELECT is(
@@ -374,6 +524,15 @@ SELECT is(
   2::BIGINT,
   'teacher sponsors can view the limited club directory'
 );
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.get_club_roster('a1000000-0000-4000-8000-000000000001')
+    WHERE email IS NOT NULL
+  ),
+  2::BIGINT,
+  'club Advisors receive roster email when needed to supervise their club'
+);
 SELECT throws_ok(
   $$SELECT public.manage_club_roster_member('b1000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001', 'member', FALSE)$$,
   'P0001',
@@ -381,7 +540,7 @@ SELECT throws_ok(
   'teacher sponsors cannot manage another school roster'
 );
 SELECT lives_ok(
-  $$INSERT INTO public.account_deletion_requests (user_id, school_id, reason) VALUES ('20000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001', 'Teacher self-service request')$$,
+  $$SELECT public.submit_account_deletion_request('Teacher self-service request')$$,
   'teachers can request deletion for their own account'
 );
 SELECT throws_ok(
@@ -490,6 +649,40 @@ SELECT set_config(
   TRUE
 );
 SET LOCAL ROLE authenticated;
+SELECT is(
+  (SELECT count(*) FROM public.profiles),
+  1::BIGINT,
+  'student Vice Presidents cannot use roster leadership to read other profile rows'
+);
+SELECT is(
+  (SELECT count(*) FROM public.club_memberships),
+  1::BIGINT,
+  'student Vice Presidents can directly read only their own membership metadata'
+);
+SELECT is(
+  (SELECT count(*) FROM public.get_club_roster('a1000000-0000-4000-8000-000000000001')),
+  2::BIGINT,
+  'student Vice Presidents manage a least-privilege roster'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.get_club_roster('a1000000-0000-4000-8000-000000000001')
+    WHERE email IS NOT NULL
+  ),
+  0::BIGINT,
+  'student Vice Presidents never receive roster email addresses'
+);
+SELECT ok(
+  NOT (
+    (
+      SELECT to_jsonb(directory)
+      FROM public.get_club_member_directory('a1000000-0000-4000-8000-000000000001') directory
+      LIMIT 1
+    ) ? 'joined_at'
+  ),
+  'the member directory omits membership timestamps'
+);
 SELECT is(
   (SELECT count(*) FROM public.club_assignments),
   2::BIGINT,
@@ -704,6 +897,7 @@ SELECT set_config(
 );
 SET LOCAL ROLE authenticated;
 SELECT ok(public.has_admin_mfa(), 'confirmed-email admin sessions pass the retired MFA compatibility gate');
+SELECT is((SELECT count(*) FROM public.schools), 1::BIGINT, 'school admins can read only their assigned school');
 SELECT is((SELECT count(*) FROM public.profiles), 3::BIGINT, 'confirmed-email school admins can read users in their school only');
 SELECT is(
   (SELECT count(*) FROM public.profiles WHERE school_id = 'b0000000-0000-4000-8000-000000000002'),
@@ -732,6 +926,60 @@ SELECT throws_ok(
 );
 SELECT is((SELECT count(*) FROM public.account_deletion_requests), 1::BIGINT, 'confirmed-email school admins can read same-school deletion requests');
 SELECT is((SELECT count(*) FROM public.opportunity_signups), 1::BIGINT, 'school admins can review opportunity signups in their own school');
+SELECT is(
+  (SELECT count(*) FROM public.feedback),
+  1::BIGINT,
+  'school admins can read support requests only from their assigned school'
+);
+SELECT is(
+  (
+    SELECT total_count
+    FROM public.get_admin_user_inventory(1, 50, NULL, NULL, NULL)
+    LIMIT 1
+  ),
+  3::BIGINT,
+  'school administrator inventory includes every account in its own school'
+);
+SELECT throws_ok(
+  $$SELECT *
+    FROM public.get_admin_user_inventory(
+      1,
+      50,
+      NULL,
+      'b0000000-0000-4000-8000-000000000002',
+      NULL
+    )$$,
+  'P0001',
+  'Administrator access required for this school',
+  'school administrators cannot request another school user inventory'
+);
+SELECT is(
+  public.review_feedback_status(
+    'a7000000-0000-4000-8000-000000000001',
+    'a0000000-0000-4000-8000-000000000001',
+    'reviewed'
+  ),
+  TRUE,
+  'school admins can triage a support request from their assigned school'
+);
+SELECT throws_ok(
+  $$UPDATE public.feedback
+    SET message = 'Client-side overwrite'
+    WHERE id = 'a7000000-0000-4000-8000-000000000001'$$,
+  '42501',
+  NULL,
+  'administrators cannot directly overwrite stored support-message content'
+);
+SELECT throws_ok(
+  $$SELECT public.review_feedback_status(
+      'b7000000-0000-4000-8000-000000000002',
+      'b0000000-0000-4000-8000-000000000002',
+      'reviewed'
+    )$$,
+  'P0001',
+  'School or district administrator access required',
+  'school admins cannot triage another school support request'
+);
 SELECT lives_ok(
   $$SELECT public.admin_set_account_status('10000000-0000-4000-8000-000000000001', 'suspended')$$,
   'confirmed-email school admins can use authorized account RPCs'
@@ -745,7 +993,7 @@ SELECT lives_ok(
   'school admins can feature clubs in their own school'
 );
 SELECT lives_ok(
-  $$INSERT INTO public.account_deletion_requests (user_id, school_id, reason) VALUES ('30000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001', 'Admin self-service request')$$,
+  $$SELECT public.submit_account_deletion_request('Admin self-service request')$$,
   'school admins can request deletion for their own account'
 );
 SELECT throws_ok(
@@ -769,12 +1017,12 @@ INSERT INTO public.clubs (
   (
     'a1100000-0000-4000-8000-000000000002',
     'a0000000-0000-4000-8000-000000000001',
-    'School A Inactive Club', 'school-a-inactive-club', 'active', TRUE, FALSE, 'public'
+    'Sponsor Test Inactive Club', 'sponsor-test-inactive-club', 'active', TRUE, FALSE, 'public'
   ),
   (
     'a1100000-0000-4000-8000-000000000003',
     'a0000000-0000-4000-8000-000000000001',
-    'School A Unlisted Club', 'school-a-unlisted-club', 'active', FALSE, TRUE, 'public'
+    'Sponsor Test Unlisted Club', 'sponsor-test-unlisted-club', 'active', FALSE, TRUE, 'public'
   );
 
 SELECT set_config(
@@ -856,7 +1104,17 @@ SELECT is(
   'a teacher receives only one active sponsorship for the selected club'
 );
 SELECT lives_ok(
-  $$UPDATE public.account_deletion_requests SET status = 'rejected', reviewed_by = '30000000-0000-4000-8000-000000000001', reviewed_at = NOW() WHERE user_id = '10000000-0000-4000-8000-000000000001'$$,
+  $$SELECT *
+    FROM public.review_account_deletion_request(
+      (
+        SELECT id
+        FROM public.account_deletion_requests
+        WHERE target_user_id_snapshot = '10000000-0000-4000-8000-000000000001'
+          AND status = 'pending'
+      ),
+      'reject',
+      'The school administrator verified and rejected this test request.'
+    )$$,
   'school admins can review same-school deletion requests'
 );
 SELECT is(
@@ -911,7 +1169,69 @@ SELECT set_config(
   TRUE
 );
 SET LOCAL ROLE authenticated;
-SELECT is((SELECT count(*) FROM public.profiles), 5::BIGINT, 'confirmed-email super admins can read profiles across schools');
+SELECT is((SELECT count(*) FROM public.schools), 2::BIGINT, 'platform admins can resolve all school workspaces');
+SELECT is(
+  (SELECT count(*) FROM public.profiles),
+  1::BIGINT,
+  'platform administrators use the audited inventory instead of direct cross-school profile reads'
+);
+SELECT is(
+  (SELECT count(*) FROM public.club_memberships),
+  0::BIGINT,
+  'platform administrators cannot read roster rows without school support access'
+);
+UPDATE public.club_memberships
+SET role = 'president'
+WHERE club_id = 'a1000000-0000-4000-8000-000000000001'
+  AND user_id = '10000000-0000-4000-8000-000000000001';
+DELETE FROM public.club_memberships
+WHERE club_id = 'a1000000-0000-4000-8000-000000000001'
+  AND user_id = '10000000-0000-4000-8000-000000000001';
+RESET ROLE;
+SELECT is(
+  (
+    SELECT role
+    FROM public.club_memberships
+    WHERE club_id = 'a1000000-0000-4000-8000-000000000001'
+      AND user_id = '10000000-0000-4000-8000-000000000001'
+  ),
+  'officer',
+  'platform administrators cannot directly update school roster rows'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.club_memberships
+    WHERE club_id = 'a1000000-0000-4000-8000-000000000001'
+      AND user_id = '10000000-0000-4000-8000-000000000001'
+  ),
+  1::BIGINT,
+  'platform administrators cannot directly delete school roster rows'
+);
+SET LOCAL ROLE authenticated;
+SELECT throws_ok(
+  $$SELECT public.manage_club_roster_member(
+      'a1000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+      'member',
+      FALSE,
+      FALSE
+    )$$,
+  'P0001',
+  'Platform support access is read-only',
+  'platform support cannot mutate a school club roster'
+);
+SELECT is(
+  (SELECT count(*) FROM public.feedback),
+  0::BIGINT,
+  'platform admins cannot read support-message content without a school support session'
+);
+SELECT throws_ok(
+  $$SELECT * FROM public.get_club_member_directory('a1000000-0000-4000-8000-000000000001')$$,
+  'P0001',
+  'Start a school support session to view this roster',
+  'platform admins cannot open a real member directory without temporary support access'
+);
 SELECT is(
   (public.get_admin_statistics(NULL)->>'totalClubs')::INTEGER,
   (SELECT count(*)::INTEGER FROM public.clubs),
@@ -927,7 +1247,7 @@ SELECT is(
   'super admins can explicitly scope statistics to one school'
 );
 SELECT lives_ok(
-  $$INSERT INTO public.account_deletion_requests (user_id, school_id, reason) VALUES ('40000000-0000-4000-8000-000000000001', NULL, 'Super admin self-service request')$$,
+  $$SELECT public.submit_account_deletion_request('Super admin self-service request')$$,
   'super admins can request deletion for their own account'
 );
 RESET ROLE;
@@ -940,7 +1260,11 @@ SELECT set_config(
   TRUE
 );
 SET LOCAL ROLE authenticated;
-SELECT is((SELECT count(*) FROM public.profiles), 5::BIGINT, 'higher-assurance super admin sessions retain platform-wide access');
+SELECT is(
+  (SELECT count(*) FROM public.profiles),
+  1::BIGINT,
+  'higher-assurance platform sessions still require audited inventory or school support scope'
+);
 SELECT lives_ok(
   $$SELECT public.admin_set_account_status('10000000-0000-4000-8000-000000000002', 'suspended')$$,
   'super admins can manage users across schools'
@@ -966,9 +1290,64 @@ INSERT INTO public.platform_support_sessions (
 );
 
 SET LOCAL ROLE authenticated;
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.profiles
+    WHERE id = '10000000-0000-4000-8000-000000000001'
+  ),
+  1::BIGINT,
+  'a platform support session exposes a profile only in its exact school'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.profiles
+    WHERE id = '10000000-0000-4000-8000-000000000002'
+  ),
+  0::BIGINT,
+  'a platform support session does not expose another school profile'
+);
+SELECT ok(
+  (SELECT count(*) FROM public.club_memberships) > 0,
+  'a platform support session exposes roster rows only for its exact school'
+);
+SELECT is(
+  (SELECT count(*) FROM public.feedback),
+  1::BIGINT,
+  'a platform support session exposes feedback only for its exact school'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.feedback
+    WHERE school_id = 'b0000000-0000-4000-8000-000000000002'
+  ),
+  0::BIGINT,
+  'a platform support session does not expose another school support request'
+);
+SELECT throws_ok(
+  $$SELECT public.review_feedback_status(
+      'a7000000-0000-4000-8000-000000000001',
+      'a0000000-0000-4000-8000-000000000001',
+      'resolved'
+    )$$,
+  'P0001',
+  'Platform support access is read-only',
+  'platform support cannot change feedback during a read-only session'
+);
 SELECT ok(
   (SELECT count(*) FROM public.club_assignment_submissions) > 0,
   'platform admins can read school coursework during a temporary support session'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.get_club_roster('a1000000-0000-4000-8000-000000000001')
+    WHERE email IS NOT NULL
+  ),
+  0::BIGINT,
+  'platform support sessions do not disclose roster email addresses'
 );
 SELECT throws_ok(
   $$SELECT public.grade_club_assignment_submission(
@@ -1002,7 +1381,7 @@ SELECT throws_ok(
       '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
       'outsider@example.com', crypt('Password123!', gen_salt('bf')),
       '{"provider":"email","providers":["email"]}',
-      '{"full_name":"Outsider","school_id":"a0000000-0000-4000-8000-000000000001","school_access_code":"SH-AAAA-AAAA-AAAA"}',
+      '{"full_name":"Outsider","school_id":"a0000000-0000-4000-8000-000000000001","school_access_code":"SH-AAAA-AAAA-AAAA","stormhub_privacy_version":"2026-07-30","stormhub_terms_version":"2026-07-30","stormhub_acceptable_use_version":"2026-07-30","stormhub_age_assurance":"13_or_older"}',
       NOW(), NOW()
     )
   $$,
@@ -1021,12 +1400,201 @@ SELECT lives_ok(
       '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
       'outside-domain@example.com', crypt('Password123!', gen_salt('bf')),
       '{"provider":"email","providers":["email"]}',
-      '{"full_name":"Wildcard Student","school_id":"b0000000-0000-4000-8000-000000000002","school_access_code":"SH-BBBB-BBBB-BBBB"}',
+      '{"full_name":"Wildcard Student","school_id":"b0000000-0000-4000-8000-000000000002","school_access_code":"SH-BBBB-BBBB-BBBB","stormhub_privacy_version":"2026-07-30","stormhub_terms_version":"2026-07-30","stormhub_acceptable_use_version":"2026-07-30","stormhub_age_assurance":"13_or_older"}',
       NOW(), NOW()
     )
   $$,
   'a school configured with * accepts any verified email domain'
 );
+
+INSERT INTO public.districts (id, name, slug, city, state, is_active)
+VALUES (
+  'd7000000-0000-4000-8000-000000000002',
+  'School B District',
+  'school-b-district',
+  'Test City',
+  'NE',
+  TRUE
+);
+
+UPDATE public.schools
+SET district_id = 'd7000000-0000-4000-8000-000000000002'
+WHERE id = 'b0000000-0000-4000-8000-000000000002';
+
+INSERT INTO auth.users (
+  id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+) VALUES (
+  '60000000-0000-4000-8000-000000000002',
+  '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+  'district-admin@example.com', crypt('Password123!', gen_salt('bf')), NOW(),
+  '{"provider":"email","providers":["email"]}',
+  '{"full_name":"District Admin","school_id":"b0000000-0000-4000-8000-000000000002","school_access_code":"SH-BBBB-BBBB-BBBB","stormhub_privacy_version":"2026-07-30","stormhub_terms_version":"2026-07-30","stormhub_acceptable_use_version":"2026-07-30","stormhub_age_assurance":"13_or_older"}',
+  NOW(), NOW()
+);
+
+UPDATE public.profiles
+SET
+  role = 'district_admin',
+  school_id = NULL,
+  district_id = 'd7000000-0000-4000-8000-000000000002'
+WHERE id = '60000000-0000-4000-8000-000000000002';
+
+-- Simulate a legacy/corrupt cross-school membership. The district inventory
+-- must not disclose the foreign club name or slug through its aggregate.
+INSERT INTO public.club_memberships (club_id, user_id, status, role)
+VALUES (
+  'a1000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000002',
+  'active',
+  'member'
+);
+
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"60000000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal1"}',
+  TRUE
+);
+SET LOCAL ROLE authenticated;
+SELECT is(
+  (SELECT count(*) FROM public.profiles),
+  3::BIGINT,
+  'district administrators see every profile assigned to their district, including themselves'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.profiles
+    WHERE school_id = 'a0000000-0000-4000-8000-000000000001'
+  ),
+  0::BIGINT,
+  'district administrator user inventory excludes profiles from another district'
+);
+SELECT is(
+  (SELECT count(*) FROM public.profiles WHERE role = 'district_admin'),
+  1::BIGINT,
+  'district administrators can see elevated district profiles in their own inventory'
+);
+SELECT is(
+  (
+    SELECT total_count
+    FROM public.get_admin_user_inventory(1, 50, NULL, NULL, NULL)
+    LIMIT 1
+  ),
+  3::BIGINT,
+  'district aggregate inventory includes all users assigned to the district'
+);
+SELECT is(
+  (
+    SELECT total_count
+    FROM public.get_admin_user_inventory(
+      1,
+      50,
+      NULL,
+      'b0000000-0000-4000-8000-000000000002',
+      NULL
+    )
+    LIMIT 1
+  ),
+  2::BIGINT,
+  'district selected-school inventory excludes district-only elevated accounts'
+);
+SELECT throws_ok(
+  $$SELECT *
+    FROM public.get_admin_user_inventory(
+      1,
+      50,
+      NULL,
+      'a0000000-0000-4000-8000-000000000001',
+      NULL
+    )$$,
+  'P0001',
+  'Administrator access required for this school',
+  'district administrators cannot request a foreign-district school inventory'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.get_admin_user_inventory(1, 100, NULL, NULL, NULL) inventory
+    CROSS JOIN LATERAL jsonb_array_elements(inventory.club_assignments) assignment
+    WHERE inventory.user_id = '10000000-0000-4000-8000-000000000002'
+      AND assignment->>'club_id' = 'a1000000-0000-4000-8000-000000000001'
+  ),
+  0::BIGINT,
+  'district user inventory does not leak foreign-school club assignments'
+);
+SELECT is(
+  (SELECT count(*) FROM public.feedback),
+  1::BIGINT,
+  'district admins read support requests only from schools in their district'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.feedback
+    WHERE school_id = 'a0000000-0000-4000-8000-000000000001'
+  ),
+  0::BIGINT,
+  'district admins cannot read another district support request'
+);
+SELECT is(
+  public.review_feedback_status(
+    'b7000000-0000-4000-8000-000000000002',
+    'b0000000-0000-4000-8000-000000000002',
+    'reviewed'
+  ),
+  TRUE,
+  'district admins can triage support requests inside their district'
+);
+RESET ROLE;
+
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"40000000-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}',
+  TRUE
+);
+SET LOCAL ROLE authenticated;
+SELECT throws_ok(
+  $$SELECT public.admin_set_user_role_and_clubs(
+      '60000000-0000-4000-8000-000000000002',
+      'admin',
+      ARRAY[]::UUID[]
+    )$$,
+  'P0001',
+  'Elevated account assignments are managed from the district workspace',
+  'generic role management cannot demote an elevated account'
+);
+SELECT throws_ok(
+  $$SELECT public.admin_set_account_status(
+      '60000000-0000-4000-8000-000000000002',
+      'suspended'
+    )$$,
+  'P0001',
+  'Elevated account status is managed from the district workspace',
+  'generic account management cannot suspend an elevated account'
+);
+SELECT is(
+  (SELECT count(*) FROM public.profiles),
+  4::BIGINT,
+  'direct profile reads remain limited to self and the active school support scope'
+);
+SELECT is(
+  (
+    SELECT count(*)
+    FROM public.get_admin_user_inventory(1, 2, NULL, NULL, NULL)
+  ),
+  2::BIGINT,
+  'platform user inventory returns the explicitly requested page size'
+);
+SELECT is(
+  (
+    SELECT MAX(total_count)
+    FROM public.get_admin_user_inventory(1, 2, NULL, NULL, NULL)
+  ),
+  7::BIGINT,
+  'platform user inventory reports the complete total across pages'
+);
+RESET ROLE;
 
 SELECT * FROM finish();
 ROLLBACK;

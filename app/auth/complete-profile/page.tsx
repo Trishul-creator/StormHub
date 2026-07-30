@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { GoogleOnboardingForm } from "@/components/auth/google-onboarding-form";
 import { safeAuthRedirectPath } from "@/lib/auth-redirect";
 import { defaultPathForProfile } from "@/lib/auth";
-import { getAllSchools } from "@/lib/schools";
+import { getSignupSchools } from "@/lib/schools";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types/database";
 
@@ -34,8 +34,7 @@ export default async function CompleteProfilePage({ searchParams }: CompleteProf
     redirect("/auth/sign-in?error=google_onboarding_required");
   }
 
-  const schools = (await getAllSchools())
-    .filter((school) => school.is_active !== false && school.is_public !== false)
+  const schools = (await getSignupSchools())
     .map((school) => ({ id: school.id, name: school.name }));
   const params = await searchParams;
   const next = safeAuthRedirectPath(params.next);

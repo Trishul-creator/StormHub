@@ -18,8 +18,9 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
   const { slug } = await params;
   const club = await getManagedClubBySlug(slug);
   if (!club) notFound();
-  const { profile, membership } = await requireClubManager(club);
-  const canManageCoursework = canManageClubCoursework(profile, club, membership);
+  const { profile, membership, readOnlySupport } = await requireClubManager(club);
+  const canManageCoursework = readOnlySupport
+    || canManageClubCoursework(profile, club, membership);
   const [school, memberCount, announcements, events, resources, assignments] = await Promise.all([
     getSchoolById(club.school_id),
     getClubMemberCount(club.id),
@@ -36,7 +37,14 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <PageHeader title="Club overview" description={`Monitor ${club.name} content, classwork, events, resources, and membership.`}>
+      <PageHeader
+        title={readOnlySupport ? "Read-only club overview" : "Club overview"}
+        description={
+          readOnlySupport
+            ? `Inspect ${club.name} during this recorded support session. Changes are disabled.`
+            : `Monitor ${club.name} content, classwork, events, resources, and membership.`
+        }
+      >
         {isPubliclyVisible ? (
           <Button variant="outline" size="sm" asChild>
             <Link href={publicHref}>View public page</Link>
@@ -69,7 +77,9 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold text-storm-navy">Coursework</h2>
             <Button variant="ghost" size="sm" asChild>
-              <Link href={`/manage/clubs/${slug}/coursework`}>Manage <ArrowRight className="h-3.5 w-3.5" /></Link>
+              <Link href={`/manage/clubs/${slug}/coursework`}>
+                {readOnlySupport ? "Inspect" : "Manage"} <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
             </Button>
           </div>
           <div className="space-y-3">
@@ -93,7 +103,11 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold text-storm-navy">Recent announcements</h2>
             <Button variant="ghost" size="sm" asChild>
-              <Link href={`/clubs/${slug}/member`}>View <ArrowRight className="h-3.5 w-3.5" /></Link>
+              <Link href={readOnlySupport
+                ? `/manage/clubs/${slug}/announcements`
+                : `/clubs/${slug}/member`}>
+                View <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
             </Button>
           </div>
           <div className="space-y-3">
@@ -115,7 +129,9 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold text-storm-navy">Upcoming calendar</h2>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/calendar">Calendar <ArrowRight className="h-3.5 w-3.5" /></Link>
+              <Link href={readOnlySupport ? `/manage/clubs/${slug}/events` : "/calendar"}>
+                {readOnlySupport ? "Inspect" : "Calendar"} <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
             </Button>
           </div>
           <div className="space-y-3">
@@ -135,7 +151,11 @@ export default async function ManageClubDashboard({ params }: ManageClubPageProp
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold text-storm-navy">Member resources</h2>
             <Button variant="ghost" size="sm" asChild>
-              <Link href={`/clubs/${slug}/member`}>View <ArrowRight className="h-3.5 w-3.5" /></Link>
+              <Link href={readOnlySupport
+                ? `/manage/clubs/${slug}/resources`
+                : `/clubs/${slug}/member`}>
+                View <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
             </Button>
           </div>
           <div className="space-y-3">

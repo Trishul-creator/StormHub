@@ -39,11 +39,19 @@ export function StatusBadge({ status }: { status: string }) {
     submitted: "warning",
     draft: "secondary",
     rejected: "destructive",
+    closed: "warning",
+    archived: "secondary",
     active: "success",
     going: "success",
     open: "warning",
     reviewed: "secondary",
     resolved: "success",
+    requested: "warning",
+    under_review: "warning",
+    export_ready: "default",
+    scheduled: "warning",
+    completed: "success",
+    cancelled: "secondary",
   };
   const labels: Record<string, string> = {
     submitted: "Submitted",
@@ -51,9 +59,17 @@ export function StatusBadge({ status }: { status: string }) {
     rejected: "Rejected",
     pending: "Pending",
     draft: "Draft",
+    closed: "Closed",
+    archived: "Archived",
     open: "Open",
     reviewed: "Reviewed",
     resolved: "Resolved",
+    requested: "Requested",
+    under_review: "Under review",
+    export_ready: "Export ready",
+    scheduled: "Scheduled",
+    completed: "Completed",
+    cancelled: "Cancelled",
   };
   return <Badge variant={map[status] || "default"}>{labels[status] || humanizeLabel(status)}</Badge>;
 }

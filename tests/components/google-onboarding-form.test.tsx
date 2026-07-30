@@ -41,8 +41,10 @@ describe("GoogleOnboardingForm", () => {
     );
 
     fireEvent.change(screen.getByLabelText("School"), { target: { value: "school-1" } });
-    fireEvent.change(screen.getByLabelText("Grade"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("Grade (students)"), { target: { value: "10" } });
     fireEvent.change(screen.getByLabelText("School access code"), { target: { value: "SH-1234-ABCD-5678" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /at least 13/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /agree to the/i }));
     fireEvent.submit(screen.getByRole("button", { name: "Continue to StormHub" }).closest("form")!);
 
     await waitFor(() => expect(completeGoogleOnboarding).toHaveBeenCalledWith({
@@ -50,6 +52,8 @@ describe("GoogleOnboardingForm", () => {
       fullName: "Google Student",
       gradeLevel: "10",
       accessCode: "SH-1234-ABCD-5678",
+      acceptedPolicies: true,
+      ageAssurance: "13_or_older",
       next: "/dashboard",
     }));
     expect(replace).toHaveBeenCalledWith("/dashboard");

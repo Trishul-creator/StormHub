@@ -14,6 +14,7 @@ import { Captcha } from "@/components/auth/captcha";
 import { PasswordInput } from "@/components/auth/password-input";
 import { createClient } from "@/lib/supabase/client";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
+import { HIGH_SCHOOL_AGE_ASSURANCE } from "@/lib/policy";
 
 interface SignUpSchool {
   id: string;
@@ -50,6 +51,10 @@ export function SignUpForm({
     const schoolId = String(form.get("schoolId") ?? "");
     const website = String(form.get("website") ?? "");
     const formLoadedAt = Number(form.get("loadedAt") ?? 0);
+    const acceptedPolicies = form.get("policyAccepted") === "on";
+    const ageAssurance = form.get("ageAssurance") === "on"
+      ? HIGH_SCHOOL_AGE_ASSURANCE
+      : undefined;
 
     if (website || !formLoadedAt || Date.now() - formLoadedAt < 1500) {
       setLoading(false);
@@ -79,7 +84,13 @@ export function SignUpForm({
       gradeLevelRaw ? Number(gradeLevelRaw) : null,
       accessCode,
       schoolId,
-      { website, loadedAt: formLoadedAt, captchaToken }
+      {
+        website,
+        loadedAt: formLoadedAt,
+        captchaToken,
+        acceptedPolicies,
+        ageAssurance,
+      }
     );
     setLoading(false);
     if (result.success) {
@@ -150,18 +161,21 @@ export function SignUpForm({
             <Input id="email" name="email" type="email" required placeholder="you@school.edu" className="mt-1" />
           </div>
           <div>
-            <Label htmlFor="gradeLevel">Grade</Label>
+            <Label htmlFor="gradeLevel">Grade (students)</Label>
             <select
               id="gradeLevel"
               name="gradeLevel"
               className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               defaultValue=""
             >
-              <option value="">Select grade</option>
+              <option value="">School staff or not applicable</option>
               {[9, 10, 11, 12].map((grade) => (
                 <option key={grade} value={grade}>{grade}th grade</option>
               ))}
             </select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Students should select their current high-school grade. Staff roles are assigned by an administrator.
+            </p>
           </div>
           <div>
             <Label htmlFor="password">Password</Label>
@@ -207,7 +221,13 @@ export function SignUpForm({
           <input type="hidden" name="loadedAt" value={loadedAt} />
           <Captcha onToken={setCaptchaToken} />
           <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
-            <input type="checkbox" required className="mt-1 h-4 w-4 rounded border-input" />
+            <input name="ageAssurance" type="checkbox" required className="mt-1 h-4 w-4 rounded border-input" />
+            <span>
+              I confirm that I am at least 13 and am authorized to use this high-school workspace.
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+            <input name="policyAccepted" type="checkbox" required className="mt-1 h-4 w-4 rounded border-input" />
             <span>
               I will use StormHub for school purposes and agree to the{" "}
               <Link href="/acceptable-use" className="text-storm-electric hover:underline">Acceptable Use Policy</Link>,{" "}

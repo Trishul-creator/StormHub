@@ -2,11 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StatisticsScopeSelector } from "@/components/admin/statistics-scope-selector";
 
-const replace = vi.fn();
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace }),
-}));
+const navigate = vi.fn();
 
 const schools = [
   { id: "school-1", name: "North High", slug: "north" },
@@ -15,34 +11,43 @@ const schools = [
 
 describe("statistics scope selector", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    navigate.mockReset();
   });
 
   it("applies a school immediately without a separate submit button", async () => {
-    render(<StatisticsScopeSelector schools={schools} activeSlug={null} />);
+    render(
+      <StatisticsScopeSelector
+        schools={schools}
+        activeSlug={null}
+        onNavigate={navigate}
+      />
+    );
 
     fireEvent.change(screen.getByLabelText("View scope"), {
       target: { value: "south" },
     });
 
     await waitFor(() => {
-      expect(replace).toHaveBeenCalledWith(
-        "/admin/statistics?school=south",
-        { scroll: false }
-      );
+      expect(navigate).toHaveBeenCalledWith("/admin/statistics?school=south");
     });
     expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
   });
 
   it("returns to platform statistics when All schools is selected", async () => {
-    render(<StatisticsScopeSelector schools={schools} activeSlug="north" />);
+    render(
+      <StatisticsScopeSelector
+        schools={schools}
+        activeSlug="north"
+        onNavigate={navigate}
+      />
+    );
 
     fireEvent.change(screen.getByLabelText("View scope"), {
       target: { value: "" },
     });
 
     await waitFor(() => {
-      expect(replace).toHaveBeenCalledWith("/admin/statistics", { scroll: false });
+      expect(navigate).toHaveBeenCalledWith("/admin/statistics");
     });
   });
 
@@ -55,6 +60,7 @@ describe("statistics scope selector", () => {
         queryKey="district"
         clearQueryKeys={["school"]}
         allLabel="Platform-wide"
+        onNavigate={navigate}
       />
     );
 
@@ -63,10 +69,7 @@ describe("statistics scope selector", () => {
     });
 
     await waitFor(() => {
-      expect(replace).toHaveBeenCalledWith(
-        "/admin/statistics?district=example-district",
-        { scroll: false }
-      );
+      expect(navigate).toHaveBeenCalledWith("/admin/statistics?district=example-district");
     });
   });
 });

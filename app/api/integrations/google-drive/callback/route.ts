@@ -5,6 +5,7 @@ import {
   saveGoogleDriveConnection,
   verifyGoogleOAuthState,
 } from "@/lib/google-drive";
+import { safeAuthRedirectPath } from "@/lib/auth-redirect";
 
 export const runtime = "nodejs";
 
@@ -13,7 +14,7 @@ function redirectWithStatus(
   returnTo: string,
   status: "connected" | "denied" | "error"
 ) {
-  const url = new URL(returnTo, request.url);
+  const url = new URL(safeAuthRedirectPath(returnTo, "/settings"), request.url);
   url.searchParams.set("google_drive", status);
   const response = NextResponse.redirect(url);
   response.cookies.set("stormhub_google_drive_nonce", "", {
