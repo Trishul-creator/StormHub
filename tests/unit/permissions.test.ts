@@ -10,6 +10,7 @@ import {
   canManageClubPublication,
   canManageClubCoursework,
   canManageClubRoster,
+  canManageUserAccountFromInventory,
   canAssignClubLeadership,
   canGradeClubCoursework,
   canInspectClubCoursework,
@@ -223,6 +224,17 @@ describe("administrative inventory editing", () => {
     expect(canOpenUserEditor("district_admin", "admin", true)).toBe(true);
     expect(canOpenUserEditor("admin", "student", true)).toBe(true);
     expect(canOpenUserEditor("admin", "admin", true)).toBe(false);
+  });
+
+  it("keeps aggregate account actions scoped without exposing elevated accounts", () => {
+    expect(canManageUserAccountFromInventory("super_admin", "student")).toBe(true);
+    expect(canManageUserAccountFromInventory("super_admin", "admin")).toBe(true);
+    expect(canManageUserAccountFromInventory("district_admin", "teacher")).toBe(true);
+    expect(canManageUserAccountFromInventory("district_admin", "admin")).toBe(true);
+    expect(canManageUserAccountFromInventory("admin", "student")).toBe(true);
+    expect(canManageUserAccountFromInventory("admin", "admin")).toBe(false);
+    expect(canManageUserAccountFromInventory("super_admin", "district_admin")).toBe(false);
+    expect(canManageUserAccountFromInventory("super_admin", "super_admin")).toBe(false);
   });
 });
 

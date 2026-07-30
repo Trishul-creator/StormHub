@@ -59,6 +59,17 @@ export function canOpenUserEditor(
   return false;
 }
 
+export function canManageUserAccountFromInventory(
+  actorRole: UserRole,
+  targetRole: UserRole
+): boolean {
+  if (targetRole === "district_admin" || targetRole === "super_admin") return false;
+  if (actorRole === "admin") {
+    return targetRole === "student" || targetRole === "teacher";
+  }
+  return actorRole === "district_admin" || actorRole === "super_admin";
+}
+
 export function isManagerRole(role?: string | null): boolean {
   return !!role && MANAGER_ROLES.includes(role as UserRole);
 }
