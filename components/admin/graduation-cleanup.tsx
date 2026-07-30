@@ -7,6 +7,10 @@ import { deactivateGraduatingStudents } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
+import {
+  beginAdminReauthentication,
+  needsAdminReauthentication,
+} from "@/lib/admin-step-up-shared";
 
 export function GraduationCleanup() {
   const [year, setYear] = useState(new Date().getFullYear());
@@ -17,6 +21,10 @@ export function GraduationCleanup() {
     if (!window.confirm(`Deactivate every active grade 12 student as the class of ${year}? Accounts can be reactivated individually.`)) return;
     startTransition(async () => {
       const result = await deactivateGraduatingStudents(year);
+      if (needsAdminReauthentication(result)) {
+        beginAdminReauthentication();
+        return;
+      }
       toast({
         title: result.success ? "Graduation cleanup complete" : "Graduation cleanup needs review",
         description: result.success ? `${result.count ?? 0} accounts were deactivated.` : result.error,

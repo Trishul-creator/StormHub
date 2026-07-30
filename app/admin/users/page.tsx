@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Search } from "lucide-react";
 import { GraduationCleanup } from "@/components/admin/graduation-cleanup";
+import { UserInventoryFilters } from "@/components/admin/user-inventory-filters";
 import { UserRoleEditor } from "@/components/admin/user-role-editor";
 import { PageHeader } from "@/components/layout/page-header";
 import { RoleBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/lib/auth";
+import { getAllDistricts } from "@/lib/districts";
 import {
   ADMIN_USERS_PAGE_SIZE,
   getAdminUsers,
@@ -14,7 +15,11 @@ import {
   isDemoMode,
   normalizeAdminUserSearch,
 } from "@/lib/data";
-import { canAccessSchoolAdmin, canOpenUserEditor } from "@/lib/permissions";
+import {
+  canAccessSchoolAdmin,
+  canManageUserAccountFromInventory,
+  canOpenUserEditor,
+} from "@/lib/permissions";
 import {
   getAllSchools,
   getAdminScopeSchools,
@@ -69,6 +74,11 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
   const clubs = selectedSchool
     ? await getManageableClubs(profile, selectedSchool.id)
     : [];
+  const assignableDistricts = profile.role === "super_admin"
+    ? (await getAllDistricts()).filter(
+        (district) => district.is_active && !district.access_disabled_at
+      )
+    : [];
   const demo = isDemoMode();
   const firstResult = userPage.total === 0
     ? 0
@@ -89,63 +99,19 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
         }
       />
 
-      <form
-        action="/admin/users"
-        method="get"
-        className="mb-6 grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)_minmax(14rem,20rem)_auto_auto] md:items-end"
-        role="search"
-      >
-        <label className="text-sm font-medium text-storm-navy">
-          Search people
-          <span className="relative mt-1 block">
-            <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <input
-              name="q"
-              type="search"
-              defaultValue={search}
-              maxLength={100}
-              placeholder="Name or email"
-              className="h-10 w-full rounded-lg border bg-background pl-9 pr-3 text-foreground"
-            />
-          </span>
-        </label>
-        <label className="text-sm font-medium text-storm-navy">
-          Role
-          <select
-            name="role"
-            defaultValue={role ?? ""}
-            className="mt-1 block h-10 w-full rounded-lg border bg-background px-3 text-foreground"
-          >
-            <option value="">All roles</option>
-            {roleOptions.map((option) => (
-              <option key={option} value={option}>{option.replace("_", " ")}</option>
-            ))}
-          </select>
-        </label>
-        {canChooseSchool && (
-          <label className="text-sm font-medium text-storm-navy">
-            School scope
-            <select
-              name="school"
-              defaultValue={selectedSchool?.slug ?? ""}
-              className="mt-1 block h-10 w-full rounded-lg border bg-background px-3 text-foreground"
-            >
-              <option value="">
-                {profile.role === "district_admin" ? "All district schools" : "All platform schools"}
-              </option>
-              {scopeSchools.map((school) => (
-                <option key={school.id} value={school.slug}>{school.name}</option>
-              ))}
-            </select>
-          </label>
-        )}
-        <Button type="submit">Apply filters</Button>
-        {(search || role || selectedSchool && canChooseSchool) && (
-          <Button variant="ghost" asChild>
-            <Link href="/admin/users">Clear</Link>
-          </Button>
-        )}
-      </form>
+      <UserInventoryFilters
+        initialSearch={search}
+        initialRole={role}
+        initialSchool={canChooseSchool ? selectedSchool?.slug ?? null : null}
+        roles={roleOptions}
+        schools={scopeSchools.map(({ id, name, slug }) => ({ id, name, slug }))}
+        schoolLabel={
+          profile.role === "district_admin"
+            ? "All district schools"
+            : "All platform schools"
+        }
+        showSchool={canChooseSchool}
+      />
 
       {!demo && profile.role === "admin" && <GraduationCleanup />}
 
@@ -196,15 +162,11 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
                 <td className="p-4">
                   {demo ? (
                     <span className="text-xs text-muted-foreground">Unavailable in demo mode</span>
-                  ) : !canOpenUserEditor(
-                    profile.role,
-                    user.role,
-                    Boolean(selectedSchool)
-                  ) ? (
+                  ) : !canManageUserAccountFromInventory(profile.role, user.role) ? (
                     <span className="text-xs text-muted-foreground">
                       {user.role === "district_admin" || user.role === "super_admin"
                         ? "Manage elevated access from the district workspace."
-                        : "Choose one school to manage this account."}
+                        : "A higher-level administrator must manage this account."}
                     </span>
                   ) : (
                     <UserRoleEditor
@@ -212,6 +174,13 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
                       clubs={clubs}
                       actorId={profile.id}
                       actorRole={profile.role}
+                      actorEmail={profile.email ?? ""}
+                      districts={assignableDistricts.map(({ id, name }) => ({ id, name }))}
+                      accountActionsOnly={!canOpenUserEditor(
+                        profile.role,
+                        user.role,
+                        Boolean(selectedSchool)
+                      )}
                     />
                   )}
                 </td>
@@ -260,10 +229,10 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
         {demo
           ? "Demo user data is shown. Role changes are unavailable in demo mode."
           : profile.role === "district_admin"
-            ? "District administrators can manage student, teacher, and school-admin accounts inside their assigned district."
+            ? "District administrators can ban, restore, or delete eligible accounts across their district. Choose one school to edit roles and Advisor club assignments."
             : profile.role === "admin"
               ? "School admins can manage student and teacher accounts in their own school."
-              : "Platform administrators can manage school-level accounts. District and platform administrator accounts remain read-only in this inventory."}
+              : "Platform administrators can ban, restore, or delete eligible school-level accounts from this view. Choose one school to edit roles and Advisor club assignments; elevated accounts remain protected."}
       </p>
     </div>
   );

@@ -10,6 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import {
+  beginAdminReauthentication,
+  needsAdminReauthentication,
+} from "@/lib/admin-step-up-shared";
 
 export function SignupDomainSettings({
   schoolId,
@@ -38,6 +42,8 @@ export function SignupDomainSettings({
             : `${schoolName} now accepts ${savedDomains.join(", ")}.`,
         });
         router.refresh();
+      } else if (needsAdminReauthentication(result)) {
+        beginAdminReauthentication();
       } else {
         toast({ title: "Could not update signup domains", description: result.error, variant: "destructive" });
       }

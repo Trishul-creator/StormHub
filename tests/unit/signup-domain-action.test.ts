@@ -13,6 +13,9 @@ vi.mock("next/cache", () => ({
 vi.mock("@/lib/supabase/server", () => ({
   createClient: mocks.createClient,
 }));
+vi.mock("@/lib/admin-step-up", () => ({
+  requireRecentAdminAuthentication: vi.fn().mockResolvedValue(null),
+}));
 vi.mock("@/lib/auth", () => ({
   createProfileIfMissing: vi.fn(),
   defaultPathForProfile: vi.fn(),

@@ -14,6 +14,10 @@ import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import {
+  beginAdminReauthentication,
+  needsAdminReauthentication,
+} from "@/lib/admin-step-up-shared";
 import type {
   TenantOffboardingScope,
   TenantOffboardingStatus,
@@ -77,6 +81,10 @@ export function TenantOffboardingWorkflow({
     startTransition(async () => {
       const result = await submitTenantOffboardingRequest({ scopeType, scopeId, reason });
       if (!result.success) {
+        if (needsAdminReauthentication(result)) {
+          beginAdminReauthentication();
+          return;
+        }
         toast({
           title: "Could not submit offboarding request",
           description: result.error,
@@ -230,6 +238,10 @@ function TenantOffboardingRequestCard({
         completionReference,
       });
       if (!result.success) {
+        if (needsAdminReauthentication(result)) {
+          beginAdminReauthentication();
+          return;
+        }
         toast({
           title: "Could not update offboarding request",
           description: result.error,
@@ -254,6 +266,10 @@ function TenantOffboardingRequestCard({
         reason: notes,
       });
       if (!result.success) {
+        if (needsAdminReauthentication(result)) {
+          beginAdminReauthentication();
+          return;
+        }
         toast({
           title: "Could not cancel offboarding request",
           description: result.error,

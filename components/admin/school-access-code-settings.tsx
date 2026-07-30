@@ -6,6 +6,10 @@ import { rotateSchoolSignupAccessCode } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
+import {
+  beginAdminReauthentication,
+  needsAdminReauthentication,
+} from "@/lib/admin-step-up-shared";
 
 export function SchoolAccessCodeSettings({
   schoolId,
@@ -40,6 +44,10 @@ export function SchoolAccessCodeSettings({
     startTransition(async () => {
       const result = await rotateSchoolSignupAccessCode(schoolId);
       if (!result.success || !result.accessCode) {
+        if (needsAdminReauthentication(result)) {
+          beginAdminReauthentication();
+          return;
+        }
         toast({
           title: "Could not rotate access code",
           description: result.error,

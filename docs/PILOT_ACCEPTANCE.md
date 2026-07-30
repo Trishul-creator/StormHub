@@ -10,7 +10,7 @@ Record a result and evidence for every item before inviting pilot users.
 - axe serious/critical accessibility checks and keyboard navigation
 - Supabase migration reset, database lint, and pgTAP role matrix
 - Staging schema check proves every required privacy, district, tenant-RPC, policy, and operational
-  migration through `20260730280000_platform_support_access_logging.sql` is present; missing
+  migration through `20260730290000_admin_step_up_authentication.sql` is present; missing
   schema fails rather than skipping a flow
 - Staging E2E and Vercel preview
 - CodeQL
@@ -24,6 +24,8 @@ On one district-managed Chromebook and one physical phone:
 
 - Create and confirm a student account with hCaptcha, the selected school access code, and an allowed school domain.
 - Request a password reset, open the emailed link, set matching passwords, and sign in with the new password.
+- As each administrator tier, let the five-minute confirmation window expire, then verify a
+  protected role or organization change requires the same account's password or Google sign-in.
 - Reject an incorrect school code, a disallowed-domain signup, and a missing CAPTCHA.
 - Join/leave a club, RSVP/remove RSVP, bookmark/remove bookmark.
 - Open school calendar and opportunity filters.

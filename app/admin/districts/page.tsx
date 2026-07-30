@@ -15,12 +15,14 @@ import {
 import { getAllSchools } from "@/lib/schools";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/utils";
+import { requireRecentAdminAuthenticationOrRedirect } from "@/lib/admin-step-up";
 
 async function createDistrictAction(formData: FormData) {
   "use server";
 
   const { profile } = await requireAdmin();
   if (profile.role !== "super_admin") redirect("/admin?error=platform_admin_required");
+  await requireRecentAdminAuthenticationOrRedirect("/admin/districts", undefined, profile.id);
   const admin = createAdminClient();
   if (!admin) redirect("/admin/districts?error=database_required");
 

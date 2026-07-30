@@ -112,6 +112,7 @@ import {
   validateStoredCourseworkFile,
 } from "@/lib/coursework-files";
 import { feedbackResponseDedupeKey } from "@/lib/support-feedback";
+import { requireRecentAdminAuthentication } from "@/lib/admin-step-up";
 
 const DEMO_USER_COOKIE = "stormhub_demo_user";
 const DEMO_EMAIL_COOKIE = "stormhub_demo_email";
@@ -2781,6 +2782,8 @@ export async function updateUserRoleAndClubs(data: {
   const supabase = await createClient();
   const actor = await getCurrentProfile();
   if (!supabase || !actor) return { success: false, error: "Please sign in." };
+  const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
+  if (reauthentication) return reauthentication;
 
   const targetReader = actor.role === "super_admin" ? createAdminClient() : supabase;
   if (!targetReader) {
@@ -2858,6 +2861,76 @@ export async function updateUserRoleAndClubs(data: {
   return { success: true };
 }
 
+export async function assignUserToDistrictAdministrator(data: {
+  targetUserId: string;
+  districtId: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) {
+    return { success: false, error: "District administrator assignment is unavailable in demo mode." };
+  }
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  const actor = await getCurrentProfile();
+  if (!supabase || !admin || !actor) {
+    return { success: false, error: "Administrator configuration is incomplete." };
+  }
+  if (actor.role !== "super_admin") {
+    return { success: false, error: "Platform administrator access required." };
+  }
+  const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
+  if (reauthentication) return reauthentication;
+
+  const districtId = data.districtId.trim();
+  if (!districtId) return { success: false, error: "Choose a district." };
+  const [{ data: target }, { data: district }] = await Promise.all([
+    admin
+      .from("profiles")
+      .select("id,role,account_status")
+      .eq("id", data.targetUserId)
+      .maybeSingle(),
+    admin
+      .from("districts")
+      .select("id,is_active,access_disabled_at")
+      .eq("id", districtId)
+      .maybeSingle(),
+  ]);
+  if (!target) return { success: false, error: "User not found." };
+  if (target.id === actor.id || target.role === "super_admin") {
+    return { success: false, error: "Platform administrator assignments are protected." };
+  }
+  if (target.account_status !== "active") {
+    return { success: false, error: "Only an active account can manage a district." };
+  }
+  if (!district || district.is_active !== true || district.access_disabled_at) {
+    return { success: false, error: "Choose an active district." };
+  }
+
+  const { error } = await supabase.rpc("assign_district_administrator", {
+    target_user_id: data.targetUserId,
+    target_district_id: districtId,
+  });
+  if (error) {
+    return {
+      success: false,
+      error: friendlyError(error, "Could not assign this district administrator."),
+    };
+  }
+
+  await createNotification({
+    recipientUserId: data.targetUserId,
+    type: "system_message",
+    importance: "important",
+    title: "You were promoted to district administrator",
+    message: "A platform administrator assigned your account to manage one district. Your homepage checklist has been reset for your new responsibilities.",
+    link: "/admin/districts",
+    sendEmail: true,
+  });
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/districts");
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
 export async function deleteUserAccount(
   targetUserId: string,
   approvedRequestId?: string
@@ -2870,6 +2943,8 @@ export async function deleteUserAccount(
     return { success: false, error: "Administrator configuration is incomplete. Check SUPABASE_SERVICE_ROLE_KEY." };
   }
   if (!isAdminRole(actor.role)) return { success: false, error: "Administrator access required." };
+  const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
+  if (reauthentication) return reauthentication;
 
   const targetReader = actor.role === "super_admin" ? admin : supabase;
   const { data: targetData, error: targetError } = await targetReader
@@ -3056,6 +3131,8 @@ export async function updateUserAccountStatus(
   const actor = await getCurrentProfile();
   if (!supabase || !admin || !actor) return { success: false, error: "Administrator configuration is incomplete." };
   if (!isAdminRole(actor.role)) return { success: false, error: "Administrator access required." };
+  const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
+  if (reauthentication) return reauthentication;
 
   const targetReader = actor.role === "super_admin" ? admin : supabase;
   const { data: targetData, error: targetError } = await targetReader
@@ -3103,6 +3180,8 @@ export async function deactivateGraduatingStudents(
   if (!supabase || !admin || !actor || !isAdminRole(actor.role)) {
     return { success: false, error: "Administrator configuration is incomplete." };
   }
+  const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
+  if (reauthentication) return reauthentication;
 
   let query = supabase
     .from("profiles")
@@ -3163,6 +3242,8 @@ export async function reviewAccountDeletionRequest(data: {
   if (!supabase || !admin || !actor || !isAdminRole(actor.role)) {
     return { success: false, error: "Administrator configuration is incomplete." };
   }
+  const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
+  if (reauthentication) return reauthentication;
 
   const { data: request, error: requestError } = await supabase
     .from("account_deletion_requests")
@@ -3300,6 +3381,8 @@ export async function submitTenantOffboardingRequest(data: {
   if (!supabase || !actor || !isAdminRole(actor.role)) {
     return { success: false, error: "Active administrator access is required." };
   }
+  const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
+  if (reauthentication) return reauthentication;
   if (!["school", "district"].includes(data.scopeType)) {
     return { success: false, error: "Choose a school or district." };
   }
@@ -3345,6 +3428,8 @@ export async function reviewTenantOffboardingRequest(data: {
   if (!supabase || !actor || !isAdminRole(actor.role)) {
     return { success: false, error: "Active administrator access is required." };
   }
+  const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
+  if (reauthentication) return reauthentication;
   const validStatuses: TenantOffboardingStatus[] = [
     "under_review",
     "export_ready",
@@ -3397,6 +3482,8 @@ export async function cancelTenantOffboardingRequest(data: {
   if (!supabase || !actor || !isAdminRole(actor.role)) {
     return { success: false, error: "Active administrator access is required." };
   }
+  const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
+  if (reauthentication) return reauthentication;
   const reason = data.reason.trim();
   if (reason.length < 10 || reason.length > 2000) {
     return { success: false, error: "Explain the cancellation in at least 10 characters." };
@@ -4306,6 +4393,8 @@ export async function updateSchoolSignupDomains(input: {
 
   const supabase = await createClient();
   if (!supabase) return { success: false, error: "Database not configured." };
+  const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
+  if (reauthentication) return reauthentication;
   const { data, error } = await supabase.rpc("set_school_signup_domains", {
     target_school_id: input.schoolId,
     requested_domains: domains,
@@ -4335,6 +4424,8 @@ export async function rotateSchoolSignupAccessCode(
   if (!actor || !admin || !school || !canManageSchoolAccess(actor, school.id, school.district_id)) {
     return { success: false, error: "Administrator access required." };
   }
+  const reauthentication = await requireRecentAdminAuthentication(undefined, actor.id);
+  if (reauthentication) return reauthentication;
 
   const accessCode = generateSchoolSignupAccessCode();
   const rotatedAt = new Date().toISOString();
@@ -4372,6 +4463,8 @@ export async function startPlatformSupportSession(input: {
   if (!actor || actor.role !== "super_admin" || !admin) {
     return { success: false, error: "Platform administrator access required." };
   }
+  const reauthentication = await requireRecentAdminAuthentication(undefined, actor.id);
+  if (reauthentication) return reauthentication;
   const reason = input.reason.trim().replace(/\s+/g, " ");
   if (reason.length < 10 || reason.length > 500) {
     return { success: false, error: "Enter a support reason between 10 and 500 characters." };
@@ -4465,6 +4558,8 @@ export async function endPlatformSupportSession(
   if (!actor || actor.role !== "super_admin" || !admin) {
     return { success: false, error: "Platform administrator access required." };
   }
+  const reauthentication = await requireRecentAdminAuthentication(undefined, actor.id);
+  if (reauthentication) return reauthentication;
   const active = await getActivePlatformSupportSession(actor, schoolId);
   if (!active) return { success: true };
   const { data: school } = await admin

@@ -54,4 +54,21 @@ test.describe("super admin district chooser", () => {
     await expect(page.getByText(/Platform Admin Mode/i)).toBeVisible();
     await expect(page.getByRole("button", { name: /join club/i })).toHaveCount(0);
   });
+
+  test("platform user inventory filters immediately and exposes scoped account controls", async ({ page }) => {
+    await signIn(page, "super_admin");
+    await page.goto("/admin/users");
+
+    await expect(page.getByRole("heading", { name: "Users & Roles" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /apply filters/i })).toHaveCount(0);
+
+    await page.getByLabel("Role").selectOption("teacher");
+    await expect(page).toHaveURL(/\/admin\/users\?role=teacher/, { timeout: 15_000 });
+
+    const accountActions = page.getByRole("button", { name: /account actions for/i }).first();
+    await expect(accountActions).toBeVisible();
+    await accountActions.click();
+    await expect(page.getByRole("menuitem", { name: /ban account|restore account/i })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Delete user" })).toBeVisible();
+  });
 });

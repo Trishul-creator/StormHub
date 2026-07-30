@@ -260,6 +260,10 @@ async function assertRequiredTablesExist(admin: SupabaseAdmin) {
         requested_resource_id: null,
       },
     },
+    {
+      name: "has_recent_admin_authentication",
+      args: { maximum_age_seconds: 300 },
+    },
     { name: "has_any_active_legal_hold", args: {} },
     {
       name: "can_review_account_deletion_request",
@@ -639,6 +643,7 @@ async function main() {
   );
 
   const stagingUsers = users;
+  const stagingUserIds = new Map<string, string>();
   for (const user of stagingUsers) {
     const schoolId = user.schoolSlug ? schoolIds.get(user.schoolSlug)! : null;
     const authSchoolId = schoolId ?? schoolIds.get("school1")!;
@@ -678,6 +683,7 @@ async function main() {
     }
 
     if (!userId) throw new Error(`Could not create or find ${user.email}.`);
+    stagingUserIds.set(user.email, userId);
     await assertAuthUserReady(admin, userId, user.email);
     const profilePayload = {
       id: userId,
@@ -724,6 +730,20 @@ async function main() {
       throw new Error(`Profile district mismatch for ${user.email}.`);
     }
   }
+
+  const superAdminId = stagingUserIds.get("e2e.superadmin@stormhub.test");
+  if (!superAdminId) {
+    throw new Error("Could not resolve the staging platform administrator.");
+  }
+  // Support sessions are retained for audit history, but an open session from
+  // an earlier run would bypass the access-gate scenario. Close only sessions
+  // owned by the dedicated E2E actor so every run starts from the same state.
+  const { error: supportSessionCleanupError } = await admin
+    .from("platform_support_sessions")
+    .update({ ended_at: new Date().toISOString() })
+    .eq("actor_user_id", superAdminId)
+    .is("ended_at", null);
+  if (supportSessionCleanupError) throw supportSessionCleanupError;
 
   console.log(`Staging E2E data and users are ready: ${stagingUsers.length} accounts.`);
 }

@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { reviewAccountDeletionRequest } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import {
+  beginAdminReauthentication,
+  needsAdminReauthentication,
+} from "@/lib/admin-step-up-shared";
 
 export function DeletionRequestReview({
   requestId,
@@ -24,6 +28,10 @@ export function DeletionRequestReview({
     }
     startTransition(async () => {
       const result = await reviewAccountDeletionRequest({ requestId, decision, reviewerNotes: notes });
+      if (needsAdminReauthentication(result)) {
+        beginAdminReauthentication();
+        return;
+      }
       if (result.success) {
         toast({ title: decision === "complete" ? "Account deleted" : "Request rejected" });
         router.refresh();

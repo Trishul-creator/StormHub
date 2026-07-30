@@ -83,6 +83,8 @@ export interface District {
   state?: string | null;
   website_url?: string | null;
   is_active: boolean;
+  access_disabled_at?: string | null;
+  access_disabled_by_offboarding_request?: string | null;
   created_at?: string;
   updated_at?: string;
 }
