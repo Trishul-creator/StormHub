@@ -1,9 +1,22 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useRouter } from "next/navigation";
-import { Ban, CheckCircle2, Loader2, Trash2 } from "lucide-react";
-import { deleteUserAccount, updateUserAccountStatus, updateUserRoleAndClubs } from "@/lib/actions";
+import {
+  Ban,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  Loader2,
+  MoreHorizontal,
+  Trash2,
+} from "lucide-react";
+import {
+  deleteUserAccount,
+  updateUserAccountStatus,
+  updateUserRoleAndClubs,
+} from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { getSponsorAssignableClubs } from "@/lib/permissions";
@@ -14,11 +27,13 @@ export function UserRoleEditor({
   clubs,
   actorId,
   actorRole,
+  accountActionsOnly = false,
 }: {
   user: AdminUser;
   clubs: Club[];
   actorId: string;
   actorRole: UserRole;
+  accountActionsOnly?: boolean;
 }) {
   const [role, setRole] = useState<UserRole>(user.role);
   const assignableClubs = useMemo(
@@ -48,18 +63,9 @@ export function UserRoleEditor({
   const elevatedTarget = user.role === "district_admin" || user.role === "super_admin";
   const protectedTarget = elevatedTarget
     || (actorRole !== "super_admin" && !editableTargetRoles.includes(user.role));
-  const canDelete = !isSelf && !protectedTarget;
   const roles: UserRole[] = actorRole === "super_admin" || actorRole === "district_admin"
     ? ["student", "teacher", "admin"]
     : ["student", "teacher"];
-
-  function toggleClub(clubId: string) {
-    setClubIds((current) =>
-      current.includes(clubId)
-        ? current.filter((id) => id !== clubId)
-        : [...current, clubId]
-    );
-  }
 
   function save() {
     startTransition(async () => {
@@ -111,75 +117,160 @@ export function UserRoleEditor({
 
   if (isSelf || protectedTarget) {
     return (
-      <div className="space-y-2">
-        <span className="block text-xs text-muted-foreground">
-          {isSelf
-            ? "Your own account cannot be changed here."
-            : elevatedTarget
-              ? "Manage this elevated assignment from the district workspace."
-              : "A higher-level administrator must modify this account."}
-        </span>
-        {canDelete && (
-          <Button size="sm" variant="destructive" onClick={removeUser} disabled={pending}>
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-            Delete user
-          </Button>
-        )}
-      </div>
+      <span className="block text-xs text-muted-foreground">
+        {isSelf
+          ? "Your own account cannot be changed here."
+          : elevatedTarget
+            ? "Manage this elevated assignment from the district workspace."
+            : "A higher-level administrator must modify this account."}
+      </span>
     );
   }
 
-  return (
-    <div className="min-w-64 space-y-3">
-      <select
-        value={role}
-        onChange={(event) => setRole(event.target.value as UserRole)}
-        className="flex h-9 w-full rounded-lg border bg-background px-3 text-sm text-foreground"
-      >
-        {roles.map((option) => (
-          <option key={option} value={option}>{option.replace("_", " ")}</option>
-        ))}
-      </select>
-
-      {role === "teacher" && (
-        <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2">
-          <p className="mb-1 text-xs font-medium">Assigned clubs <span className="font-normal text-muted-foreground">(optional)</span></p>
-          {assignableClubs.map((club) => (
-            <label key={club.id} className="flex items-center gap-2 text-xs">
-              <input
-                type="checkbox"
-                checked={clubIds.includes(club.id)}
-                onChange={() => toggleClub(club.id)}
-              />
-              {club.name}
-            </label>
-          ))}
-          {assignableClubs.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              No published, active clubs are available in this teacher&apos;s school.
-            </p>
+  const accountActions = (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={pending}
+          aria-label={`Account actions for ${user.full_name || user.email || "user"}`}
+        >
+          {pending ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
           )}
-        </div>
-      )}
+          Account
+          <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+        </Button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={6}
+          collisionPadding={12}
+          className="z-50 min-w-52 rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-xl"
+        >
+          <DropdownMenu.Label className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+            Account access
+          </DropdownMenu.Label>
+          {user.account_status === "suspended" || user.account_status === "deactivated" ? (
+            <DropdownMenu.Item
+              onSelect={() => changeStatus("active")}
+              className="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2 py-2 text-sm outline-none focus:bg-muted"
+            >
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+              Restore account
+            </DropdownMenu.Item>
+          ) : (
+            <DropdownMenu.Item
+              onSelect={() => changeStatus("suspended")}
+              className="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2 py-2 text-sm outline-none focus:bg-muted"
+            >
+              <Ban className="h-4 w-4 text-amber-600" aria-hidden="true" />
+              Ban account
+            </DropdownMenu.Item>
+          )}
+          <DropdownMenu.Separator className="my-1 h-px bg-border" />
+          <DropdownMenu.Item
+            onSelect={removeUser}
+            className="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2 py-2 text-sm text-destructive outline-none focus:bg-destructive/10 focus:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            Delete user
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
 
-      <div className="flex flex-wrap gap-2">
+  if (accountActionsOnly) {
+    return accountActions;
+  }
+
+  return (
+    <div className="min-w-60 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          aria-label={`Role for ${user.full_name || user.email || "user"}`}
+          value={role}
+          onChange={(event) => setRole(event.target.value as UserRole)}
+          className="h-9 min-w-32 flex-1 rounded-lg border bg-background px-3 text-sm text-foreground"
+        >
+          {roles.map((option) => (
+            <option key={option} value={option}>{option.replace("_", " ")}</option>
+          ))}
+        </select>
+
+        {role === "teacher" && (
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                aria-label={`Choose Advisor clubs for ${user.full_name || user.email || "user"}`}
+              >
+                Clubs
+                {clubIds.length > 0 && (
+                  <span className="rounded-full bg-storm-electric/10 px-1.5 text-xs text-storm-electric">
+                    {clubIds.length}
+                  </span>
+                )}
+                <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+              </Button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                align="start"
+                sideOffset={6}
+                collisionPadding={12}
+                className="z-50 max-h-72 w-72 overflow-y-auto rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-xl"
+              >
+                <DropdownMenu.Label className="px-2 py-1.5">
+                  <span className="block text-sm font-semibold">Advisor clubs</span>
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    Published clubs in this teacher&apos;s school
+                  </span>
+                </DropdownMenu.Label>
+                <DropdownMenu.Separator className="my-1 h-px bg-border" />
+                {assignableClubs.map((club) => (
+                  <DropdownMenu.CheckboxItem
+                    key={club.id}
+                    checked={clubIds.includes(club.id)}
+                    onCheckedChange={(checked) => {
+                      setClubIds((current) => checked === true
+                        ? current.includes(club.id) ? current : [...current, club.id]
+                        : current.filter((id) => id !== club.id));
+                    }}
+                    onSelect={(event) => event.preventDefault()}
+                    className="relative flex cursor-pointer select-none items-center rounded-lg py-2 pl-8 pr-2 text-sm outline-none focus:bg-muted"
+                  >
+                    <DropdownMenu.ItemIndicator className="absolute left-2 inline-flex items-center">
+                      <Check className="h-4 w-4 text-storm-electric" aria-hidden="true" />
+                    </DropdownMenu.ItemIndicator>
+                    <span className="truncate">{club.name}</span>
+                  </DropdownMenu.CheckboxItem>
+                ))}
+                {assignableClubs.length === 0 && (
+                  <p className="px-2 py-3 text-xs text-muted-foreground">
+                    No published, active clubs are available in this teacher&apos;s school.
+                  </p>
+                )}
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" onClick={save} disabled={pending}>
           {pending && <Loader2 className="h-4 w-4 animate-spin" />}
           Save role
         </Button>
-        {user.account_status === "suspended" || user.account_status === "deactivated" ? (
-          <Button size="sm" variant="outline" onClick={() => changeStatus("active")} disabled={pending}>
-            <CheckCircle2 className="h-4 w-4" /> Restore account
-          </Button>
-        ) : (
-          <Button size="sm" variant="outline" onClick={() => changeStatus("suspended")} disabled={pending}>
-            <Ban className="h-4 w-4" /> Ban account
-          </Button>
-        )}
-        <Button size="sm" variant="destructive" onClick={removeUser} disabled={pending}>
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-          Delete user
-        </Button>
+        {accountActions}
       </div>
     </div>
   );
