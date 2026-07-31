@@ -86,8 +86,9 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
             paramName="category"
             exclusiveParamNames={["closing"]}
           />
-          <a
+          <Link
             href={closingHref}
+            scroll={false}
             className={`mt-6 block rounded-lg px-3 py-2 text-sm ${
               query.closing === "true"
                 ? "bg-amber-100 font-medium text-amber-800"
@@ -95,7 +96,7 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
             }`}
           >
             ⏰ Closing soon
-          </a>
+          </Link>
           <div className="mt-6">
             <p className="mb-2 text-sm font-medium text-storm-navy">Grade</p>
             {[9, 10, 11, 12].map((grade) => {
@@ -106,9 +107,10 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
                 grade: String(grade),
               });
               return (
-                <a
+                <Link
                   key={grade}
                   href={`?${gradeParams.toString()}`}
+                  scroll={false}
                   className={`block rounded-lg px-3 py-2 text-sm ${
                     query.grade === String(grade)
                       ? "bg-storm-electric/10 font-medium text-storm-electric"
@@ -116,7 +118,7 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
                   }`}
                 >
                   Grade {grade}
-                </a>
+                </Link>
               );
             })}
           </div>

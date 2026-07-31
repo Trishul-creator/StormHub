@@ -107,9 +107,9 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
             exclusiveParamNames={["closing"]}
           />
           <div className="mt-6 space-y-1">
-            <a href={closingHref} className={`block rounded-lg px-3 py-2 text-sm ${params.closing === "true" ? "bg-amber-100 text-amber-800 font-medium" : "hover:bg-storm-light/50 text-muted-foreground"}`}>
+            <Link href={closingHref} scroll={false} className={`block rounded-lg px-3 py-2 text-sm ${params.closing === "true" ? "bg-amber-100 text-amber-800 font-medium" : "hover:bg-storm-light/50 text-muted-foreground"}`}>
               ⏰ Closing soon
-            </a>
+            </Link>
           </div>
           <div className="mt-6">
             <p className="mb-2 text-sm font-medium text-storm-navy">Grade</p>
@@ -123,13 +123,14 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
                   grade: String(grade),
                 }).toString()}`;
                 return (
-                  <a
+                  <Link
                     key={grade}
                     href={href}
+                    scroll={false}
                     className={`block rounded-lg px-3 py-2 text-sm ${params.grade === String(grade) ? "bg-storm-electric/10 text-storm-electric font-medium" : "hover:bg-storm-light/50 text-muted-foreground"}`}
                   >
                     Grade {grade}
-                  </a>
+                  </Link>
                 );
               })}
             </div>

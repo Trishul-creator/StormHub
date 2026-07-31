@@ -26,7 +26,8 @@ export function SchoolFilter({
     const params = new URLSearchParams(searchParams.toString());
     if (slug) params.set("school", slug);
     else params.delete("school");
-    router.push(`${pathname}?${params.toString()}`);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
 
   return (
@@ -37,7 +38,7 @@ export function SchoolFilter({
         aria-label="School"
         value={activeSlug ?? ""}
         onChange={(event) => selectSchool(event.target.value)}
-        className="h-10 w-full rounded-md border border-input bg-white px-3 text-sm"
+        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
       >
         {schools.map((school) => (
           <option key={school.slug} value={school.slug}>

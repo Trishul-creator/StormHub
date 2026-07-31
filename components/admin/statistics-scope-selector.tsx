@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 interface StatisticsScopeOption {
@@ -29,11 +30,11 @@ export function StatisticsScopeSelector({
   onNavigate?: (destination: string) => void;
 }) {
   const [selectedSlug, setSelectedSlug] = useState(activeSlug ?? "");
-  const [pending, setPending] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
 
   useEffect(() => {
     setSelectedSlug(activeSlug ?? "");
-    setPending(false);
   }, [activeSlug]);
 
   function changeScope(nextSlug: string) {
@@ -45,18 +46,11 @@ export function StatisticsScopeSelector({
     const destination = query.size > 0
       ? `/admin/statistics?${query.toString()}`
       : "/admin/statistics";
-    setPending(true);
     if (onNavigate) {
       onNavigate(destination);
       return;
     }
-
-    // A full navigation is intentional here. Next.js client transitions can
-    // leave streamed, data-heavy statistics routes suspended after the RSC
-    // response is aborted, which makes the selector appear permanently busy.
-    // Reloading the scoped URL keeps the query string, session, and server-side
-    // authorization checks deterministic.
-    window.location.assign(destination);
+    startTransition(() => router.replace(destination, { scroll: false }));
   }
 
   return (
@@ -65,9 +59,8 @@ export function StatisticsScopeSelector({
       <select
         aria-label={label}
         value={selectedSlug}
-        disabled={pending}
         onChange={(event) => changeScope(event.target.value)}
-        className="mt-1 block h-10 w-full min-w-56 rounded-lg border border-blue-200 bg-card px-3 pr-10 text-sm font-medium normal-case tracking-normal text-storm-navy shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:cursor-wait disabled:opacity-75 dark:border-blue-900"
+        className="mt-1 block h-10 w-full min-w-56 rounded-lg border border-blue-200 bg-card px-3 pr-10 text-sm font-medium normal-case tracking-normal text-storm-navy shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-blue-900"
       >
         <option value="">{allLabel}</option>
         {schools.map((school) => (

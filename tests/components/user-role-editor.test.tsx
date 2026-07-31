@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { UserRoleEditor } from "@/components/admin/user-role-editor";
 import {
   assignUserToDistrictAdministrator,
@@ -27,6 +27,10 @@ beforeAll(() => {
     configurable: true,
     value: vi.fn(),
   });
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
 });
 
 function club(overrides: Partial<Club> = {}): Club {
@@ -151,15 +155,17 @@ describe("UserRoleEditor sponsor choices", () => {
     expect(screen.getByRole("combobox", { name: /district for teacher/i })).toHaveTextContent(
       "Elkhorn Public Schools"
     );
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
-    expect(assignUserToDistrictAdministrator).toHaveBeenCalledWith({
-      targetUserId: "teacher-1",
-      districtId: "district-1",
+    await waitFor(() => {
+      expect(assignUserToDistrictAdministrator).toHaveBeenCalledWith({
+        targetUserId: "teacher-1",
+        districtId: "district-1",
+      });
     });
+    expect(screen.queryByRole("button", { name: /save changes/i })).not.toBeInTheDocument();
   });
 
-  it("opens identity confirmation when a sensitive role change needs step-up", async () => {
+  it("opens identity confirmation immediately and restores the role when it is canceled", async () => {
     vi.mocked(updateUserRoleAndClubs).mockResolvedValueOnce({
       success: false,
       error: "Confirm your identity.",
@@ -175,10 +181,18 @@ describe("UserRoleEditor sponsor choices", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    const roleControl = screen.getByRole("combobox", { name: /role for teacher/i });
+    fireEvent.keyDown(roleControl, { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("option", { name: /teacher.*advisor/i }));
 
     expect(await screen.findByRole("dialog")).toBeVisible();
     expect(screen.getByText("Confirm your identity")).toBeVisible();
     expect(screen.getByLabelText(/password for admin@school.edu/i)).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: /close identity confirmation/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(roleControl).toHaveTextContent("Student");
+    expect(screen.queryByRole("button", { name: /save changes/i })).not.toBeInTheDocument();
   });
 });

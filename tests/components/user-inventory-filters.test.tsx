@@ -2,6 +2,10 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { UserInventoryFilters } from "@/components/admin/user-inventory-filters";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+}));
+
 const roles = ["student", "teacher", "admin", "district_admin", "super_admin"] as const;
 const schools = [
   { id: "school-1", name: "North High", slug: "north" },

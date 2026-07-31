@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Select from "@radix-ui/react-select";
 import { useRouter } from "next/navigation";
@@ -109,6 +109,11 @@ export function UserRoleEditor({
   const [pending, startTransition] = useTransition();
   const [reauthenticationOpen, setReauthenticationOpen] = useState(false);
   const retryAfterAuthentication = useRef<(() => void) | null>(null);
+  const cancelAfterAuthentication = useRef<(() => void) | null>(null);
+  const authenticationCompleted = useRef(false);
+  const savedRole = useRef<UserRole>(user.role);
+  const savedClubIds = useRef<string[]>(initialClubIds);
+  const savedDistrictId = useRef(user.district_id ?? (districts.length === 1 ? districts[0].id : ""));
   const router = useRouter();
   const isSelf = user.id === actorId;
   const editableTargetRoles = actorRole === "district_admin"
@@ -131,40 +136,92 @@ export function UserRoleEditor({
       ? ["student", "teacher", "admin"]
       : ["student", "teacher"];
 
-  function requestReauthentication(retry: () => void) {
+  useEffect(() => {
+    savedRole.current = user.role;
+    savedClubIds.current = initialClubIds;
+    savedDistrictId.current = user.district_id
+      ?? (districts.length === 1 ? districts[0].id : "");
+  }, [districts, initialClubIds, user.district_id, user.role]);
+
+  function resetEditor() {
+    setRole(savedRole.current);
+    setClubIds(savedClubIds.current);
+    setDistrictId(savedDistrictId.current);
+  }
+
+  function requestReauthentication(retry: () => void, onCancel?: () => void) {
     retryAfterAuthentication.current = retry;
+    cancelAfterAuthentication.current = onCancel ?? null;
+    authenticationCompleted.current = false;
     setReauthenticationOpen(true);
   }
 
-  function save() {
-    if (role === "district_admin") {
-      if (!districtId) {
-        toast({
-          title: "Choose a district",
-          description: "A district administrator must be assigned to exactly one district.",
-          variant: "destructive",
-        });
-        return;
+  function handleReauthenticationOpenChange(open: boolean) {
+    if (!open) {
+      if (!authenticationCompleted.current) {
+        cancelAfterAuthentication.current?.();
       }
-      assignDistrictAdministrator(districtId);
-      return;
+      retryAfterAuthentication.current = null;
+      cancelAfterAuthentication.current = null;
+      authenticationCompleted.current = false;
     }
+    setReauthenticationOpen(open);
+  }
 
+  function handleReauthenticationVerified() {
+    authenticationCompleted.current = true;
+    retryAfterAuthentication.current?.();
+  }
+
+  function updateRoleAndClubs(nextRole: UserRole, nextClubIds: string[]) {
     startTransition(async () => {
       const result = await updateUserRoleAndClubs({
         targetUserId: user.id,
-        role,
-        clubIds,
+        role: nextRole,
+        clubIds: nextClubIds,
       });
       if (result.success) {
-        toast({ title: "User updated", description: "Role and club assignments were saved." });
+        savedRole.current = nextRole;
+        savedClubIds.current = nextClubIds;
+        savedDistrictId.current = "";
+        toast({ title: "User updated", description: "The change was saved automatically." });
         router.refresh();
       } else if (needsAdminReauthentication(result)) {
-        requestReauthentication(save);
+        requestReauthentication(
+          () => updateRoleAndClubs(nextRole, nextClubIds),
+          resetEditor
+        );
       } else {
+        resetEditor();
         toast({ title: "Could not update user", description: result.error, variant: "destructive" });
       }
     });
+  }
+
+  function changeRole(nextRole: UserRole) {
+    if (nextRole === role) return;
+
+    setRole(nextRole);
+    if (nextRole === "district_admin") {
+      const nextDistrictId = districtId
+        || (districts.length === 1 ? districts[0].id : "");
+      if (nextDistrictId) {
+        setDistrictId(nextDistrictId);
+        assignDistrictAdministrator(nextDistrictId);
+      }
+      return;
+    }
+
+    const nextClubIds = nextRole === "teacher" ? clubIds : [];
+    updateRoleAndClubs(nextRole, nextClubIds);
+  }
+
+  function changeAdvisorClub(clubId: string, checked: boolean) {
+    const nextClubIds = checked
+      ? clubIds.includes(clubId) ? clubIds : [...clubIds, clubId]
+      : clubIds.filter((id) => id !== clubId);
+    setClubIds(nextClubIds);
+    updateRoleAndClubs("teacher", nextClubIds);
   }
 
   function removeUser() {
@@ -235,7 +292,10 @@ export function UserRoleEditor({
     const district = districts.find((option) => option.id === districtId);
     if (!district || !window.confirm(
       `Promote ${user.full_name || user.email || "this user"} to district administrator for ${district.name}? Their school and club assignments will be removed.`
-    )) return;
+    )) {
+      resetEditor();
+      return;
+    }
     assignDistrictAdministratorAfterConfirmation(districtId);
   }
 
@@ -246,14 +306,21 @@ export function UserRoleEditor({
         districtId,
       });
       if (result.success) {
+        savedRole.current = "district_admin";
+        savedClubIds.current = [];
+        savedDistrictId.current = districtId;
         toast({
           title: "District administrator assigned",
           description: `${user.full_name || user.email || "The user"} now manages one district.`,
         });
         router.refresh();
       } else if (needsAdminReauthentication(result)) {
-        requestReauthentication(() => assignDistrictAdministratorAfterConfirmation(districtId));
+        requestReauthentication(
+          () => assignDistrictAdministratorAfterConfirmation(districtId),
+          resetEditor
+        );
       } else {
+        resetEditor();
         toast({
           title: "Could not assign district administrator",
           description: result.error,
@@ -348,9 +415,9 @@ export function UserRoleEditor({
         {accountActions}
         <AdminReauthenticationDialog
           open={reauthenticationOpen}
-          onOpenChange={setReauthenticationOpen}
+          onOpenChange={handleReauthenticationOpenChange}
           email={actorEmail}
-          onVerified={() => retryAfterAuthentication.current?.()}
+          onVerified={handleReauthenticationVerified}
         />
       </>
     );
@@ -364,7 +431,7 @@ export function UserRoleEditor({
     <div className="min-w-72 space-y-2.5">
       <Select.Root
         value={selectedRole}
-        onValueChange={(value) => setRole(value as UserRole)}
+        onValueChange={(value) => changeRole(value as UserRole)}
         disabled={pending}
       >
         <Select.Trigger
@@ -432,7 +499,14 @@ export function UserRoleEditor({
       {selectedRole === "district_admin" && (
         <div className="rounded-xl border border-violet-300/70 bg-violet-500/5 p-2.5 dark:border-violet-800/80 dark:bg-violet-950/20">
           <p className="mb-2 text-xs font-semibold text-foreground">Assigned district</p>
-          <Select.Root value={districtId} onValueChange={setDistrictId} disabled={pending}>
+          <Select.Root
+            value={districtId}
+            onValueChange={(nextDistrictId) => {
+              setDistrictId(nextDistrictId);
+              assignDistrictAdministrator(nextDistrictId);
+            }}
+            disabled={pending}
+          >
             <Select.Trigger
               aria-label={`District for ${user.full_name || user.email || "user"}`}
               className="flex h-10 w-full items-center gap-2 rounded-lg border bg-background px-3 text-left text-sm text-foreground shadow-sm outline-none transition hover:border-violet-400 focus-visible:ring-2 focus-visible:ring-violet-500/30"
@@ -519,11 +593,7 @@ export function UserRoleEditor({
                   <DropdownMenu.CheckboxItem
                     key={club.id}
                     checked={clubIds.includes(club.id)}
-                    onCheckedChange={(checked) => {
-                      setClubIds((current) => checked === true
-                        ? current.includes(club.id) ? current : [...current, club.id]
-                        : current.filter((id) => id !== club.id));
-                    }}
+                    onCheckedChange={(checked) => changeAdvisorClub(club.id, checked === true)}
                     onSelect={(event) => event.preventDefault()}
                     className="relative flex cursor-pointer select-none items-center rounded-lg py-2 pl-8 pr-2 text-sm outline-none focus:bg-muted"
                   >
@@ -549,22 +619,32 @@ export function UserRoleEditor({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          size="sm"
-          onClick={save}
-          disabled={pending || (selectedRole === "district_admin" && !districtId)}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span
+          className="inline-flex min-h-8 items-center gap-1.5 text-xs text-muted-foreground"
+          aria-live="polite"
         >
-          {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-          Save changes
-        </Button>
+          {pending ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-storm-electric" aria-hidden="true" />
+              Saving…
+            </>
+          ) : selectedRole === "district_admin" && !districtId ? (
+            "Choose a district to continue"
+          ) : (
+            <>
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
+              Changes save automatically
+            </>
+          )}
+        </span>
         {accountActions}
       </div>
       <AdminReauthenticationDialog
         open={reauthenticationOpen}
-        onOpenChange={setReauthenticationOpen}
+        onOpenChange={handleReauthenticationOpenChange}
         email={actorEmail}
-        onVerified={() => retryAfterAuthentication.current?.()}
+        onVerified={handleReauthenticationVerified}
       />
     </div>
   );
