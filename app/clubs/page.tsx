@@ -13,6 +13,7 @@ import { isAdminRole } from "@/lib/permissions";
 import { SchoolFilter } from "@/components/layout/school-filter";
 import { getSchoolFilterContext } from "@/lib/schools";
 import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
+import Link from "next/link";
 
 interface ClubsPageProps {
   searchParams: Promise<{ q?: string; category?: string; featured?: string; filter?: string; school?: string }>;
@@ -79,12 +80,13 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
             exclusiveParamNames={["featured", "category"]}
           />
           <div className="mt-6">
-            <a
+            <Link
               href={featuredHref}
+              scroll={false}
               className={`block rounded-lg px-3 py-2 text-sm ${featuredOnly ? "bg-storm-electric/10 text-storm-electric font-medium" : "hover:bg-storm-light/50 text-muted-foreground"}`}
             >
               ⭐ Featured clubs
-            </a>
+            </Link>
           </div>
         </aside>
 

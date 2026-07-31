@@ -87,8 +87,9 @@ export default async function SchoolClubsPage({ params, searchParams }: SchoolCl
             activeValue={query.filter === "featured" ? undefined : query.filter}
             exclusiveParamNames={["featured"]}
           />
-          <a
+          <Link
             href={featuredHref}
+            scroll={false}
             className={`mt-6 block rounded-lg px-3 py-2 text-sm ${
               featuredOnly
                 ? "bg-storm-electric/10 font-medium text-storm-electric"
@@ -96,7 +97,7 @@ export default async function SchoolClubsPage({ params, searchParams }: SchoolCl
             }`}
           >
             ⭐ Featured clubs
-          </a>
+          </Link>
         </aside>
         <div data-tour="club-directory-results" className="min-w-0 flex-1">
           <MobileFilterDrawer

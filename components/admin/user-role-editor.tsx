@@ -1,17 +1,20 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import * as Select from "@radix-ui/react-select";
 import { useRouter } from "next/navigation";
 import {
   Ban,
+  BookOpen,
+  Building2,
   Check,
   CheckCircle2,
   ChevronDown,
-  ChevronRight,
+  GraduationCap,
   Loader2,
   MoreHorizontal,
-  ShieldCheck,
+  School,
   Trash2,
 } from "lucide-react";
 import {
@@ -26,6 +29,41 @@ import { toast } from "@/hooks/use-toast";
 import { needsAdminReauthentication } from "@/lib/admin-step-up-shared";
 import { getSponsorAssignableClubs } from "@/lib/permissions";
 import type { AdminUser, Club, UserRole } from "@/types/database";
+
+const ROLE_DETAILS: Record<Exclude<UserRole, "super_admin">, {
+  label: string;
+  description: string;
+}> = {
+  student: {
+    label: "Student",
+    description: "Join clubs, complete coursework, and participate in events.",
+  },
+  teacher: {
+    label: "Teacher / Advisor",
+    description: "Advise assigned clubs and manage their activities.",
+  },
+  admin: {
+    label: "School administrator",
+    description: "Manage users, clubs, and settings for one school.",
+  },
+  district_admin: {
+    label: "District administrator",
+    description: "Manage every school inside one assigned district.",
+  },
+};
+
+function RoleIcon({
+  role,
+  className,
+}: {
+  role: Exclude<UserRole, "super_admin">;
+  className?: string;
+}) {
+  if (role === "student") return <GraduationCap className={className} aria-hidden="true" />;
+  if (role === "teacher") return <BookOpen className={className} aria-hidden="true" />;
+  if (role === "admin") return <School className={className} aria-hidden="true" />;
+  return <Building2 className={className} aria-hidden="true" />;
+}
 
 export function UserRoleEditor({
   user,
@@ -51,21 +89,31 @@ export function UserRoleEditor({
   );
   const initialClubIds = useMemo(
     () => {
-      const assignableClubIds = new Set(assignableClubs.map((club) => club.id));
-      return user.club_assignments
+      const activeSponsorClubIds = user.club_assignments
         .filter((assignment) =>
           assignment.role === "sponsor"
           && assignment.status === "active"
-          && assignableClubIds.has(assignment.club_id)
         )
         .map((assignment) => assignment.club_id);
+      if (clubs.length === 0) return activeSponsorClubIds;
+
+      const assignableClubIds = new Set(assignableClubs.map((club) => club.id));
+      return activeSponsorClubIds.filter((clubId) => assignableClubIds.has(clubId));
     },
-    [assignableClubs, user.club_assignments]
+    [assignableClubs, clubs.length, user.club_assignments]
   );
   const [clubIds, setClubIds] = useState<string[]>(initialClubIds);
+  const [districtId, setDistrictId] = useState(
+    user.district_id ?? (districts.length === 1 ? districts[0].id : "")
+  );
   const [pending, startTransition] = useTransition();
   const [reauthenticationOpen, setReauthenticationOpen] = useState(false);
   const retryAfterAuthentication = useRef<(() => void) | null>(null);
+  const cancelAfterAuthentication = useRef<(() => void) | null>(null);
+  const authenticationCompleted = useRef(false);
+  const savedRole = useRef<UserRole>(user.role);
+  const savedClubIds = useRef<string[]>(initialClubIds);
+  const savedDistrictId = useRef(user.district_id ?? (districts.length === 1 ? districts[0].id : ""));
   const router = useRouter();
   const isSelf = user.id === actorId;
   const editableTargetRoles = actorRole === "district_admin"
@@ -75,31 +123,105 @@ export function UserRoleEditor({
   const protectedTarget = elevatedTarget
     || (actorRole !== "super_admin" && !editableTargetRoles.includes(user.role));
   const canDelete = !isSelf && !protectedTarget;
-  const roles: UserRole[] = actorRole === "super_admin" || actorRole === "district_admin"
-    ? ["student", "teacher", "admin"]
-    : ["student", "teacher"];
+  const roles: Array<Exclude<UserRole, "super_admin">> = actorRole === "super_admin"
+    ? [
+        "student",
+        "teacher",
+        "admin",
+        ...(districts.length > 0 && (user.account_status ?? "active") === "active"
+          ? ["district_admin" as const]
+          : []),
+      ]
+    : actorRole === "district_admin"
+      ? ["student", "teacher", "admin"]
+      : ["student", "teacher"];
 
-  function requestReauthentication(retry: () => void) {
+  useEffect(() => {
+    savedRole.current = user.role;
+    savedClubIds.current = initialClubIds;
+    savedDistrictId.current = user.district_id
+      ?? (districts.length === 1 ? districts[0].id : "");
+  }, [districts, initialClubIds, user.district_id, user.role]);
+
+  function resetEditor() {
+    setRole(savedRole.current);
+    setClubIds(savedClubIds.current);
+    setDistrictId(savedDistrictId.current);
+  }
+
+  function requestReauthentication(retry: () => void, onCancel?: () => void) {
     retryAfterAuthentication.current = retry;
+    cancelAfterAuthentication.current = onCancel ?? null;
+    authenticationCompleted.current = false;
     setReauthenticationOpen(true);
   }
 
-  function save() {
+  function handleReauthenticationOpenChange(open: boolean) {
+    if (!open) {
+      if (!authenticationCompleted.current) {
+        cancelAfterAuthentication.current?.();
+      }
+      retryAfterAuthentication.current = null;
+      cancelAfterAuthentication.current = null;
+      authenticationCompleted.current = false;
+    }
+    setReauthenticationOpen(open);
+  }
+
+  function handleReauthenticationVerified() {
+    authenticationCompleted.current = true;
+    retryAfterAuthentication.current?.();
+  }
+
+  function updateRoleAndClubs(nextRole: UserRole, nextClubIds: string[]) {
     startTransition(async () => {
       const result = await updateUserRoleAndClubs({
         targetUserId: user.id,
-        role,
-        clubIds,
+        role: nextRole,
+        clubIds: nextClubIds,
       });
       if (result.success) {
-        toast({ title: "User updated", description: "Role and club assignments were saved." });
+        savedRole.current = nextRole;
+        savedClubIds.current = nextClubIds;
+        savedDistrictId.current = "";
+        toast({ title: "User updated", description: "The change was saved automatically." });
         router.refresh();
       } else if (needsAdminReauthentication(result)) {
-        requestReauthentication(save);
+        requestReauthentication(
+          () => updateRoleAndClubs(nextRole, nextClubIds),
+          resetEditor
+        );
       } else {
+        resetEditor();
         toast({ title: "Could not update user", description: result.error, variant: "destructive" });
       }
     });
+  }
+
+  function changeRole(nextRole: UserRole) {
+    if (nextRole === role) return;
+
+    setRole(nextRole);
+    if (nextRole === "district_admin") {
+      const nextDistrictId = districtId
+        || (districts.length === 1 ? districts[0].id : "");
+      if (nextDistrictId) {
+        setDistrictId(nextDistrictId);
+        assignDistrictAdministrator(nextDistrictId);
+      }
+      return;
+    }
+
+    const nextClubIds = nextRole === "teacher" ? clubIds : [];
+    updateRoleAndClubs(nextRole, nextClubIds);
+  }
+
+  function changeAdvisorClub(clubId: string, checked: boolean) {
+    const nextClubIds = checked
+      ? clubIds.includes(clubId) ? clubIds : [...clubIds, clubId]
+      : clubIds.filter((id) => id !== clubId);
+    setClubIds(nextClubIds);
+    updateRoleAndClubs("teacher", nextClubIds);
   }
 
   function removeUser() {
@@ -170,7 +292,10 @@ export function UserRoleEditor({
     const district = districts.find((option) => option.id === districtId);
     if (!district || !window.confirm(
       `Promote ${user.full_name || user.email || "this user"} to district administrator for ${district.name}? Their school and club assignments will be removed.`
-    )) return;
+    )) {
+      resetEditor();
+      return;
+    }
     assignDistrictAdministratorAfterConfirmation(districtId);
   }
 
@@ -181,14 +306,21 @@ export function UserRoleEditor({
         districtId,
       });
       if (result.success) {
+        savedRole.current = "district_admin";
+        savedClubIds.current = [];
+        savedDistrictId.current = districtId;
         toast({
           title: "District administrator assigned",
           description: `${user.full_name || user.email || "The user"} now manages one district.`,
         });
         router.refresh();
       } else if (needsAdminReauthentication(result)) {
-        requestReauthentication(() => assignDistrictAdministratorAfterConfirmation(districtId));
+        requestReauthentication(
+          () => assignDistrictAdministratorAfterConfirmation(districtId),
+          resetEditor
+        );
       } else {
+        resetEditor();
         toast({
           title: "Could not assign district administrator",
           description: result.error,
@@ -205,7 +337,7 @@ export function UserRoleEditor({
           {isSelf
             ? "Your own account cannot be changed here."
             : elevatedTarget
-              ? "Manage this elevated assignment from the district workspace."
+              ? "This elevated account is protected from school-level role changes."
               : "A higher-level administrator must modify this account."}
         </span>
         {canDelete && (
@@ -265,41 +397,6 @@ export function UserRoleEditor({
             </DropdownMenu.Item>
           )}
           <DropdownMenu.Separator className="my-1 h-px bg-border" />
-          {actorRole === "super_admin"
-            && districts.length > 0
-            && (user.account_status ?? "active") === "active"
-            && (
-            <>
-              <DropdownMenu.Sub>
-                <DropdownMenu.SubTrigger className="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2 py-2 text-sm outline-none focus:bg-muted data-[state=open]:bg-muted">
-                  <ShieldCheck className="h-4 w-4 text-violet-600" aria-hidden="true" />
-                  Assign district admin
-                  <ChevronRight className="ml-auto h-4 w-4" aria-hidden="true" />
-                </DropdownMenu.SubTrigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.SubContent
-                    sideOffset={6}
-                    collisionPadding={12}
-                    className="z-[60] max-h-72 min-w-64 overflow-y-auto rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-xl"
-                  >
-                    <DropdownMenu.Label className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                      Choose the one district to manage
-                    </DropdownMenu.Label>
-                    {districts.map((district) => (
-                      <DropdownMenu.Item
-                        key={district.id}
-                        onSelect={() => assignDistrictAdministrator(district.id)}
-                        className="cursor-pointer select-none rounded-lg px-2 py-2 text-sm outline-none focus:bg-muted"
-                      >
-                        {district.name}
-                      </DropdownMenu.Item>
-                    ))}
-                  </DropdownMenu.SubContent>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Sub>
-              <DropdownMenu.Separator className="my-1 h-px bg-border" />
-            </>
-          )}
           <DropdownMenu.Item
             onSelect={removeUser}
             className="flex cursor-pointer select-none items-center gap-2 rounded-lg px-2 py-2 text-sm text-destructive outline-none focus:bg-destructive/10 focus:text-destructive"
@@ -318,29 +415,149 @@ export function UserRoleEditor({
         {accountActions}
         <AdminReauthenticationDialog
           open={reauthenticationOpen}
-          onOpenChange={setReauthenticationOpen}
+          onOpenChange={handleReauthenticationOpenChange}
           email={actorEmail}
-          onVerified={() => retryAfterAuthentication.current?.()}
+          onVerified={handleReauthenticationVerified}
         />
       </>
     );
   }
 
-  return (
-    <div className="min-w-60 space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          aria-label={`Role for ${user.full_name || user.email || "user"}`}
-          value={role}
-          onChange={(event) => setRole(event.target.value as UserRole)}
-          className="h-9 min-w-32 flex-1 rounded-lg border bg-background px-3 text-sm text-foreground"
-        >
-          {roles.map((option) => (
-            <option key={option} value={option}>{option.replace("_", " ")}</option>
-          ))}
-        </select>
+  const selectedRole = role === "super_admin" ? "admin" : role;
+  const selectedRoleDetails = ROLE_DETAILS[selectedRole];
+  const selectedDistrict = districts.find((district) => district.id === districtId);
 
-        {role === "teacher" && (
+  return (
+    <div className="min-w-72 space-y-2.5">
+      <Select.Root
+        value={selectedRole}
+        onValueChange={(value) => changeRole(value as UserRole)}
+        disabled={pending}
+      >
+        <Select.Trigger
+          aria-label={`Role for ${user.full_name || user.email || "user"}`}
+          className="group flex min-h-12 w-full items-center gap-3 rounded-xl border border-border/80 bg-card px-3 py-2 text-left text-foreground shadow-sm outline-none transition hover:border-storm-electric/40 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-storm-electric/40 data-[state=open]:border-storm-electric/50 data-[state=open]:ring-2 data-[state=open]:ring-storm-electric/20"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-storm-electric/10 text-storm-electric">
+            <RoleIcon role={selectedRole} className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold">{selectedRoleDetails.label}</span>
+            <span className="block text-[11px] text-muted-foreground">Account role</span>
+          </span>
+          <Select.Icon asChild>
+            <ChevronDown
+              className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
+              aria-hidden="true"
+            />
+          </Select.Icon>
+        </Select.Trigger>
+        <Select.Portal>
+          <Select.Content
+            position="popper"
+            align="end"
+            sideOffset={6}
+            collisionPadding={12}
+            className="z-[70] w-[var(--radix-select-trigger-width)] min-w-80 overflow-hidden rounded-2xl border bg-popover p-1.5 text-popover-foreground shadow-2xl"
+          >
+            <Select.Viewport>
+              <Select.Group>
+                <Select.Label className="px-2 pb-1 pt-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Choose account role
+                </Select.Label>
+                {roles.map((option) => {
+                  const details = ROLE_DETAILS[option];
+                  return (
+                    <Select.Item
+                      key={option}
+                      value={option}
+                      className="relative flex cursor-pointer select-none items-center gap-3 rounded-xl px-2.5 py-2.5 pr-9 outline-none transition data-[highlighted]:bg-muted data-[state=checked]:bg-storm-electric/10"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-background text-storm-electric">
+                        <RoleIcon role={option} className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <Select.ItemText>
+                          <span className="block text-sm font-semibold">{details.label}</span>
+                        </Select.ItemText>
+                        <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                          {details.description}
+                        </span>
+                      </span>
+                      <Select.ItemIndicator className="absolute right-3 inline-flex items-center text-storm-electric">
+                        <Check className="h-4 w-4" aria-hidden="true" />
+                      </Select.ItemIndicator>
+                    </Select.Item>
+                  );
+                })}
+              </Select.Group>
+            </Select.Viewport>
+          </Select.Content>
+        </Select.Portal>
+      </Select.Root>
+
+      {selectedRole === "district_admin" && (
+        <div className="rounded-xl border border-violet-300/70 bg-violet-500/5 p-2.5 dark:border-violet-800/80 dark:bg-violet-950/20">
+          <p className="mb-2 text-xs font-semibold text-foreground">Assigned district</p>
+          <Select.Root
+            value={districtId}
+            onValueChange={(nextDistrictId) => {
+              setDistrictId(nextDistrictId);
+              assignDistrictAdministrator(nextDistrictId);
+            }}
+            disabled={pending}
+          >
+            <Select.Trigger
+              aria-label={`District for ${user.full_name || user.email || "user"}`}
+              className="flex h-10 w-full items-center gap-2 rounded-lg border bg-background px-3 text-left text-sm text-foreground shadow-sm outline-none transition hover:border-violet-400 focus-visible:ring-2 focus-visible:ring-violet-500/30"
+            >
+              <Building2 className="h-4 w-4 shrink-0 text-violet-600 dark:text-violet-300" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate">
+                {selectedDistrict?.name ?? "Choose a district"}
+              </span>
+              <Select.Icon asChild>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              </Select.Icon>
+            </Select.Trigger>
+            <Select.Portal>
+              <Select.Content
+                position="popper"
+                align="end"
+                sideOffset={6}
+                collisionPadding={12}
+                className="z-[80] max-h-72 w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-2xl"
+              >
+                <Select.Viewport>
+                  <Select.Group>
+                    <Select.Label className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                      One district is required
+                    </Select.Label>
+                    {districts.map((district) => (
+                      <Select.Item
+                        key={district.id}
+                        value={district.id}
+                        className="relative cursor-pointer select-none rounded-lg py-2 pl-3 pr-9 text-sm outline-none data-[highlighted]:bg-muted data-[state=checked]:bg-violet-500/10"
+                      >
+                        <Select.ItemText>{district.name}</Select.ItemText>
+                        <Select.ItemIndicator className="absolute right-3 top-1/2 -translate-y-1/2 text-violet-600 dark:text-violet-300">
+                          <Check className="h-4 w-4" aria-hidden="true" />
+                        </Select.ItemIndicator>
+                      </Select.Item>
+                    ))}
+                  </Select.Group>
+                </Select.Viewport>
+              </Select.Content>
+            </Select.Portal>
+          </Select.Root>
+          <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+            Promotion removes school and club assignments and grants district-wide administration.
+          </p>
+        </div>
+      )}
+
+      {selectedRole === "teacher" && (
+        <div className="flex flex-wrap items-center gap-2">
+          {clubs.length > 0 ? (
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
               <Button
@@ -376,11 +593,7 @@ export function UserRoleEditor({
                   <DropdownMenu.CheckboxItem
                     key={club.id}
                     checked={clubIds.includes(club.id)}
-                    onCheckedChange={(checked) => {
-                      setClubIds((current) => checked === true
-                        ? current.includes(club.id) ? current : [...current, club.id]
-                        : current.filter((id) => id !== club.id));
-                    }}
+                    onCheckedChange={(checked) => changeAdvisorClub(club.id, checked === true)}
                     onSelect={(event) => event.preventDefault()}
                     className="relative flex cursor-pointer select-none items-center rounded-lg py-2 pl-8 pr-2 text-sm outline-none focus:bg-muted"
                   >
@@ -398,21 +611,40 @@ export function UserRoleEditor({
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
-        )}
-      </div>
+          ) : (
+            <span className="text-xs leading-snug text-muted-foreground">
+              Select one school in the page filters to edit Advisor club assignments.
+            </span>
+          )}
+        </div>
+      )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" onClick={save} disabled={pending}>
-          {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-          Save role
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span
+          className="inline-flex min-h-8 items-center gap-1.5 text-xs text-muted-foreground"
+          aria-live="polite"
+        >
+          {pending ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-storm-electric" aria-hidden="true" />
+              Saving…
+            </>
+          ) : selectedRole === "district_admin" && !districtId ? (
+            "Choose a district to continue"
+          ) : (
+            <>
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
+              Changes save automatically
+            </>
+          )}
+        </span>
         {accountActions}
       </div>
       <AdminReauthenticationDialog
         open={reauthenticationOpen}
-        onOpenChange={setReauthenticationOpen}
+        onOpenChange={handleReauthenticationOpenChange}
         email={actorEmail}
-        onVerified={() => retryAfterAuthentication.current?.()}
+        onVerified={handleReauthenticationVerified}
       />
     </div>
   );

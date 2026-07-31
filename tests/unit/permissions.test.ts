@@ -212,18 +212,18 @@ describe("school admin permissions", () => {
 });
 
 describe("administrative inventory editing", () => {
-  it("keeps aggregate and elevated inventory rows read-only", () => {
-    expect(canOpenUserEditor("super_admin", "teacher", false)).toBe(false);
-    expect(canOpenUserEditor("district_admin", "admin", false)).toBe(false);
-    expect(canOpenUserEditor("super_admin", "district_admin", true)).toBe(false);
-    expect(canOpenUserEditor("super_admin", "super_admin", true)).toBe(false);
+  it("allows aggregate school-level editing while keeping elevated rows read-only", () => {
+    expect(canOpenUserEditor("super_admin", "teacher")).toBe(true);
+    expect(canOpenUserEditor("district_admin", "admin")).toBe(true);
+    expect(canOpenUserEditor("super_admin", "district_admin")).toBe(false);
+    expect(canOpenUserEditor("super_admin", "super_admin")).toBe(false);
   });
 
-  it("allows only supported school-scoped targets to open the editor", () => {
-    expect(canOpenUserEditor("super_admin", "teacher", true)).toBe(true);
-    expect(canOpenUserEditor("district_admin", "admin", true)).toBe(true);
-    expect(canOpenUserEditor("admin", "student", true)).toBe(true);
-    expect(canOpenUserEditor("admin", "admin", true)).toBe(false);
+  it("allows only supported targets to open the editor", () => {
+    expect(canOpenUserEditor("super_admin", "teacher")).toBe(true);
+    expect(canOpenUserEditor("district_admin", "admin")).toBe(true);
+    expect(canOpenUserEditor("admin", "student")).toBe(true);
+    expect(canOpenUserEditor("admin", "admin")).toBe(false);
   });
 
   it("keeps aggregate account actions scoped without exposing elevated accounts", () => {

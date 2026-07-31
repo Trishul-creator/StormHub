@@ -22,6 +22,18 @@ test.describe("scoped opportunity management", () => {
     skipWithoutCredentials("super_admin");
     await signIn(page, "super_admin");
 
+    // Support sessions are intentionally durable and can outlive a browser
+    // context. End any active session first so this access-gate assertion does
+    // not depend on staging state left by another authorized support check.
+    await page.goto("/admin/schools/school1#support-access");
+    const endSupportAccess = page.getByRole("button", { name: /end access now/i });
+    if (await endSupportAccess.isVisible().catch(() => false)) {
+      await endSupportAccess.click();
+      await expect(
+        page.getByRole("button", { name: /start read-only support/i })
+      ).toBeVisible({ timeout: 15_000 });
+    }
+
     await page.goto("/admin/schools/school1/opportunities");
     await expect(page).toHaveURL(/\/admin\/schools\/school1#support-access$/);
     await expect(page.getByText(/Platform Admin Mode/i)).toBeVisible();

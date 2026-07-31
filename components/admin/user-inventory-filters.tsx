@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { UserRole } from "@/types/database";
@@ -34,8 +34,9 @@ export function UserInventoryFilters({
   const [search, setSearch] = useState(initialSearch);
   const [role, setRole] = useState<UserRole | "">(initialRole ?? "");
   const [school, setSchool] = useState(initialSchool ?? "");
-  const [pending, setPending] = useState(false);
+  const [pending, startTransition] = useTransition();
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const router = useRouter();
 
   useEffect(() => () => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -60,13 +61,12 @@ export function UserInventoryFilters({
     school: string;
   }) {
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    setPending(true);
     const destination = destinationFor(next);
     if (onNavigate) {
       onNavigate(destination);
       return;
     }
-    window.location.assign(destination);
+    startTransition(() => router.replace(destination, { scroll: false }));
   }
 
   function updateSearch(nextSearch: string) {
@@ -77,7 +77,14 @@ export function UserInventoryFilters({
     }, 450);
   }
 
-  const hasFilters = Boolean(initialSearch || initialRole || (showSchool && initialSchool));
+  const hasFilters = Boolean(search || role || (showSchool && school));
+
+  function clearFilters() {
+    setSearch("");
+    setRole("");
+    setSchool("");
+    navigate({ search: "", role: "", school: "" });
+  }
 
   return (
     <div
@@ -102,14 +109,13 @@ export function UserInventoryFilters({
             value={search}
             maxLength={100}
             placeholder="Name or email"
-            disabled={pending}
             onChange={(event) => updateSearch(event.target.value)}
             onKeyDown={(event) => {
               if (event.key !== "Enter") return;
               event.preventDefault();
               navigate({ search, role, school });
             }}
-            className="h-10 w-full rounded-lg border bg-background pl-9 pr-3 text-foreground disabled:cursor-wait disabled:opacity-70"
+            className="h-10 w-full rounded-lg border bg-background pl-9 pr-3 text-foreground"
           />
         </span>
       </label>
@@ -119,13 +125,12 @@ export function UserInventoryFilters({
         <select
           name="role"
           value={role}
-          disabled={pending}
           onChange={(event) => {
             const nextRole = event.target.value as UserRole | "";
             setRole(nextRole);
             navigate({ search, role: nextRole, school });
           }}
-          className="mt-1 block h-10 w-full rounded-lg border bg-background px-3 text-foreground disabled:cursor-wait disabled:opacity-70"
+          className="mt-1 block h-10 w-full rounded-lg border bg-background px-3 text-foreground"
         >
           <option value="">All roles</option>
           {roles.map((option) => (
@@ -140,13 +145,12 @@ export function UserInventoryFilters({
           <select
             name="school"
             value={school}
-            disabled={pending}
             onChange={(event) => {
               const nextSchool = event.target.value;
               setSchool(nextSchool);
               navigate({ search, role, school: nextSchool });
             }}
-            className="mt-1 block h-10 w-full rounded-lg border bg-background px-3 text-foreground disabled:cursor-wait disabled:opacity-70"
+            className="mt-1 block h-10 w-full rounded-lg border bg-background px-3 text-foreground"
           >
             <option value="">{schoolLabel}</option>
             {schools.map((option) => (
@@ -164,11 +168,9 @@ export function UserInventoryFilters({
           />
         )}
         {hasFilters && (
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin/users">
-              <X className="h-4 w-4" aria-hidden="true" />
-              Clear
-            </Link>
+          <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+            <X className="h-4 w-4" aria-hidden="true" />
+            Clear
           </Button>
         )}
       </div>

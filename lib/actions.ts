@@ -13,6 +13,7 @@ import { friendlyAuthEmailError, friendlyError, friendlySignInError } from "@/li
 import {
   canApproveContent,
   canApproveClubContent,
+  canAccessDistrictAdmin,
   canDeleteUser,
   canEditRole,
   canArchiveClub,
@@ -48,6 +49,7 @@ import type {
 } from "@/types/database";
 import { slugify } from "@/lib/utils";
 import { DEFAULT_SCHOOL_ID, SUPPORT_EMAIL, getCurrentSchool, getSchoolById } from "@/lib/schools";
+import { getDistrictById } from "@/lib/districts";
 import {
   createAdminAttentionNotification,
   createApprovalNeededNotifications,
@@ -4368,6 +4370,360 @@ export async function supabaseResendConfirmation(email: string, captchaToken?: s
     };
   }
   return { success: true };
+}
+
+export async function updateDistrictDetails(input: {
+  districtId: string;
+  name: string;
+  slug?: string;
+  city?: string;
+  state?: string;
+  websiteUrl?: string;
+  isActive?: boolean;
+}): Promise<{
+  success: boolean;
+  district?: { id: string; name: string; slug: string; isActive: boolean };
+  error?: string;
+}> {
+  if (isDemoMode()) {
+    return { success: false, error: "District editing is unavailable in demo mode." };
+  }
+  const actor = await getCurrentProfile();
+  const supabase = await createClient();
+  const district = await getDistrictById(input.districtId.trim());
+  if (!actor || !supabase || !district || !canAccessDistrictAdmin(actor, district.id)) {
+    return { success: false, error: "Administrator access required for this district." };
+  }
+  const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
+  if (reauthentication) return reauthentication;
+
+  const canControlWorkspace = actor.role === "super_admin";
+  const name = input.name.trim();
+  if (!name) return { success: false, error: "District name is required." };
+  const { data, error } = await supabase.rpc("update_district_details", {
+    target_district_id: district.id,
+    requested_name: name,
+    requested_city: input.city?.trim() || null,
+    requested_state: input.state?.trim() || null,
+    requested_website_url: input.websiteUrl?.trim() || null,
+    requested_slug: canControlWorkspace
+      ? slugify(input.slug?.trim() || name)
+      : null,
+    requested_is_active: canControlWorkspace
+      ? input.isActive ?? district.is_active
+      : null,
+  });
+  if (error) {
+    if (error.code === "42883" || error.message.includes("does not exist")) {
+      return {
+        success: false,
+        error: "Apply the latest database migrations before editing districts.",
+      };
+    }
+    return {
+      success: false,
+      error: friendlyError(error, "Could not update this district."),
+    };
+  }
+
+  const updated = data as {
+    id?: string;
+    name?: string;
+    slug?: string;
+    isActive?: boolean;
+  } | null;
+  const nextDistrict = {
+    id: updated?.id || district.id,
+    name: updated?.name || name,
+    slug: updated?.slug || district.slug,
+    isActive: updated?.isActive ?? input.isActive ?? district.is_active,
+  };
+  revalidatePath("/admin/districts");
+  revalidatePath(`/admin/districts/${district.slug}`);
+  revalidatePath(`/admin/districts/${nextDistrict.slug}`);
+  revalidatePath("/admin/statistics");
+  return { success: true, district: nextDistrict };
+}
+
+export async function deleteEmptyDistrict(input: {
+  districtId: string;
+  confirmationName: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) {
+    return { success: false, error: "District deletion is unavailable in demo mode." };
+  }
+  const actor = await getCurrentProfile();
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  if (!actor || actor.role !== "super_admin" || !supabase || !admin) {
+    return { success: false, error: "Platform administrator access required." };
+  }
+  const districtId = input.districtId.trim();
+  const { data: district, error: districtError } = await admin
+    .from("districts")
+    .select("id,name,slug")
+    .eq("id", districtId)
+    .maybeSingle();
+  if (districtError || !district) return { success: false, error: "District not found." };
+  if (input.confirmationName.trim() !== district.name) {
+    return { success: false, error: `Type ${district.name} exactly to confirm deletion.` };
+  }
+  const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
+  if (reauthentication) return reauthentication;
+
+  const [{ count: schoolCount, error: schoolError }, {
+    count: managerCount,
+    error: managerError,
+  }] = await Promise.all([
+    admin
+      .from("schools")
+      .select("id", { head: true, count: "exact" })
+      .eq("district_id", district.id),
+    admin
+      .from("profiles")
+      .select("id", { head: true, count: "exact" })
+      .eq("district_id", district.id),
+  ]);
+  if (schoolError || managerError) {
+    return {
+      success: false,
+      error: "StormHub could not verify that this district is empty, so nothing was deleted.",
+    };
+  }
+  if ((schoolCount ?? 0) > 0 || (managerCount ?? 0) > 0) {
+    return {
+      success: false,
+      error: "This district still contains schools or assigned accounts. Move them first, or use Tenant offboarding for a populated district.",
+    };
+  }
+
+  const { data: deleted, error } = await admin
+    .from("districts")
+    .delete()
+    .eq("id", district.id)
+    .select("id")
+    .maybeSingle();
+  if (error || !deleted) {
+    return {
+      success: false,
+      error: error?.code === "23503"
+        ? "This district still has protected records. Remove those assignments or use Tenant offboarding."
+        : friendlyError(error, "Could not permanently delete this district."),
+    };
+  }
+  await admin.from("admin_audit_log").insert({
+    school_id: null,
+    actor_user_id: actor.id,
+    action: "purge_empty",
+    entity_type: "districts",
+    entity_id: district.id,
+    old_data: { name: district.name, slug: district.slug },
+    new_data: null,
+  });
+  revalidatePath("/admin/districts");
+  revalidatePath("/admin/statistics");
+  return { success: true };
+}
+
+export async function updateSchoolDetails(input: {
+  schoolId: string;
+  name: string;
+  shortName?: string;
+  slug?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  websiteUrl?: string;
+  logoUrl?: string;
+  mascot?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  isActive?: boolean;
+  isPublic?: boolean;
+}): Promise<{
+  success: boolean;
+  school?: { id: string; name: string; slug: string; isActive: boolean; isPublic: boolean };
+  error?: string;
+}> {
+  if (isDemoMode()) {
+    return { success: false, error: "School editing is unavailable in demo mode." };
+  }
+  const actor = await getCurrentProfile();
+  const supabase = await createClient();
+  const school = await getSchoolById(input.schoolId.trim());
+  if (
+    !actor
+    || !supabase
+    || !school
+    || !canAccessSchoolAdmin(actor, school.id, school.district_id)
+  ) {
+    return { success: false, error: "Administrator access required for this school." };
+  }
+  const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
+  if (reauthentication) return reauthentication;
+
+  const canControlWorkspace = actor.role === "super_admin" || actor.role === "district_admin";
+  const name = input.name.trim();
+  if (!name) return { success: false, error: "School name is required." };
+  const { data, error } = await supabase.rpc("update_school_details", {
+    target_school_id: school.id,
+    requested_name: name,
+    requested_short_name: input.shortName?.trim() || null,
+    requested_address: input.address?.trim() || null,
+    requested_city: input.city?.trim() || null,
+    requested_state: input.state?.trim() || null,
+    requested_zip: input.zip?.trim() || null,
+    requested_website_url: input.websiteUrl?.trim() || null,
+    requested_logo_url: input.logoUrl?.trim() || null,
+    requested_mascot: input.mascot?.trim() || null,
+    requested_primary_color: input.primaryColor?.trim() || null,
+    requested_secondary_color: input.secondaryColor?.trim() || null,
+    requested_slug: canControlWorkspace
+      ? slugify(input.slug?.trim() || name)
+      : null,
+    requested_is_active: canControlWorkspace
+      ? input.isActive ?? school.is_active ?? true
+      : null,
+    requested_is_public: canControlWorkspace
+      ? input.isPublic ?? school.is_public ?? true
+      : null,
+  });
+  if (error) {
+    if (error.code === "42883" || error.message.includes("does not exist")) {
+      return {
+        success: false,
+        error: "Apply the latest database migrations before editing schools.",
+      };
+    }
+    return {
+      success: false,
+      error: friendlyError(error, "Could not update this school."),
+    };
+  }
+
+  const updated = data as {
+    id?: string;
+    name?: string;
+    slug?: string;
+    isActive?: boolean;
+    isPublic?: boolean;
+  } | null;
+  const nextSchool = {
+    id: updated?.id || school.id,
+    name: updated?.name || name,
+    slug: updated?.slug || school.slug,
+    isActive: updated?.isActive ?? input.isActive ?? school.is_active ?? true,
+    isPublic: updated?.isPublic ?? input.isPublic ?? school.is_public ?? true,
+  };
+  revalidatePath(`/admin/schools/${school.slug}`);
+  revalidatePath(`/admin/schools/${nextSchool.slug}`);
+  revalidatePath(`/s/${school.slug}`);
+  revalidatePath(`/s/${nextSchool.slug}`);
+  revalidatePath("/admin/districts");
+  revalidatePath("/admin/statistics");
+  return { success: true, school: nextSchool };
+}
+
+export async function deleteEmptySchool(input: {
+  schoolId: string;
+  confirmationName: string;
+}): Promise<{ success: boolean; districtSlug?: string | null; error?: string }> {
+  if (isDemoMode()) {
+    return { success: false, error: "School deletion is unavailable in demo mode." };
+  }
+  const actor = await getCurrentProfile();
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  if (
+    !actor
+    || !["district_admin", "super_admin"].includes(actor.role)
+    || !supabase
+    || !admin
+  ) {
+    return { success: false, error: "District or platform administrator access required." };
+  }
+  const schoolId = input.schoolId.trim();
+  const { data: school, error: schoolError } = await admin
+    .from("schools")
+    .select("id,district_id,name,slug")
+    .eq("id", schoolId)
+    .maybeSingle();
+  if (
+    schoolError
+    || !school
+    || !canAccessSchoolAdmin(actor, school.id, school.district_id)
+  ) {
+    return { success: false, error: "School not found in your administrative scope." };
+  }
+  if (input.confirmationName.trim() !== school.name) {
+    return { success: false, error: `Type ${school.name} exactly to confirm deletion.` };
+  }
+  const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
+  if (reauthentication) return reauthentication;
+
+  const dependencyTables = [
+    "profiles",
+    "clubs",
+    "opportunities",
+    "events",
+    "workshops",
+    "interest_forms",
+    "approval_requests",
+    "analytics_events",
+    "feedback",
+  ];
+  const dependencyChecks = await Promise.all(
+    dependencyTables.map(async (table) => {
+      const { count, error } = await admin
+        .from(table)
+        .select("id", { head: true, count: "exact" })
+        .eq("school_id", school.id);
+      return { table, count: count ?? 0, error };
+    })
+  );
+  if (dependencyChecks.some((check) => check.error)) {
+    return {
+      success: false,
+      error: "StormHub could not verify that this school is empty, so nothing was deleted.",
+    };
+  }
+  const populated = dependencyChecks.filter((check) => check.count > 0);
+  if (populated.length > 0) {
+    return {
+      success: false,
+      error: "This school contains accounts or activity. Use Tenant offboarding so exports, retention, and deletion evidence are preserved.",
+    };
+  }
+
+  const district = school.district_id ? await getDistrictById(school.district_id) : null;
+  const { data: deleted, error } = await admin
+    .from("schools")
+    .delete()
+    .eq("id", school.id)
+    .select("id")
+    .maybeSingle();
+  if (error || !deleted) {
+    return {
+      success: false,
+      error: error?.code === "23503"
+        ? "This school still has protected records. Use Tenant offboarding for a populated school."
+        : friendlyError(error, "Could not permanently delete this school."),
+    };
+  }
+  await admin.from("admin_audit_log").insert({
+    school_id: null,
+    actor_user_id: actor.id,
+    action: "purge_empty",
+    entity_type: "schools",
+    entity_id: school.id,
+    old_data: { name: school.name, slug: school.slug, district_id: school.district_id },
+    new_data: null,
+  });
+  revalidatePath("/admin/districts");
+  revalidatePath("/admin/statistics");
+  if (district) revalidatePath(`/admin/districts/${district.slug}`);
+  return { success: true, districtSlug: district?.slug ?? null };
 }
 
 export async function updateSchoolSignupDomains(input: {

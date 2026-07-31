@@ -2,16 +2,16 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SchoolFilter } from "@/components/layout/school-filter";
 
-const push = vi.fn();
+const replace = vi.fn();
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/calendar",
-  useRouter: () => ({ push }),
+  useRouter: () => ({ replace }),
   useSearchParams: () => new URLSearchParams("q=robotics&type=meeting"),
 }));
 
 describe("SchoolFilter", () => {
-  beforeEach(() => push.mockReset());
+  beforeEach(() => replace.mockReset());
 
   it("preserves other filters when changing schools", () => {
     render(
@@ -25,7 +25,10 @@ describe("SchoolFilter", () => {
     );
 
     fireEvent.change(screen.getByLabelText("School"), { target: { value: "south" } });
-    expect(push).toHaveBeenCalledWith("/calendar?q=robotics&type=meeting&school=south");
+    expect(replace).toHaveBeenCalledWith(
+      "/calendar?q=robotics&type=meeting&school=south",
+      { scroll: false }
+    );
   });
 
   it("does not add a redundant selector when only one school is available", () => {

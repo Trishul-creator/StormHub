@@ -26,7 +26,7 @@ export default async function EmailOutboxPage() {
     <div className="container mx-auto px-4 py-8">
       <PageHeader
         title="Email delivery"
-        description="Review generic support alerts, administrator replies, and other email queued by StormHub. Raw support requests stay in their school-scoped inbox."
+        description="Review generic support alerts, administrator replies, and other email queued by StormHub. Verification and password-reset email is sent directly by Supabase Auth and does not appear here."
       >
         <Button variant="outline" asChild>
           <Link href="/admin/feedback"><ArrowLeft className="h-4 w-4" /> Support inbox</Link>
@@ -39,7 +39,7 @@ export default async function EmailOutboxPage() {
       {items.length === 0 ? (
         <EmptyState
           title="No queued email"
-          description="Generic support alerts, administrator replies, and notification email will appear here when email delivery is enabled. Requester message content remains in the scoped support inbox."
+          description="Generic support alerts, administrator replies, and notification email will appear here when delivery is enabled. Verification email is handled separately by Supabase Auth."
           actionLabel="Open support inbox"
           actionHref="/admin/feedback"
         />

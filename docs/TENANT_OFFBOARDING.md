@@ -2,7 +2,12 @@
 
 StormHub uses a recoverable, reviewed workflow for school and district deletion
 instructions. The workflow preserves an audit trail and does not expose a
-one-click physical cascade delete.
+one-click physical cascade delete for a populated tenant. A platform super
+administrator may permanently remove a provably empty setup-only district, and
+a district or platform administrator may remove a provably empty school in
+their scope, after exact-name and recent-identity confirmation. The server
+rechecks that the tenant has no accounts or activity and records the operation
+in the administrator audit log.
 
 ## Roles and separation of duties
 
@@ -16,9 +21,9 @@ one-click physical cascade delete.
   verified deletion complete.
 - A requester cannot review their own request.
 
-Use **Administration → Tenant offboarding** for every request. Do not process a
+Use **Administration → Tenant offboarding** for every populated-tenant request. Do not process a
 school or district deletion from email, chat, or an untracked support message.
-Do not directly delete a `schools` or `districts` row as a shortcut. This
+Do not directly delete a populated `schools` or `districts` row as a shortcut. This
 workflow is the supported school/district removal function and preserves the
 authorization, recovery, hold, and evidence controls required for safe removal.
 StormHub permits only one active workflow in a tenant tree: an active district

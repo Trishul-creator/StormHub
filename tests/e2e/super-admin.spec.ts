@@ -62,7 +62,7 @@ test.describe("super admin district chooser", () => {
     await expect(page.getByRole("heading", { name: "Users & Roles" })).toBeVisible();
     await expect(page.getByRole("button", { name: /apply filters/i })).toHaveCount(0);
 
-    await page.getByLabel("Role").selectOption("teacher");
+    await page.locator('select[name="role"]').selectOption("teacher");
     await expect(page).toHaveURL(/\/admin\/users\?role=teacher/, { timeout: 15_000 });
 
     const accountActions = page.getByRole("button", { name: /account actions for/i }).first();

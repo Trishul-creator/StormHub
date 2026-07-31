@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import { Building2, Plus, ShieldCheck, Users } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
+import { DistrictSettings } from "@/components/admin/organization-settings";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth";
@@ -13,62 +14,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getAllSchools } from "@/lib/schools";
 import { slugify } from "@/lib/utils";
 import type { Profile } from "@/types/database";
-import { createClient } from "@/lib/supabase/server";
 import { requireRecentAdminAuthenticationOrRedirect } from "@/lib/admin-step-up";
 
 interface DistrictPageProps {
   params: Promise<{ districtSlug: string }>;
-  searchParams: Promise<{ updated?: string; error?: string }>;
-}
-
-async function updateDistrictDetailsAction(formData: FormData) {
-  "use server";
-
-  const { profile } = await requireAdmin();
-  const districtId = String(formData.get("district_id") ?? "");
-  const currentSlug = String(formData.get("current_slug") ?? "");
-  if (!canAccessDistrictAdmin(profile, districtId)) {
-    redirect("/admin?error=district_scope_required");
-  }
-  await requireRecentAdminAuthenticationOrRedirect(
-    `/admin/districts/${currentSlug}`,
-    undefined,
-    profile.id
-  );
-
-  const supabase = await createClient();
-  if (!supabase) {
-    redirect(`/admin/districts/${currentSlug}?error=database_required`);
-  }
-
-  const canControlDistrict = profile.role === "super_admin";
-  const name = String(formData.get("name") ?? "").trim();
-  const requestedSlug = canControlDistrict
-    ? slugify(String(formData.get("slug") ?? "").trim() || name)
-    : null;
-  const { data, error } = await supabase.rpc("update_district_details", {
-    target_district_id: districtId,
-    requested_name: name,
-    requested_city: String(formData.get("city") ?? "").trim() || null,
-    requested_state: String(formData.get("state") ?? "").trim() || null,
-    requested_website_url: String(formData.get("website_url") ?? "").trim() || null,
-    requested_slug: requestedSlug,
-    requested_is_active: canControlDistrict
-      ? formData.get("is_active") === "on"
-      : null,
-  });
-  if (error) {
-    console.error("[updateDistrictDetailsAction]", error.message);
-    redirect(`/admin/districts/${currentSlug}?error=update_district_failed`);
-  }
-
-  const updated = data as { slug?: string } | null;
-  const nextSlug = updated?.slug || currentSlug;
-  revalidatePath("/admin/districts");
-  revalidatePath(`/admin/districts/${currentSlug}`);
-  revalidatePath(`/admin/districts/${nextSlug}`);
-  revalidatePath("/admin/statistics");
-  redirect(`/admin/districts/${nextSlug}?updated=district`);
 }
 
 async function createDistrictSchoolAction(formData: FormData) {
@@ -128,48 +77,6 @@ async function createDistrictSchoolAction(formData: FormData) {
   revalidatePath(`/admin/districts/${districtSlug}`);
 }
 
-async function assignDistrictAdministratorAction(formData: FormData) {
-  "use server";
-
-  const { profile } = await requireAdmin();
-  if (profile.role !== "super_admin") redirect("/admin?error=platform_admin_required");
-  const districtId = String(formData.get("district_id") ?? "");
-  const districtSlug = String(formData.get("district_slug") ?? "");
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  await requireRecentAdminAuthenticationOrRedirect(
-    `/admin/districts/${districtSlug}`,
-    undefined,
-    profile.id
-  );
-  const admin = createAdminClient();
-  const supabase = await createClient();
-  if (!admin || !supabase || !districtId || !email) {
-    redirect(`/admin/districts/${districtSlug}?error=missing_district_admin`);
-  }
-
-  const { data: target } = await admin
-    .from("profiles")
-    .select("id,role")
-    .eq("email", email)
-    .maybeSingle();
-  if (!target) redirect(`/admin/districts/${districtSlug}?error=user_not_found`);
-  if (target.id === profile.id || target.role === "super_admin") {
-    redirect(`/admin/districts/${districtSlug}?error=protected_platform_admin`);
-  }
-
-  const { error } = await supabase.rpc("assign_district_administrator", {
-    target_user_id: target.id,
-    target_district_id: districtId,
-  });
-  if (error) {
-    console.error("[assignDistrictAdministratorAction]", error.message);
-    redirect(`/admin/districts/${districtSlug}?error=assign_failed`);
-  }
-
-  revalidatePath(`/admin/districts/${districtSlug}`);
-  revalidatePath("/admin/users");
-}
-
 async function attachExistingSchoolAction(formData: FormData) {
   "use server";
 
@@ -202,10 +109,9 @@ async function attachExistingSchoolAction(formData: FormData) {
   revalidatePath("/admin/districts");
 }
 
-export default async function DistrictPage({ params, searchParams }: DistrictPageProps) {
+export default async function DistrictPage({ params }: DistrictPageProps) {
   const { profile } = await requireAdmin();
   const { districtSlug } = await params;
-  const notice = await searchParams;
   const district = await getDistrictBySlug(districtSlug);
   if (!district) notFound();
   if (!canAccessDistrictAdmin(profile, district.id)) {
@@ -217,14 +123,20 @@ export default async function DistrictPage({ params, searchParams }: DistrictPag
     ? (await getAllSchools()).filter((school) => !school.district_id)
     : [];
   const admin = createAdminClient();
-  const { data: managerRows } = admin
-    ? await admin
-        .from("profiles")
-        .select("*")
-        .eq("district_id", district.id)
-        .eq("role", "district_admin")
-        .order("full_name")
-    : { data: [] };
+  const [{ data: managerRows }, { count: assignedAccountCount }] = admin
+    ? await Promise.all([
+        admin
+          .from("profiles")
+          .select("*")
+          .eq("district_id", district.id)
+          .eq("role", "district_admin")
+          .order("full_name"),
+        admin
+          .from("profiles")
+          .select("id", { head: true, count: "exact" })
+          .eq("district_id", district.id),
+      ])
+    : [{ data: [] }, { count: 0 }];
   const managers = (managerRows as Profile[] | null) ?? [];
 
   return (
@@ -249,97 +161,18 @@ export default async function DistrictPage({ params, searchParams }: DistrictPag
               District-wide statistics
             </Link>
           </Button>
+          <Button variant="outline" asChild>
+            <Link href="/admin/users">Assign teachers &amp; roles</Link>
+          </Button>
+          <DistrictSettings
+            district={district}
+            actorRole={profile.role}
+            actorEmail={profile.email ?? ""}
+            schoolCount={schools.length}
+            assignedAccountCount={assignedAccountCount ?? 0}
+          />
         </PageHeader>
       </div>
-
-      {notice.updated === "district" && (
-        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
-          District details were updated.
-        </div>
-      )}
-      {notice.error === "update_district_failed" && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100">
-          The district could not be updated. Check the name, state, website URL, and URL name, then try again.
-        </div>
-      )}
-
-      <details className="mb-8 rounded-2xl border bg-card">
-        <summary className="cursor-pointer list-none px-5 py-4 font-semibold text-storm-navy">
-          Edit district details
-          <span className="ml-2 text-sm font-normal text-muted-foreground">
-            {profile.role === "super_admin"
-              ? "Identity, routing, and availability"
-              : "Name, location, and website"}
-          </span>
-        </summary>
-        <form action={updateDistrictDetailsAction} className="grid gap-4 border-t p-5 md:grid-cols-2">
-          <input type="hidden" name="district_id" value={district.id} />
-          <input type="hidden" name="current_slug" value={district.slug} />
-          <label className="block text-sm">
-            <span className="font-medium text-foreground">District name</span>
-            <input
-              name="name"
-              required
-              defaultValue={district.name}
-              className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground"
-            />
-          </label>
-          {profile.role === "super_admin" && (
-            <label className="block text-sm">
-              <span className="font-medium text-foreground">Workspace URL name</span>
-              <input
-                name="slug"
-                required
-                defaultValue={district.slug}
-                pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-                className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground"
-              />
-            </label>
-          )}
-          <label className="block text-sm">
-            <span className="font-medium text-foreground">City</span>
-            <input
-              name="city"
-              defaultValue={district.city ?? ""}
-              className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="font-medium text-foreground">State</span>
-            <input
-              name="state"
-              defaultValue={district.state ?? ""}
-              maxLength={50}
-              pattern="[A-Za-z][A-Za-z .-]{1,49}"
-              className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground"
-            />
-          </label>
-          <label className="block text-sm md:col-span-2">
-            <span className="font-medium text-foreground">District website</span>
-            <input
-              name="website_url"
-              type="url"
-              placeholder="https://www.example.org"
-              defaultValue={district.website_url ?? ""}
-              className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-foreground"
-            />
-          </label>
-          {profile.role === "super_admin" && (
-            <label className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm md:col-span-2">
-              <input name="is_active" type="checkbox" defaultChecked={district.is_active} />
-              <span>
-                <strong className="text-foreground">District active</strong>
-                <span className="ml-2 text-muted-foreground">
-                  Inactive districts remain in platform records but cannot be launched normally.
-                </span>
-              </span>
-            </label>
-          )}
-          <div className="md:col-span-2">
-            <Button type="submit">Save district details</Button>
-          </div>
-        </form>
-      </details>
 
       <section aria-labelledby="district-schools-title" data-tour="district-schools">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -445,18 +278,23 @@ export default async function DistrictPage({ params, searchParams }: DistrictPag
       )}
 
       <section className="mt-8 rounded-2xl border bg-card p-5" aria-labelledby="district-admins-title">
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-700 dark:text-violet-300">
-            <ShieldCheck className="h-5 w-5" />
-          </span>
-          <div>
-            <h2 id="district-admins-title" className="font-semibold text-storm-navy">
-              District administrators
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              These accounts can manage schools only inside this district.
-            </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-700 dark:text-violet-300">
+              <ShieldCheck className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 id="district-admins-title" className="font-semibold text-storm-navy">
+                District administrators
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                These accounts can manage schools only inside this district.
+              </p>
+            </div>
           </div>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/admin/users">Manage teachers &amp; roles</Link>
+          </Button>
         </div>
         <div className="mt-4 space-y-2">
           {managers.map((manager) => (
@@ -467,26 +305,18 @@ export default async function DistrictPage({ params, searchParams }: DistrictPag
             </div>
           ))}
           {managers.length === 0 && (
-            <p className="text-sm text-muted-foreground">No district administrator is assigned yet.</p>
+            <p className="text-sm text-muted-foreground">
+              No district administrator is assigned yet. Use the Role control in Users &amp; Roles
+              to assign one.
+            </p>
           )}
+          <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
+            To assign a teacher, open <strong className="text-foreground">Users &amp; Roles</strong>,
+            choose the teacher&apos;s school, set their role to Teacher / Advisor, and select the
+            published clubs they sponsor. District administrators can do this for every school in
+            their district.
+          </p>
         </div>
-        {profile.role === "super_admin" && (
-          <form action={assignDistrictAdministratorAction} className="mt-4 flex flex-col gap-3 sm:flex-row">
-            <input type="hidden" name="district_id" value={district.id} />
-            <input type="hidden" name="district_slug" value={district.slug} />
-            <label className="flex-1 text-sm">
-              <span className="sr-only">Existing account email</span>
-              <input
-                name="email"
-                type="email"
-                required
-                className="w-full rounded-md border bg-background px-3 py-2"
-                placeholder="Existing user email"
-              />
-            </label>
-            <Button type="submit">Assign district administrator</Button>
-          </form>
-        )}
       </section>
     </main>
   );

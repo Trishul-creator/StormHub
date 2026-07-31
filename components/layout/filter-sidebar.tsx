@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Filter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -18,6 +19,7 @@ interface FilterSidebarProps {
   paramName?: string;
   exclusiveParamNames?: string[];
   className?: string;
+  onSelection?: () => void;
 }
 
 export function FilterSidebar({
@@ -27,6 +29,7 @@ export function FilterSidebar({
   paramName = "filter",
   exclusiveParamNames = [],
   className,
+  onSelection,
 }: FilterSidebarProps) {
   const searchParams = useSearchParams();
   function hrefFor(value?: string) {
@@ -46,26 +49,30 @@ export function FilterSidebar({
     <div className={cn("space-y-2", className)}>
       <h2 className="font-semibold text-storm-navy text-sm">{title}</h2>
       <div className="flex flex-col gap-1">
-        <a
+        <Link
           href={hrefFor()}
+          scroll={false}
+          onClick={onSelection}
           className={cn(
             "rounded-lg px-3 py-2 text-sm transition-colors",
             !activeValue ? "bg-storm-electric/10 text-storm-electric font-medium" : "hover:bg-storm-light/50 text-muted-foreground"
           )}
         >
           All
-        </a>
+        </Link>
         {options.map((opt) => (
-          <a
+          <Link
             key={opt.value}
             href={hrefFor(opt.value)}
+            scroll={false}
+            onClick={onSelection}
             className={cn(
               "rounded-lg px-3 py-2 text-sm transition-colors",
               activeValue === opt.value ? "bg-storm-electric/10 text-storm-electric font-medium" : "hover:bg-storm-light/50 text-muted-foreground"
             )}
           >
             {opt.label}
-          </a>
+          </Link>
         ))}
       </div>
     </div>
@@ -99,6 +106,7 @@ export function MobileFilterDrawer({
               activeValue={activeValue}
               paramName={paramName}
               exclusiveParamNames={exclusiveParamNames}
+              onSelection={() => setOpen(false)}
             />
           </div>
         </div>

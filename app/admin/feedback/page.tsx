@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Building2, Clock3, Eye, Inbox, LockKeyhole } from "lucide-react";
 import { FeedbackStatusActions } from "@/components/admin/feedback-status-actions";
 import { PlatformSupportExpiryGuard } from "@/components/admin/platform-support-expiry-guard";
+import { SupportSchoolSelector } from "@/components/admin/support-school-selector";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge, StatusBadge } from "@/components/ui/badge";
@@ -272,26 +273,6 @@ function SupportScope({
   }
 
   return (
-    <form
-      action="/admin/feedback"
-      method="get"
-      className="mb-6 flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-end"
-    >
-      <label className="flex-1 text-sm font-medium text-storm-navy">
-        School inbox
-        <select
-          name="school"
-          defaultValue={selectedSchool?.slug ?? ""}
-          required
-          className="mt-1 block h-10 w-full rounded-lg border bg-background px-3 text-foreground"
-        >
-          <option value="" disabled>Choose a school</option>
-          {schools.map((school) => (
-            <option key={school.id} value={school.slug}>{school.name}</option>
-          ))}
-        </select>
-      </label>
-      <Button type="submit">Open school inbox</Button>
-    </form>
+    <SupportSchoolSelector schools={schools} activeSlug={selectedSchool?.slug} />
   );
 }
