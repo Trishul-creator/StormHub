@@ -3,21 +3,19 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { ArrowRight, Clock3, DatabaseZap, Eye, Loader2, ShieldAlert, X } from "lucide-react";
+import { ArrowRight, Clock3, DatabaseZap, Eye, Inbox, Loader2, ShieldAlert, X } from "lucide-react";
 import {
   endPlatformSupportSession,
   startPlatformSupportSession,
 } from "@/lib/actions";
+import { AdminReauthenticationDialog } from "@/components/auth/admin-reauthentication-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import type { PlatformSupportSession } from "@/lib/support-access";
-import {
-  beginAdminReauthentication,
-  needsAdminReauthentication,
-} from "@/lib/admin-step-up-shared";
+import { needsAdminReauthentication } from "@/lib/admin-step-up-shared";
 
 const MAX_BROWSER_TIMEOUT_MS = 2_147_000_000;
 
@@ -25,18 +23,22 @@ export function PlatformSupportAccess({
   schoolId,
   schoolName,
   schoolSlug,
+  actorEmail,
   initialSession,
   supportAvailable,
 }: {
   schoolId: string;
   schoolName: string;
   schoolSlug: string;
+  actorEmail: string;
   initialSession: PlatformSupportSession | null;
   supportAvailable: boolean;
 }) {
   const router = useRouter();
   const [session, setSession] = useState(initialSession);
   const [pending, startTransition] = useTransition();
+  const [reauthenticationOpen, setReauthenticationOpen] = useState(false);
+  const [retryAfterReauthentication, setRetryAfterReauthentication] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     setSession(initialSession);
@@ -60,16 +62,17 @@ export function PlatformSupportAccess({
     };
   }, [router, session]);
 
-  function start(formData: FormData) {
+  function requestReauthentication(retry: () => void) {
+    setRetryAfterReauthentication(() => retry);
+    setReauthenticationOpen(true);
+  }
+
+  function runStart(input: { reason: string; durationMinutes: number }) {
     startTransition(async () => {
-      const result = await startPlatformSupportSession({
-        schoolId,
-        reason: String(formData.get("reason") ?? ""),
-        durationMinutes: Number(formData.get("durationMinutes") ?? 30),
-      });
+      const result = await startPlatformSupportSession({ schoolId, ...input });
       if (!result.success || !result.session) {
         if (needsAdminReauthentication(result)) {
-          beginAdminReauthentication();
+          requestReauthentication(() => runStart(input));
           return;
         }
         toast({
@@ -88,12 +91,19 @@ export function PlatformSupportAccess({
     });
   }
 
+  function start(formData: FormData) {
+    runStart({
+      reason: String(formData.get("reason") ?? ""),
+      durationMinutes: Number(formData.get("durationMinutes") ?? 30),
+    });
+  }
+
   function end() {
     startTransition(async () => {
       const result = await endPlatformSupportSession(schoolId);
       if (!result.success) {
         if (needsAdminReauthentication(result)) {
-          beginAdminReauthentication();
+          requestReauthentication(end);
           return;
         }
         toast({
@@ -110,10 +120,11 @@ export function PlatformSupportAccess({
   }
 
   return (
-    <Card
-      id="support-access"
-      className={session ? "scroll-mt-24 border-amber-300 dark:border-amber-800" : "scroll-mt-24"}
-    >
+    <>
+      <Card
+        id="support-access"
+        className={session ? "scroll-mt-24 border-amber-300 dark:border-amber-800" : "scroll-mt-24"}
+      >
       <CardHeader>
         <div className="flex items-center gap-2">
           <ShieldAlert className="h-5 w-5 text-storm-electric" />
@@ -150,7 +161,12 @@ export function PlatformSupportAccess({
             </div>
             <div className="flex flex-wrap gap-2">
               <Button asChild>
-                <Link href={`/admin/schools/${schoolSlug}/support`}>
+                <Link href={`/admin/feedback?school=${encodeURIComponent(schoolSlug)}`}>
+                  Open support inbox <Inbox className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href={`/admin/schools/${schoolSlug}/support`} className="gap-2">
                   Open read-only workspace <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
@@ -199,6 +215,16 @@ export function PlatformSupportAccess({
           </form>
         )}
       </CardContent>
-    </Card>
+      </Card>
+      <AdminReauthenticationDialog
+        open={reauthenticationOpen}
+        onOpenChange={(open) => {
+          setReauthenticationOpen(open);
+          if (!open) setRetryAfterReauthentication(null);
+        }}
+        email={actorEmail}
+        onVerified={() => retryAfterReauthentication?.()}
+      />
+    </>
   );
 }

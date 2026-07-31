@@ -1,22 +1,20 @@
 import { isDemoMode, isSupabaseMode } from "@/lib/supabase/mode";
-import { createClient } from "@/lib/supabase/server";
-import { DEFAULT_SCHOOL_SLUG } from "@/lib/schools";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function SetupBanner() {
   if (!isSupabaseMode()) return null;
-  const supabase = await createClient();
-  if (!supabase) return null;
-  const { data, error } = await supabase
+  const admin = createAdminClient();
+  if (!admin) return null;
+  const { error } = await admin
     .from("schools")
-    .select("id")
-    .eq("slug", DEFAULT_SCHOOL_SLUG)
-    .maybeSingle();
-  if (!error && data) return null;
+    .select("id", { head: true, count: "exact" })
+    .limit(1);
+  if (!error) return null;
   return (
-    <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900">
+    <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
       Supabase is connected, but database tables are missing or incomplete. Apply{" "}
-      <code className="rounded bg-amber-100 px-1">supabase/schema.sql</code>,{" "}
-      <code className="rounded bg-amber-100 px-1">supabase/policies.sql</code>, and the documented patches.
+      <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/60">supabase/schema.sql</code>,{" "}
+      <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/60">supabase/policies.sql</code>, and the documented patches.
     </div>
   );
 }
@@ -24,10 +22,10 @@ export async function SetupBanner() {
 export function SetupRequiredMessage() {
   if (isDemoMode()) return null;
   return (
-    <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+    <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
       <strong>Database setup needed.</strong> Open your Supabase SQL Editor and apply{" "}
-      <code className="rounded bg-amber-100 px-1">supabase/schema.sql</code>,{" "}
-      <code className="rounded bg-amber-100 px-1">supabase/policies.sql</code>, and the documented patches.
+      <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/60">supabase/schema.sql</code>,{" "}
+      <code className="rounded bg-amber-100 px-1 dark:bg-amber-900/60">supabase/policies.sql</code>, and the documented patches.
     </div>
   );
 }

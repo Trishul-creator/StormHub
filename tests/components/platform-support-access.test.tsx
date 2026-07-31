@@ -37,6 +37,7 @@ describe("platform support access", () => {
         schoolId="school-1"
         schoolName="Example High"
         schoolSlug="example-high"
+        actorEmail="admin@example.edu"
         initialSession={null}
         supportAvailable={false}
       />
@@ -52,6 +53,7 @@ describe("platform support access", () => {
         schoolId="school-1"
         schoolName="Example High"
         schoolSlug="example-high"
+        actorEmail="admin@example.edu"
         initialSession={null}
         supportAvailable
       />
@@ -64,6 +66,7 @@ describe("platform support access", () => {
         schoolId="school-1"
         schoolName="Example High"
         schoolSlug="example-high"
+        actorEmail="admin@example.edu"
         initialSession={activeSession}
         supportAvailable
       />
