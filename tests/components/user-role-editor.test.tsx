@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { UserRoleEditor } from "@/components/admin/user-role-editor";
-import { updateUserRoleAndClubs } from "@/lib/actions";
+import {
+  assignUserToDistrictAdministrator,
+  updateUserRoleAndClubs,
+} from "@/lib/actions";
 import type { AdminUser, Club } from "@/types/database";
 
 vi.mock("next/navigation", () => ({
@@ -18,6 +21,13 @@ vi.mock("@/lib/actions", () => ({
 vi.mock("@/hooks/use-toast", () => ({
   toast: vi.fn(),
 }));
+
+beforeAll(() => {
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    configurable: true,
+    value: vi.fn(),
+  });
+});
 
 function club(overrides: Partial<Club> = {}): Club {
   return {
@@ -92,10 +102,10 @@ describe("UserRoleEditor sponsor choices", () => {
     );
 
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-    expect(screen.getByText(/manage this elevated assignment/i)).toBeVisible();
+    expect(screen.getByText(/elevated account is protected/i)).toBeVisible();
   });
 
-  it("offers account controls without role or club editing in aggregate scope", async () => {
+  it("keeps role assignment out of the account-access menu", async () => {
     render(
       <UserRoleEditor
         user={{ ...teacher, role: "student" }}
@@ -114,8 +124,39 @@ describe("UserRoleEditor sponsor choices", () => {
       { key: "Enter" }
     );
     expect(await screen.findByText("Ban account")).toBeVisible();
-    expect(screen.getByText("Assign district admin")).toBeVisible();
+    expect(screen.queryByText("Assign district admin")).not.toBeInTheDocument();
     expect(screen.getByText("Delete user")).toBeVisible();
+  });
+
+  it("assigns district administration from the same polished role control", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.mocked(assignUserToDistrictAdministrator).mockResolvedValueOnce({ success: true });
+
+    render(
+      <UserRoleEditor
+        user={{ ...teacher, role: "student" }}
+        actorId="super-admin"
+        actorRole="super_admin"
+        actorEmail="platform@example.edu"
+        clubs={[]}
+        districts={[{ id: "district-1", name: "Elkhorn Public Schools" }]}
+      />
+    );
+
+    const roleControl = screen.getByRole("combobox", { name: /role for teacher/i });
+    expect(roleControl).toHaveTextContent("Student");
+    fireEvent.keyDown(roleControl, { key: "ArrowDown" });
+    fireEvent.click(await screen.findByRole("option", { name: /district administrator/i }));
+
+    expect(screen.getByRole("combobox", { name: /district for teacher/i })).toHaveTextContent(
+      "Elkhorn Public Schools"
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(assignUserToDistrictAdministrator).toHaveBeenCalledWith({
+      targetUserId: "teacher-1",
+      districtId: "district-1",
+    });
   });
 
   it("opens identity confirmation when a sensitive role change needs step-up", async () => {
@@ -134,7 +175,7 @@ describe("UserRoleEditor sponsor choices", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Save role" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     expect(await screen.findByRole("dialog")).toBeVisible();
     expect(screen.getByText("Confirm your identity")).toBeVisible();

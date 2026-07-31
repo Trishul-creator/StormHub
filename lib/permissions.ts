@@ -42,16 +42,9 @@ export function isAdminRole(role?: string | null): boolean {
 
 export function canOpenUserEditor(
   actorRole: UserRole,
-  targetRole: UserRole,
-  hasExplicitSchoolScope: boolean
+  targetRole: UserRole
 ): boolean {
   if (targetRole === "district_admin" || targetRole === "super_admin") return false;
-  if (
-    (actorRole === "district_admin" || actorRole === "super_admin")
-    && !hasExplicitSchoolScope
-  ) {
-    return false;
-  }
   if (actorRole === "admin") return targetRole === "student" || targetRole === "teacher";
   if (actorRole === "district_admin" || actorRole === "super_admin") {
     return ["student", "teacher", "admin"].includes(targetRole);

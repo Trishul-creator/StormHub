@@ -94,8 +94,8 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
           selectedSchool
             ? `All accounts assigned to ${selectedSchool.name}, including school administrators.`
             : profile.role === "district_admin"
-              ? "All accounts assigned to your district. Filter to one school when assigning teacher sponsorships."
-              : "All platform accounts, including district and platform administrators. Elevated accounts are shown read-only."
+              ? "All accounts assigned to your district. Change school-level roles here; select one school to edit Advisor club assignments."
+              : "All platform accounts. Change school-level and district-administrator access from the same role control."
         }
       />
 
@@ -165,7 +165,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
                   ) : !canManageUserAccountFromInventory(profile.role, user.role) ? (
                     <span className="text-xs text-muted-foreground">
                       {user.role === "district_admin" || user.role === "super_admin"
-                        ? "Manage elevated access from the district workspace."
+                        ? "This elevated account is protected from school-level role changes."
                         : "A higher-level administrator must manage this account."}
                     </span>
                   ) : (
@@ -176,11 +176,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
                       actorRole={profile.role}
                       actorEmail={profile.email ?? ""}
                       districts={assignableDistricts.map(({ id, name }) => ({ id, name }))}
-                      accountActionsOnly={!canOpenUserEditor(
-                        profile.role,
-                        user.role,
-                        Boolean(selectedSchool)
-                      )}
+                      accountActionsOnly={!canOpenUserEditor(profile.role, user.role)}
                     />
                   )}
                 </td>
@@ -229,10 +225,10 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
         {demo
           ? "Demo user data is shown. Role changes are unavailable in demo mode."
           : profile.role === "district_admin"
-            ? "District administrators can ban, restore, or delete eligible accounts across their district. Choose one school to edit roles and Advisor club assignments."
+            ? "District administrators can change school-level roles and manage eligible accounts across their district. Select one school to edit Advisor club assignments."
             : profile.role === "admin"
               ? "School admins can manage student and teacher accounts in their own school."
-              : "Platform administrators can ban, restore, or delete eligible school-level accounts from this view. Choose one school to edit roles and Advisor club assignments; elevated accounts remain protected."}
+              : "Platform administrators can assign student, teacher, school administrator, or district administrator access from the Role control. Existing elevated accounts remain protected."}
       </p>
     </div>
   );

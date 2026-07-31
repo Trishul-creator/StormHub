@@ -128,48 +128,6 @@ async function createDistrictSchoolAction(formData: FormData) {
   revalidatePath(`/admin/districts/${districtSlug}`);
 }
 
-async function assignDistrictAdministratorAction(formData: FormData) {
-  "use server";
-
-  const { profile } = await requireAdmin();
-  if (profile.role !== "super_admin") redirect("/admin?error=platform_admin_required");
-  const districtId = String(formData.get("district_id") ?? "");
-  const districtSlug = String(formData.get("district_slug") ?? "");
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  await requireRecentAdminAuthenticationOrRedirect(
-    `/admin/districts/${districtSlug}`,
-    undefined,
-    profile.id
-  );
-  const admin = createAdminClient();
-  const supabase = await createClient();
-  if (!admin || !supabase || !districtId || !email) {
-    redirect(`/admin/districts/${districtSlug}?error=missing_district_admin`);
-  }
-
-  const { data: target } = await admin
-    .from("profiles")
-    .select("id,role")
-    .eq("email", email)
-    .maybeSingle();
-  if (!target) redirect(`/admin/districts/${districtSlug}?error=user_not_found`);
-  if (target.id === profile.id || target.role === "super_admin") {
-    redirect(`/admin/districts/${districtSlug}?error=protected_platform_admin`);
-  }
-
-  const { error } = await supabase.rpc("assign_district_administrator", {
-    target_user_id: target.id,
-    target_district_id: districtId,
-  });
-  if (error) {
-    console.error("[assignDistrictAdministratorAction]", error.message);
-    redirect(`/admin/districts/${districtSlug}?error=assign_failed`);
-  }
-
-  revalidatePath(`/admin/districts/${districtSlug}`);
-  revalidatePath("/admin/users");
-}
-
 async function attachExistingSchoolAction(formData: FormData) {
   "use server";
 
@@ -445,18 +403,25 @@ export default async function DistrictPage({ params, searchParams }: DistrictPag
       )}
 
       <section className="mt-8 rounded-2xl border bg-card p-5" aria-labelledby="district-admins-title">
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-700 dark:text-violet-300">
-            <ShieldCheck className="h-5 w-5" />
-          </span>
-          <div>
-            <h2 id="district-admins-title" className="font-semibold text-storm-navy">
-              District administrators
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              These accounts can manage schools only inside this district.
-            </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-700 dark:text-violet-300">
+              <ShieldCheck className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 id="district-admins-title" className="font-semibold text-storm-navy">
+                District administrators
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                These accounts can manage schools only inside this district.
+              </p>
+            </div>
           </div>
+          {profile.role === "super_admin" && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/admin/users">Manage roles</Link>
+            </Button>
+          )}
         </div>
         <div className="mt-4 space-y-2">
           {managers.map((manager) => (
@@ -467,26 +432,12 @@ export default async function DistrictPage({ params, searchParams }: DistrictPag
             </div>
           ))}
           {managers.length === 0 && (
-            <p className="text-sm text-muted-foreground">No district administrator is assigned yet.</p>
+            <p className="text-sm text-muted-foreground">
+              No district administrator is assigned yet. Use the Role control in Users &amp; Roles
+              to assign one.
+            </p>
           )}
         </div>
-        {profile.role === "super_admin" && (
-          <form action={assignDistrictAdministratorAction} className="mt-4 flex flex-col gap-3 sm:flex-row">
-            <input type="hidden" name="district_id" value={district.id} />
-            <input type="hidden" name="district_slug" value={district.slug} />
-            <label className="flex-1 text-sm">
-              <span className="sr-only">Existing account email</span>
-              <input
-                name="email"
-                type="email"
-                required
-                className="w-full rounded-md border bg-background px-3 py-2"
-                placeholder="Existing user email"
-              />
-            </label>
-            <Button type="submit">Assign district administrator</Button>
-          </form>
-        )}
       </section>
     </main>
   );
