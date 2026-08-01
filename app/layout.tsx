@@ -54,7 +54,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           schoolSlug={school?.slug}
           districtSlug={district?.slug}
         />
-        <SetupBanner />
+        <SetupBanner role={profile?.role} />
         <main id="main-content" className="min-h-[calc(100vh-4rem)]" tabIndex={-1}>{children}</main>
         <Footer />
         {profile && (

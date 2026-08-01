@@ -32,13 +32,22 @@ describe("SetupBanner", () => {
 
   it("does not claim tables are missing when the service-role schema probe succeeds", async () => {
     mocks.createAdminClient.mockReturnValue(adminClient(null));
-    const element = await SetupBanner();
+    const element = await SetupBanner({ role: "super_admin" });
     expect(element).toBeNull();
   });
 
   it("shows setup guidance only when the schema probe actually fails", async () => {
     mocks.createAdminClient.mockReturnValue(adminClient({ message: "relation schools missing" }));
-    render(await SetupBanner());
-    expect(screen.getByText(/database tables are missing or incomplete/i)).toBeVisible();
+    render(await SetupBanner({ role: "super_admin" }));
+    expect(screen.getByText(/production database check could not read/i)).toBeVisible();
+    expect(screen.getByRole("link", { name: /open system health/i })).toHaveAttribute(
+      "href",
+      "/admin/system-health"
+    );
+  });
+
+  it("does not expose platform diagnostics to school-scoped users", async () => {
+    mocks.createAdminClient.mockReturnValue(adminClient({ message: "relation schools missing" }));
+    expect(await SetupBanner({ role: "admin" })).toBeNull();
   });
 });

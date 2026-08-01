@@ -46,9 +46,23 @@ test.describe("public platform surfaces", () => {
   });
 
   test("scheduled jobs reject unauthenticated requests", async ({ request }) => {
-    for (const path of ["/api/cron/weekly-digest", "/api/cron/publish-scheduled"]) {
+    for (const path of [
+      "/api/cron/weekly-digest",
+      "/api/cron/publish-scheduled",
+      "/api/cron/data-retention",
+    ]) {
       const response = await request.get(path);
       expect(response.status()).toBe(401);
     }
+  });
+
+  test("public health reporting never exposes operational details", async ({ request }) => {
+    const response = await request.get("/api/health");
+    expect([200, 503]).toContain(response.status());
+
+    const body = await response.json();
+    expect(Object.keys(body).sort()).toEqual(["status", "timestamp"]);
+    expect(["ok", "degraded"]).toContain(body.status);
+    expect(body.checks).toBeUndefined();
   });
 });

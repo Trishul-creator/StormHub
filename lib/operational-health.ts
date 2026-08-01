@@ -29,6 +29,20 @@ export function getEmailConfigurationStatus(
   };
 }
 
+export function isEmailDeliveryReady(
+  status: ReturnType<typeof getEmailConfigurationStatus>,
+  env: Record<string, string | undefined> = process.env,
+) {
+  const isProduction = env.VERCEL_ENV === "production"
+    || (!env.VERCEL_ENV && env.NODE_ENV === "production");
+
+  if (isProduction) {
+    return status.mode === "send" && status.status === "configured";
+  }
+
+  return status.status !== "misconfigured";
+}
+
 export function getRetentionFreshness(
   run: RetentionRun | null,
   now = Date.now(),

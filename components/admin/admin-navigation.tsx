@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Activity,
   ArchiveX,
   BarChart3,
   Building2,
@@ -41,6 +42,9 @@ export function AdminNavigation({ role }: AdminNavigationProps) {
     { href: "/admin/feedback", label: "Support inbox", icon: Inbox },
     { href: "/admin/offboarding", label: "Tenant offboarding", icon: ArchiveX },
     ...sharedLinks.slice(3),
+    ...(isSuperAdmin
+      ? [{ href: "/admin/system-health", label: "System health", icon: Activity }]
+      : []),
   ];
 
   return (
