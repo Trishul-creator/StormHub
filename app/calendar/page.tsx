@@ -16,10 +16,10 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
   const { userId, isLoggedIn, profile } = await getAuthContext();
   const { schools, selectedSchool } = await getSchoolFilterContext(profile, params.school);
   const [events, opportunities, rsvpIds, memberships] = await Promise.all([
-    getCalendarEvents(userId, selectedSchool?.id),
-    getOpportunities({ schoolId: selectedSchool?.id }),
+    getCalendarEvents(userId, selectedSchool?.id, profile),
+    getOpportunities({ schoolId: selectedSchool?.id, viewer: profile }),
     getUserRsvpIds(userId),
-    getUserMemberships(userId),
+    getUserMemberships(userId, selectedSchool?.id, profile),
   ]);
 
   return (

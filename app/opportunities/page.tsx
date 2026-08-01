@@ -30,8 +30,9 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
       category: params.category,
       closingSoon: params.closing === "true",
       schoolId: selectedSchool?.id,
+      viewer: profile,
     }),
-    getOpportunityCategories(selectedSchool?.id),
+    getOpportunityCategories(selectedSchool?.id, profile),
   ]);
   const opportunities = Number.isFinite(selectedGrade)
     ? allOpportunities.filter((opportunity) => {

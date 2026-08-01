@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { isDemoMode } from "@/lib/supabase/mode";
 import type { Profile, UserRole } from "@/types/database";
@@ -97,7 +98,7 @@ export async function createProfileIfMissing(
   return created as Profile;
 }
 
-export async function getCurrentProfile(): Promise<Profile | null> {
+export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   if (isDemoMode()) {
     const userId = await getDemoUserId();
     if (!userId) return null;
@@ -130,14 +131,14 @@ export async function getCurrentProfile(): Promise<Profile | null> {
     user.email ?? "",
     user.user_metadata?.full_name as string | undefined
   );
-}
+});
 
 /** @deprecated Use getCurrentProfile */
 export async function getCurrentUser(): Promise<Profile | null> {
   return getCurrentProfile();
 }
 
-export async function getAuthContext(): Promise<AuthContext> {
+export const getAuthContext = cache(async (): Promise<AuthContext> => {
   const isDemo = isDemoMode();
   if (isDemo) {
     const userId = await getDemoUserId();
@@ -162,7 +163,7 @@ export async function getAuthContext(): Promise<AuthContext> {
     email: profile?.email ?? null,
     isDemo: false,
   };
-}
+});
 
 export async function requireAuth(redirectTo?: string): Promise<AuthContext & { userId: string; profile: Profile }> {
   const auth = await getAuthContext();
