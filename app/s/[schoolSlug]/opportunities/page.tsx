@@ -31,8 +31,9 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
       search: query.q,
       category: query.category,
       closingSoon: query.closing === "true",
+      viewer: profile,
     }),
-    getOpportunityCategories(school.id),
+    getOpportunityCategories(school.id, profile),
   ]);
   const opportunities = Number.isFinite(selectedGrade)
     ? allOpportunities.filter((opportunity) => {
