@@ -4,6 +4,7 @@ import {
   canReadDetailedHealth,
   getEmailConfigurationStatus,
   getRetentionFreshness,
+  isEmailDeliveryReady,
 } from "@/lib/operational-health";
 
 describe("operational health reporting", () => {
@@ -32,6 +33,21 @@ describe("operational health reporting", () => {
       RESEND_API_KEY: "",
       EMAIL_FROM: "",
     })).toEqual({ mode: "send", status: "misconfigured" });
+  });
+
+  it("requires real outbound email delivery in production", () => {
+    const outboxOnly = getEmailConfigurationStatus({
+      EMAIL_DELIVERY_MODE: "outbox_only",
+    });
+    const configured = getEmailConfigurationStatus({
+      EMAIL_DELIVERY_MODE: "send",
+      RESEND_API_KEY: "secret-resend-key",
+      EMAIL_FROM: "StormHub <noreply@stormhubapp.com>",
+    });
+
+    expect(isEmailDeliveryReady(outboxOnly, { VERCEL_ENV: "production" })).toBe(false);
+    expect(isEmailDeliveryReady(configured, { VERCEL_ENV: "production" })).toBe(true);
+    expect(isEmailDeliveryReady(outboxOnly, { VERCEL_ENV: "preview" })).toBe(true);
   });
 
   it("treats a completed daily retention run as fresh for 36 hours", () => {

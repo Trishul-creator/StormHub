@@ -20,6 +20,10 @@ describe("AdminNavigation", () => {
       "/admin/offboarding"
     );
     expect(screen.getByRole("link", { name: "Audit log" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "System health" })).toHaveAttribute(
+      "href",
+      "/admin/system-health"
+    );
   });
 
   it("keeps school administrators in their permitted menu", () => {
@@ -29,6 +33,7 @@ describe("AdminNavigation", () => {
     expect(screen.queryByRole("link", { name: "Districts" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Support inbox" })).toHaveAttribute("href", "/admin/feedback");
     expect(screen.getByRole("link", { name: "Tenant offboarding" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "System health" })).not.toBeInTheDocument();
   });
 
   it("gives district administrators their district workspace and scoped support inbox", () => {
@@ -37,5 +42,6 @@ describe("AdminNavigation", () => {
     expect(screen.getByRole("link", { name: "District" })).toHaveAttribute("href", "/admin/districts");
     expect(screen.getByRole("link", { name: "Support inbox" })).toHaveAttribute("href", "/admin/feedback");
     expect(screen.getByRole("link", { name: "Tenant offboarding" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "System health" })).not.toBeInTheDocument();
   });
 });
