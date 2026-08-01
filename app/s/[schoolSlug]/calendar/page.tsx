@@ -18,10 +18,10 @@ export default async function SchoolCalendarPage({ params }: SchoolCalendarPageP
   if (!school) notFound();
 
   const [events, opportunities, rsvpIds, memberships] = await Promise.all([
-    getCalendarEvents(userId, school.id),
-    getOpportunities({ schoolId: school.id }),
+    getCalendarEvents(userId, school.id, profile),
+    getOpportunities({ schoolId: school.id, viewer: profile }),
     getUserRsvpIds(userId),
-    getUserMemberships(userId),
+    getUserMemberships(userId, school.id, profile),
   ]);
 
   return (

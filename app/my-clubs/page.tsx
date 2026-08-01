@@ -11,7 +11,7 @@ export default async function MyClubsPage() {
   const { userId, profile } = await requireAuth("/my-clubs");
 
   const [memberships, school] = await Promise.all([
-    getUserMemberships(userId),
+    getUserMemberships(userId, profile.school_id, profile),
     getCurrentSchool(profile),
   ]);
 

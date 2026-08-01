@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClubCard } from "@/components/clubs/club-card";
 import { EmptyState } from "@/components/layout/empty-state";
-import { getClubs, getEvents, getOpportunities } from "@/lib/data";
+import { getClubs, getEvents, getOpportunities, getUserClubMembershipIds } from "@/lib/data";
 import { getAuthContext } from "@/lib/auth";
-import { checkMembership } from "@/lib/actions";
 import { getSchoolBySlugForViewer } from "@/lib/schools";
 import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
 import { canJoinClub, canManageClub } from "@/lib/permissions";
@@ -23,19 +22,13 @@ export default async function SchoolWorkspacePage({ params }: SchoolWorkspacePag
   const school = await getSchoolBySlugForViewer(schoolSlug, auth.profile);
   if (!school) notFound();
 
-  const [clubs, events, opportunities] = await Promise.all([
-    getClubs({ schoolId: school.id }),
-    getEvents({ schoolId: school.id, upcoming: true }),
-    getOpportunities({ schoolId: school.id }),
+  const [clubs, events, opportunities, membershipIds] = await Promise.all([
+    getClubs({ schoolId: school.id, viewer: auth.profile }),
+    getEvents({ schoolId: school.id, upcoming: true, viewer: auth.profile }),
+    getOpportunities({ schoolId: school.id, viewer: auth.profile }),
+    getUserClubMembershipIds(auth.userId),
   ]);
   const { visibleCount, spotlightClubs } = getWorkspaceClubSummary(clubs);
-  const membershipChecks = await Promise.all(
-    clubs.map(async (club) => ({
-      slug: club.slug,
-      isMember: auth.userId ? await checkMembership(club.slug, school.id) : false,
-    }))
-  );
-  const membershipMap = Object.fromEntries(membershipChecks.map((item) => [item.slug, item.isMember]));
 
   return (
     <div>
@@ -99,7 +92,7 @@ export default async function SchoolWorkspacePage({ params }: SchoolWorkspacePag
                 key={club.id}
                 club={club}
                 isLoggedIn={auth.isLoggedIn}
-                isMember={membershipMap[club.slug]}
+                isMember={membershipIds.has(club.id)}
                 canJoin={canJoinClub(auth.profile, club)}
                 canManage={canManageClub(auth.profile, club)}
               />

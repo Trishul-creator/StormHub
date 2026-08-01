@@ -3,8 +3,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { SearchBar } from "@/components/layout/search-bar";
 import { FilterSidebar, MobileFilterDrawer } from "@/components/layout/filter-sidebar";
 import { EmptyState } from "@/components/layout/empty-state";
-import { getClubs, getManageableClubs } from "@/lib/data";
-import { checkMembership } from "@/lib/actions";
+import { getClubs, getManageableClubs, getUserClubMembershipIds } from "@/lib/data";
 import { getAuthContext } from "@/lib/auth";
 import { CLUB_FILTER_GROUPS } from "@/lib/utils";
 import { getCurrentSchool } from "@/lib/schools";
@@ -25,13 +24,17 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
   const { schools, selectedSchool } = await getSchoolFilterContext(profile, params.school);
   const school = selectedSchool ?? await getCurrentSchool(profile);
   const featuredOnly = params.featured === "true" || params.filter === "featured";
-  const clubs = await getClubs({
-    search: params.q,
-    category: params.category,
-    featured: featuredOnly,
-    filterGroup: params.filter === "featured" ? undefined : params.filter,
-    schoolId: school?.id,
-  });
+  const [clubs, membershipIds] = await Promise.all([
+    getClubs({
+      search: params.q,
+      category: params.category,
+      featured: featuredOnly,
+      filterGroup: params.filter === "featured" ? undefined : params.filter,
+      schoolId: school?.id,
+      viewer: profile,
+    }),
+    getUserClubMembershipIds(userId),
+  ]);
 
   const filterOptions = CLUB_FILTER_GROUPS.map((g) => ({ label: g.label, value: g.label }));
   const featuredParams = new URLSearchParams({
@@ -50,14 +53,6 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
     filter: params.filter ?? params.featured,
     isAdmin: isAdminRole(profile?.role),
   });
-  const membershipChecks = await Promise.all(
-    clubs.map(async (club) => ({
-      slug: club.slug,
-      isMember: userId ? await checkMembership(club.slug, school?.id) : false,
-    }))
-  );
-  const membershipMap = Object.fromEntries(membershipChecks.map((m) => [m.slug, m.isMember]));
-
   return (
     <div className="container mx-auto px-4 py-8">
       {!isLoggedIn && <div className="mb-6"><PublicDemoNotice /></div>}
@@ -110,7 +105,7 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
                 <ClubCard
                   key={club.id}
                   club={club}
-                  isMember={membershipMap[club.slug]}
+                  isMember={membershipIds.has(club.id)}
                   isLoggedIn={isLoggedIn}
                   canJoin={profile?.role === "student"}
                   canManage={manageableSlugs.has(club.slug)}

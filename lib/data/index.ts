@@ -60,9 +60,10 @@ export async function getSchool(): Promise<School | null> {
   return getCurrentSchool();
 }
 
-async function shouldUseDemoContent(): Promise<boolean> {
+async function shouldUseDemoContent(viewer?: Profile | null): Promise<boolean> {
   if (isDemoMode()) return true;
-  return shouldServePublicDemoContent(await getCurrentProfile(), false);
+  const profile = viewer === undefined ? await getCurrentProfile() : viewer;
+  return shouldServePublicDemoContent(profile, false);
 }
 
 async function resolveSchoolId(explicitSchoolId?: string | null, profile?: Profile | null): Promise<string | null> {
@@ -100,8 +101,9 @@ export async function getClubs(filters?: {
   search?: string;
   filterGroup?: string;
   schoolId?: string | null;
+  viewer?: Profile | null;
 }): Promise<Club[]> {
-  if (await shouldUseDemoContent()) {
+  if (await shouldUseDemoContent(filters?.viewer)) {
     let clubs = [...demoClubs];
     if (filters?.featured) clubs = clubs.filter((c) => c.is_featured);
     if (filters?.category) clubs = clubs.filter((c) => c.category === filters.category);
@@ -131,7 +133,7 @@ export async function getClubs(filters?: {
 
   const supabase = await createClient();
   if (!supabase) return [];
-  const schoolId = await resolveSchoolId(filters?.schoolId);
+  const schoolId = await resolveSchoolId(filters?.schoolId, filters?.viewer);
   if (filters?.schoolId && !schoolId) return [];
 
   let query = supabase
@@ -255,6 +257,52 @@ export async function getUserClubMembership(
     .eq("status", "active")
     .maybeSingle();
   return data as ClubMembership | null;
+}
+
+/**
+ * Loads the viewer's active membership state for a rendered club list in one
+ * database request. Directory pages used to perform an auth, club, and
+ * membership lookup for every card, which made tab switches progressively
+ * slower as a school's catalog grew.
+ */
+export async function getUserClubMembershipIds(
+  userId: string | null,
+  clubIds?: string[]
+): Promise<Set<string>> {
+  if (!userId || clubIds?.length === 0) return new Set();
+  if (isDemoMode()) {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const raw = cookieStore.get("stormhub_demo_memberships")?.value;
+    let joinedSlugs = demoState.memberships;
+    if (raw) {
+      try {
+        joinedSlugs = new Set(JSON.parse(raw) as string[]);
+      } catch {
+        joinedSlugs = new Set();
+      }
+    }
+    return new Set(
+      demoClubs
+        .filter((club) => (!clubIds || clubIds.includes(club.id)) && joinedSlugs.has(club.slug))
+        .map((club) => club.id)
+    );
+  }
+
+  const supabase = await createClient();
+  if (!supabase) return new Set();
+  let query = supabase
+    .from("club_memberships")
+    .select("club_id")
+    .eq("user_id", userId)
+    .eq("status", "active");
+  if (clubIds) query = query.in("club_id", clubIds);
+  const { data, error } = await query;
+  if (error) {
+    console.error("[getUserClubMembershipIds]", error.message);
+    return new Set();
+  }
+  return new Set((data ?? []).map((membership) => membership.club_id as string));
 }
 
 export async function getUserMembershipBySlug(
@@ -662,8 +710,9 @@ export async function getOpportunities(filters?: {
   search?: string;
   closingSoon?: boolean;
   schoolId?: string | null;
+  viewer?: Profile | null;
 }): Promise<Opportunity[]> {
-  const profile = await getCurrentProfile();
+  const profile = filters?.viewer === undefined ? await getCurrentProfile() : filters.viewer;
   const adminView = isAdminRole(profile?.role);
   if (shouldServePublicDemoContent(profile, isDemoMode())) {
     let opps = demoOpportunities.filter(
@@ -715,12 +764,30 @@ export async function getOpportunities(filters?: {
   return (data as Opportunity[]) || [];
 }
 
-export async function getOpportunityCategories(schoolId?: string | null): Promise<string[]> {
-  if (await shouldUseDemoContent()) {
+export async function getOpportunityCategories(
+  schoolId?: string | null,
+  viewer?: Profile | null
+): Promise<string[]> {
+  if (await shouldUseDemoContent(viewer)) {
     return [...new Set(demoOpportunities.map((opportunity) => opportunity.category).filter(Boolean) as string[])].sort();
   }
-  const opportunities = await getOpportunities({ schoolId });
-  return [...new Set(opportunities.map((opportunity) => opportunity.category).filter(Boolean) as string[])].sort();
+  const supabase = await createClient();
+  if (!supabase) return [];
+  const resolvedSchoolId = await resolveSchoolId(schoolId, viewer);
+  if (schoolId && !resolvedSchoolId) return [];
+  const adminView = isAdminRole(viewer?.role);
+  let query = supabase
+    .from("opportunities")
+    .select("category")
+    .neq("category", "Volunteering");
+  if (resolvedSchoolId) query = query.eq("school_id", resolvedSchoolId);
+  if (!adminView) query = query.eq("status", "approved").eq("visibility", "public");
+  const { data, error } = await query;
+  if (error) {
+    console.error("[getOpportunityCategories]", error.message);
+    return [];
+  }
+  return [...new Set((data ?? []).map((opportunity) => opportunity.category).filter(Boolean) as string[])].sort();
 }
 
 export async function getOpportunityBySlug(slug: string): Promise<Opportunity | null> {
@@ -759,8 +826,9 @@ export async function getEvents(filters?: {
   eventType?: string;
   upcoming?: boolean;
   schoolId?: string | null;
+  viewer?: Profile | null;
 }): Promise<Event[]> {
-  if (await shouldUseDemoContent()) {
+  if (await shouldUseDemoContent(filters?.viewer)) {
     let events = attachClubToItems(
       demoEvents.filter(
         (e) => e.status === "approved" && e.visibility === "public" && String(e.event_type) !== "volunteer"
@@ -775,7 +843,7 @@ export async function getEvents(filters?: {
   }
   const supabase = await createClient();
   if (!supabase) return [];
-  const schoolId = await resolveSchoolId(filters?.schoolId);
+  const schoolId = await resolveSchoolId(filters?.schoolId, filters?.viewer);
   let query = supabase
     .from("events")
     .select("*, club:clubs(*)")
@@ -793,8 +861,12 @@ export async function getEvents(filters?: {
   return (data as Event[]) || [];
 }
 
-export async function getCalendarEvents(userId: string | null, schoolId?: string | null): Promise<Event[]> {
-  if (await shouldUseDemoContent()) {
+export async function getCalendarEvents(
+  userId: string | null,
+  schoolId?: string | null,
+  viewer?: Profile | null
+): Promise<Event[]> {
+  if (await shouldUseDemoContent(viewer)) {
     const joinedClubIds = new Set(
       demoClubs
         .filter((club) => demoState.memberships.has(club.slug))
@@ -816,7 +888,7 @@ export async function getCalendarEvents(userId: string | null, schoolId?: string
 
   const supabase = await createClient();
   if (!supabase) return [];
-  const resolvedSchoolId = await resolveSchoolId(schoolId);
+  const resolvedSchoolId = await resolveSchoolId(schoolId, viewer);
 
   const rangeStart = new Date();
   rangeStart.setFullYear(rangeStart.getFullYear() - 1);
@@ -1350,9 +1422,54 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
   };
 }
 
-export async function getUserMemberships(userId: string | null): Promise<ClubMembership[]> {
-  const dashboard = await getStudentDashboard(userId);
-  return dashboard.memberships;
+export async function getUserMemberships(
+  userId: string | null,
+  schoolId?: string | null,
+  viewer?: Profile | null
+): Promise<ClubMembership[]> {
+  if (!userId) return [];
+  if (isDemoMode()) {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const raw = cookieStore.get("stormhub_demo_memberships")?.value;
+    let joinedSlugs: string[] = [];
+    try {
+      joinedSlugs = raw ? JSON.parse(raw) as string[] : [...demoState.memberships];
+    } catch {
+      joinedSlugs = [...demoState.memberships];
+    }
+    return joinedSlugs
+      .map((slug) => {
+        const club = demoClubs.find((candidate) => candidate.slug === slug);
+        if (!club || (schoolId && club.school_id !== schoolId)) return null;
+        return {
+          id: `demo-${slug}`,
+          club_id: club.id,
+          user_id: userId,
+          status: "active" as const,
+          role: "member" as const,
+          joined_at: new Date().toISOString(),
+          club,
+        };
+      })
+      .filter(Boolean) as ClubMembership[];
+  }
+
+  const supabase = await createClient();
+  if (!supabase) return [];
+  const resolvedSchoolId = schoolId ?? await resolveSchoolId(undefined, viewer);
+  let query = supabase
+    .from("club_memberships")
+    .select("*, club:clubs!inner(*)")
+    .eq("user_id", userId)
+    .eq("status", "active");
+  if (resolvedSchoolId) query = query.eq("clubs.school_id", resolvedSchoolId);
+  const { data, error } = await query.order("joined_at", { ascending: false });
+  if (error) {
+    console.error("[getUserMemberships]", error.message);
+    return [];
+  }
+  return (data as ClubMembership[]) ?? [];
 }
 
 export async function getManageableClubs(profile: Profile, schoolId?: string | null): Promise<Club[]> {

@@ -6,8 +6,7 @@ import { SearchBar } from "@/components/layout/search-bar";
 import { FilterSidebar, MobileFilterDrawer } from "@/components/layout/filter-sidebar";
 import { EmptyState } from "@/components/layout/empty-state";
 import { Button } from "@/components/ui/button";
-import { getClubs } from "@/lib/data";
-import { checkMembership } from "@/lib/actions";
+import { getClubs, getUserClubMembershipIds } from "@/lib/data";
 import { getAuthContext } from "@/lib/auth";
 import { getSchoolBySlugForViewer } from "@/lib/schools";
 import {
@@ -30,26 +29,22 @@ export default async function SchoolClubsPage({ params, searchParams }: SchoolCl
   if (!school) notFound();
 
   const featuredOnly = query.featured === "true" || query.filter === "featured";
-  const clubs = await getClubs({
-    schoolId: school.id,
-    search: query.q,
-    featured: featuredOnly,
-    filterGroup: query.filter === "featured" ? undefined : query.filter,
-  });
+  const [clubs, membershipIds] = await Promise.all([
+    getClubs({
+      schoolId: school.id,
+      search: query.q,
+      featured: featuredOnly,
+      filterGroup: query.filter === "featured" ? undefined : query.filter,
+      viewer: auth.profile,
+    }),
+    getUserClubMembershipIds(auth.userId),
+  ]);
   const filterOptions = CLUB_FILTER_GROUPS.map((group) => ({ label: group.label, value: group.label }));
   const featuredParams = new URLSearchParams({
     ...(query.q ? { q: query.q } : {}),
     ...(!featuredOnly ? { featured: "true" } : {}),
   });
   const featuredHref = featuredParams.size ? `?${featuredParams.toString()}` : "?";
-  const membershipChecks = await Promise.all(
-    clubs.map(async (club) => ({
-      slug: club.slug,
-      isMember: auth.userId ? await checkMembership(club.slug, school.id) : false,
-    }))
-  );
-  const membershipMap = Object.fromEntries(membershipChecks.map((item) => [item.slug, item.isMember]));
-
   return (
     <div className="container mx-auto px-4 py-8">
       {!auth.isLoggedIn && <div className="mb-6"><PublicDemoNotice /></div>}
@@ -115,7 +110,7 @@ export default async function SchoolClubsPage({ params, searchParams }: SchoolCl
                 <ClubCard
                   key={club.id}
                   club={club}
-                  isMember={membershipMap[club.slug]}
+                  isMember={membershipIds.has(club.id)}
                   isLoggedIn={auth.isLoggedIn}
                   canJoin={canJoinClub(auth.profile, club)}
                   canManage={canManageClub(auth.profile, club)}
