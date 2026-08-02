@@ -12,6 +12,7 @@ import {
   canManageClubRoster,
   canManageUserAccountFromInventory,
   canAssignClubLeadership,
+  canArchiveClub,
   canGradeClubCoursework,
   canInspectClubCoursework,
   canPublishClubCoursework,
@@ -300,6 +301,15 @@ describe("club permissions", () => {
     expect(canManageClubPublication(profile("admin", { school_id: schoolA }), club({ school_id: schoolA }))).toBe(true);
     expect(canManageClubPublication(profile("admin", { school_id: schoolA }), club({ school_id: schoolB }))).toBe(false);
     expect(canManageClubPublication(profile("super_admin"), club({ school_id: schoolB }))).toBe(false);
+  });
+
+  it("reserves club archival for the club's school administrator", () => {
+    expect(canArchiveClub(profile("admin", { school_id: schoolA }), club({ school_id: schoolA }))).toBe(true);
+    expect(canArchiveClub(profile("admin", { school_id: schoolA }), club({ school_id: schoolB }))).toBe(false);
+    expect(canArchiveClub(profile("teacher"), club(), membership("sponsor"))).toBe(false);
+    expect(canArchiveClub(profile("student"), club(), membership("president"))).toBe(false);
+    expect(canArchiveClub(profile("district_admin", { school_id: null, district_id: "district-a" }), club())).toBe(false);
+    expect(canArchiveClub(profile("super_admin"), club())).toBe(false);
   });
 
   it("allows school admins to manage while keeping platform support read-only and out of student flows", () => {

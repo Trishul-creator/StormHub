@@ -21,11 +21,11 @@ interface AdminNavigationProps {
 }
 
 const sharedLinks = [
-  { href: "/admin/statistics", label: "Statistics", icon: BarChart3 },
-  { href: "/admin/users", label: "Users & roles", icon: Users },
-  { href: "/admin/content", label: "Moderation", icon: FileCheck2 },
-  { href: "/admin/deletion-requests", label: "Deletion requests", icon: UserRoundX },
-  { href: "/admin/audit", label: "Audit log", icon: History },
+  { href: "/admin/statistics", label: "Statistics", icon: BarChart3, tourId: "admin-statistics" },
+  { href: "/admin/users", label: "Users & roles", icon: Users, tourId: "admin-users" },
+  { href: "/admin/content", label: "Moderation", icon: FileCheck2, tourId: "admin-moderation" },
+  { href: "/admin/deletion-requests", label: "Deletion requests", icon: UserRoundX, tourId: "admin-deletion" },
+  { href: "/admin/audit", label: "Audit log", icon: History, tourId: "admin-audit" },
 ];
 
 export function AdminNavigation({ role }: AdminNavigationProps) {
@@ -33,17 +33,17 @@ export function AdminNavigation({ role }: AdminNavigationProps) {
   const isDistrictAdmin = role === "district_admin";
   const links: WorkspaceNavigationLink[] = [
     isSuperAdmin
-      ? { href: "/admin/districts", label: "Districts", icon: Building2 }
+      ? { href: "/admin/districts", label: "Districts", icon: Building2, tourId: "admin-districts" }
       : isDistrictAdmin
-        ? { href: "/admin/districts", label: "District", icon: Building2 }
-      : { href: "/admin", label: "Overview", icon: LayoutDashboard },
+        ? { href: "/admin/districts", label: "District", icon: Building2, tourId: "admin-districts" }
+      : { href: "/admin", label: "Overview", icon: LayoutDashboard, tourId: "admin-overview" },
     ...sharedLinks.slice(0, 2),
     sharedLinks[2],
-    { href: "/admin/feedback", label: "Support inbox", icon: Inbox },
-    { href: "/admin/offboarding", label: "Tenant offboarding", icon: ArchiveX },
+    { href: "/admin/feedback", label: "Support inbox", icon: Inbox, tourId: "admin-support" },
+    { href: "/admin/offboarding", label: "Tenant offboarding", icon: ArchiveX, tourId: "admin-offboarding" },
     ...sharedLinks.slice(3),
     ...(isSuperAdmin
-      ? [{ href: "/admin/system-health", label: "System health", icon: Activity }]
+      ? [{ href: "/admin/system-health", label: "System health", icon: Activity, tourId: "admin-system-health" }]
       : []),
   ];
 

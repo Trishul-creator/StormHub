@@ -106,4 +106,23 @@ describe("OpportunityManagement", () => {
 
     expect(screen.getAllByRole("button", { name: /delete/i })).toHaveLength(1);
   });
+
+  it("saves the exact eligible grade toggles", async () => {
+    render(<OpportunityManagement school={school} opportunities={opportunities} />);
+
+    const scienceFair = screen.getByText("Science Fair").closest("article");
+    expect(scienceFair).not.toBeNull();
+    const gradeTen = scienceFair!.querySelector<HTMLInputElement>('input[name="eligible_grades"][value="10"]');
+    expect(gradeTen).toBeChecked();
+    fireEvent.click(gradeTen!);
+    fireEvent.click(scienceFair!.querySelector<HTMLButtonElement>('button[type="submit"]')!);
+
+    await waitFor(() => {
+      expect(mocks.updateOpportunity).toHaveBeenCalledWith(expect.objectContaining({
+        id: "published-1",
+        schoolId: "school-1",
+        eligibleGrades: [9, 11, 12],
+      }));
+    });
+  });
 });

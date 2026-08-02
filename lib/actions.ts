@@ -80,6 +80,8 @@ import { safeAuthRedirectPath } from "@/lib/auth-redirect";
 import {
   canManageSchoolAccess,
   generateSchoolSignupAccessCode,
+  normalizeSchoolSignupAccessCode,
+  validateSchoolSignupAccessCode,
   verifySchoolSignupAccessCode,
 } from "@/lib/school-access";
 import {
@@ -839,7 +841,9 @@ export async function submitFeedback(data: {
   });
   if (!senderLimit.allowed) return { success: false, error: senderLimit.error };
 
+  const feedbackId = randomUUID();
   const { error: insertError } = await admin.from("feedback").insert({
+    id: feedbackId,
     school_id: supportSchoolId,
     user_id: profile?.id ?? null,
     name,
@@ -854,19 +858,32 @@ export async function submitFeedback(data: {
     markRateLimitAttemptSuccessful(senderLimit.attemptId),
   ]);
 
-  await createEmailOutboxItem({
-    recipientEmail: SUPPORT_EMAIL,
-    subject: "[StormHub Support] New request",
-    body: [
-      "A new support request is ready for authorized review.",
-      "",
-      "Sign in to StormHub to view it inside the scoped administration workspace.",
-      "Open in StormHub: /admin/feedback",
-    ].join("\n"),
-    type: "support_message",
-  });
+  await Promise.all([
+    createAdminAttentionNotification({
+      schoolId: supportSchoolId,
+      title: "New support request",
+      message: `A ${normalizedCategory.replaceAll("-", " ")} message was submitted to your school inbox.`,
+      link: "/admin/feedback",
+      importance: "important",
+      type: "system_message",
+    }),
+    createEmailOutboxItem({
+      recipientEmail: SUPPORT_EMAIL,
+      subject: "[StormHub Support] New request",
+      body: [
+        "A new support request is ready for authorized review.",
+        "",
+        "Sign in to StormHub to view it inside the scoped administration workspace.",
+        "Open in StormHub: /admin/feedback",
+      ].join("\n"),
+      type: "support_message",
+    }),
+  ]);
   revalidatePath("/admin/feedback");
-  return { success: true };
+  return {
+    success: true,
+    message: `Your support request was saved (${feedbackId.slice(0, 8).toUpperCase()}).`,
+  };
 }
 
 export async function updateFeedbackStatus(
@@ -1138,6 +1155,7 @@ export async function submitContent(data: {
   importance?: NotificationImportance;
   send_email_to_members?: boolean;
   deadline_reminder_enabled?: boolean;
+  eligible_grades?: number[];
   release_at?: string;
 }): Promise<{ success: boolean; error?: string; approved?: boolean; scheduled?: boolean }> {
   if (isDemoMode()) return { success: true, approved: false };
@@ -1319,6 +1337,10 @@ export async function submitContent(data: {
     if (data.external_url?.trim() && !externalUrl) {
       return { success: false, error: "The sign-up link must start with http:// or https://." };
     }
+    const eligibleGrades = normalizeEligibleGrades(data.eligible_grades);
+    if (!eligibleGrades) {
+      return { success: false, error: "Choose at least one eligible grade from 9 through 12." };
+    }
     table = "opportunities";
     insert = {
       school_id: opportunitySchool?.id,
@@ -1334,6 +1356,12 @@ export async function submitContent(data: {
       location: data.location?.trim() || null,
       external_url: externalUrl,
       action_label: data.action_label?.trim() || "Sign Up",
+      eligibility: eligibleGrades.length === 4
+        ? "All students in grades 9–12"
+        : `Grades ${eligibleGrades.join(", ")}`,
+      eligible_grades: eligibleGrades,
+      grade_min: Math.min(...eligibleGrades),
+      grade_max: Math.max(...eligibleGrades),
       visibility: "public",
       status: contentStatus,
       importance: data.importance ?? "normal",
@@ -1434,6 +1462,16 @@ function parseOptionalDateTime(value?: string | null): string | null | undefined
   return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
 }
 
+function normalizeEligibleGrades(grades?: number[] | null): number[] | null {
+  const requested = (grades ?? []).map(Number);
+  if (
+    requested.length === 0
+    || requested.some((grade) => !Number.isInteger(grade) || grade < 9 || grade > 12)
+  ) return null;
+  const normalized = [...new Set(requested)].sort((left, right) => left - right);
+  return normalized.length > 0 ? normalized : null;
+}
+
 type ManagedOpportunityStatus = Extract<ContentStatus, "approved" | "closed" | "archived">;
 
 async function getOpportunityManagementContext(schoolId: string): Promise<
@@ -1485,6 +1523,7 @@ export async function updateOpportunity(data: {
   eventDate?: string;
   location?: string;
   externalUrl?: string;
+  eligibleGrades?: number[];
 }): Promise<{ success: boolean; error?: string }> {
   const context = await getOpportunityManagementContext(data.schoolId);
   if ("error" in context) return { success: false, error: context.error };
@@ -1525,6 +1564,18 @@ export async function updateOpportunity(data: {
   if (data.externalUrl?.trim() && !externalUrl) {
     return { success: false, error: "The sign-up link must start with http:// or https://." };
   }
+  const eligibleGrades = data.eligibleGrades === undefined
+    ? normalizeEligibleGrades(opportunity.eligible_grades)
+      ?? normalizeEligibleGrades(
+        Array.from(
+          { length: (opportunity.grade_max ?? 12) - (opportunity.grade_min ?? 9) + 1 },
+          (_, index) => (opportunity.grade_min ?? 9) + index,
+        ),
+      )
+    : normalizeEligibleGrades(data.eligibleGrades);
+  if (!eligibleGrades) {
+    return { success: false, error: "Choose at least one eligible grade from 9 through 12." };
+  }
 
   const { error } = await context.supabase
     .from("opportunities")
@@ -1538,6 +1589,12 @@ export async function updateOpportunity(data: {
       event_date: eventDate,
       location: data.location?.trim() || null,
       external_url: externalUrl,
+      eligibility: eligibleGrades.length === 4
+        ? "All students in grades 9–12"
+        : `Grades ${eligibleGrades.join(", ")}`,
+      eligible_grades: eligibleGrades,
+      grade_min: Math.min(...eligibleGrades),
+      grade_max: Math.max(...eligibleGrades),
     })
     .eq("id", opportunity.id)
     .eq("school_id", context.school.id);
@@ -3701,7 +3758,7 @@ export async function archiveClubWorkspace(data: {
     .eq("status", "active")
     .maybeSingle();
   if (!canArchiveClub(actor, club, membership as ClubMembership | null)) {
-    return { success: false, error: "Only the club Advisor or an administrator can archive this club." };
+    return { success: false, error: "Only a school administrator can archive this club." };
   }
   if (data.confirmationName.trim() !== club.name) {
     return { success: false, error: "Enter the club name exactly to confirm archival." };
@@ -4816,6 +4873,48 @@ export async function rotateSchoolSignupAccessCode(
       return { success: false, error: "Apply the latest database migration before managing school access codes." };
     }
     return { success: false, error: friendlyError(error, "Could not rotate the school access code.") };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/schools");
+  return { success: true, accessCode, rotatedAt };
+}
+
+export async function setSchoolSignupAccessCode(input: {
+  schoolId: string;
+  accessCode: string;
+}): Promise<{ success: boolean; accessCode?: string; rotatedAt?: string; error?: string }> {
+  if (isDemoMode()) {
+    return { success: false, error: "School access codes are unavailable in demo mode." };
+  }
+  const actor = await getCurrentProfile();
+  const admin = createAdminClient();
+  const school = await getSchoolById(input.schoolId);
+  if (!actor || !admin || !school || !canManageSchoolAccess(actor, school.id, school.district_id)) {
+    return { success: false, error: "Administrator access required." };
+  }
+
+  const accessCode = normalizeSchoolSignupAccessCode(input.accessCode);
+  const validationError = validateSchoolSignupAccessCode(accessCode);
+  if (validationError) return { success: false, error: validationError };
+
+  const reauthentication = await requireRecentAdminAuthentication(undefined, actor.id);
+  if (reauthentication) return reauthentication;
+  const rotatedAt = new Date().toISOString();
+  const { error } = await admin.from("school_signup_access").upsert({
+    school_id: school.id,
+    access_code: accessCode,
+    rotated_by: actor.id,
+    rotated_at: rotatedAt,
+  }, { onConflict: "school_id" });
+  if (error) {
+    if (error.code === "42P01") {
+      return { success: false, error: "Apply the latest database migration before managing school access codes." };
+    }
+    if (error.code === "23505") {
+      return { success: false, error: "That access code is already assigned to another school." };
+    }
+    return { success: false, error: friendlyError(error, "Could not save the school access code.") };
   }
 
   revalidatePath("/admin");

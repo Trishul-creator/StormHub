@@ -363,6 +363,7 @@ export interface Opportunity {
   category?: string | null;
   tags?: string[];
   eligibility?: string | null;
+  eligible_grades?: number[] | null;
   grade_min?: number | null;
   grade_max?: number | null;
   deadline?: string | null;

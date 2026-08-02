@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   canManageSchoolAccess,
   generateSchoolSignupAccessCode,
+  normalizeSchoolSignupAccessCode,
+  validateSchoolSignupAccessCode,
 } from "@/lib/school-access";
 import type { Profile } from "@/types/database";
 
@@ -48,5 +50,14 @@ describe("school signup access", () => {
     ).toBe(false);
     expect(canManageSchoolAccess(profile("teacher", "school-a"), "school-a")).toBe(false);
     expect(canManageSchoolAccess(profile("student", "school-a"), "school-a")).toBe(false);
+  });
+
+  it("normalizes and validates custom school codes", () => {
+    expect(normalizeSchoolSignupAccessCode("  eagles 2026 ")).toBe("EAGLES-2026");
+    expect(validateSchoolSignupAccessCode("EAGLES-2026")).toBeNull();
+    expect(validateSchoolSignupAccessCode("ONLYLETTERS")).toMatch(/number/i);
+    expect(validateSchoolSignupAccessCode("12345678")).toMatch(/letter/i);
+    expect(validateSchoolSignupAccessCode("BAD--CODE1")).toMatch(/single hyphens/i);
+    expect(validateSchoolSignupAccessCode("A1")).toMatch(/8 to 32/i);
   });
 });
