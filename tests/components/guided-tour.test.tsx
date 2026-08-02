@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { GuidedTour } from "@/components/onboarding/guided-tour";
+import { buildTourSteps, GuidedTour } from "@/components/onboarding/guided-tour";
 import { GuidedTourSettings } from "@/components/settings/guided-tour-settings";
 
-const tourKey = "stormhub:tour:pilot-v2:user-1:student:initial";
+const tourKey = "stormhub:tour:pilot-v3:user-1:student:initial";
 const navigationState = vi.hoisted(() => ({ pathname: "/dashboard" }));
 
 vi.mock("next/navigation", () => ({
@@ -125,6 +125,24 @@ describe("guided walkthrough", () => {
       "href",
       "/manage?tour=1"
     );
+  });
+
+  it("builds a distinct walkthrough for every platform role", () => {
+    const titles = (role: Parameters<typeof buildTourSteps>[0]) =>
+      buildTourSteps(role, false).map((step) => step.title);
+
+    expect(titles("student")).toContain("Your club workspaces");
+    expect(titles("teacher")).toContain("Advisor-wide tools");
+    expect(titles("admin")).toContain("School administration menu");
+    expect(titles("district_admin")).toContain("District statistics");
+    expect(titles("super_admin")).toContain("Production health");
+    expect(new Set([
+      titles("student").join("|"),
+      titles("teacher").join("|"),
+      titles("admin").join("|"),
+      titles("district_admin").join("|"),
+      titles("super_admin").join("|"),
+    ]).size).toBe(5);
   });
 
   it("waits until account setup is complete before starting automatically", async () => {

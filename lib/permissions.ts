@@ -375,9 +375,10 @@ export function canManageClubCoursework(
 export function canArchiveClub(
   user: Profile | null,
   club: Club | string,
-  membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
+  _membership?: Pick<ClubMembership, "club_id" | "status" | "role"> | string | null
 ): boolean {
-  return canAssignClubLeadership(user, club, membership);
+  if (!user || user.role !== "admin" || !user.school_id) return false;
+  return typeof club !== "string" && user.school_id === club.school_id;
 }
 
 export function canCreateOpportunity(user: Profile | null): boolean {

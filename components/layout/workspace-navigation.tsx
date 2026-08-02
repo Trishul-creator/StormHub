@@ -9,6 +9,7 @@ export interface WorkspaceNavigationLink {
   href: string;
   label: string;
   icon: LucideIcon;
+  tourId?: string;
 }
 
 interface WorkspaceNavigationProps {
@@ -62,13 +63,14 @@ export function WorkspaceNavigation({
           aria-label={ariaLabel}
           className="flex min-w-0 flex-1 gap-1 overflow-x-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          {links.map(({ href, label, icon: Icon }) => {
+          {links.map(({ href, label, icon: Icon, tourId: linkTourId }) => {
             const active = isActive(href);
 
             return (
               <Link
                 key={href}
                 href={href}
+                data-tour={linkTourId}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "group flex min-w-fit items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-[background-color,color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-storm-electric focus-visible:ring-offset-2 motion-reduce:transform-none",

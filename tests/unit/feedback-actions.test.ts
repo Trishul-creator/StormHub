@@ -87,9 +87,9 @@ describe("support feedback release safeguards", () => {
       publicSchoolId: "public-school",
     });
 
-    await expect(submitFeedback(validFeedback({
-      schoolId: "public-school",
-    }))).resolves.toEqual({ success: true });
+    const result = await submitFeedback(validFeedback({ schoolId: "public-school" }));
+    expect(result).toMatchObject({ success: true });
+    expect(result.message).toMatch(/support request was saved/i);
     expect(feedbackInsert).toHaveBeenCalledWith(expect.objectContaining({
       school_id: "public-school",
       user_id: null,
@@ -107,9 +107,9 @@ describe("support feedback release safeguards", () => {
       email: "student@example.test",
     });
 
-    await expect(submitFeedback(validFeedback({
-      schoolId: "other-school",
-    }))).resolves.toEqual({ success: true });
+    const result = await submitFeedback(validFeedback({ schoolId: "other-school" }));
+    expect(result).toMatchObject({ success: true });
+    expect(result.message).toMatch(/support request was saved/i);
     expect(admin.from).not.toHaveBeenCalledWith("schools");
     expect(feedbackInsert).toHaveBeenCalledWith(expect.objectContaining({
       school_id: "assigned-school",

@@ -95,7 +95,7 @@ export function TenantOffboardingWorkflow({
       setReason("");
       toast({
         title: "Offboarding request recorded",
-        description: "No tenant data was deleted. A higher-scope administrator must review it.",
+        description: "No tenant data was deleted. Continue through the audited review steps below when authorized.",
       });
       router.refresh();
     });
@@ -166,9 +166,11 @@ export function TenantOffboardingWorkflow({
               />
             </div>
             <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-              A separate higher-scope reviewer must verify the export and evidence before marking
-              the workflow complete. Platform approval deactivates the tenant and its accounts;
-              StormHub does not perform an automatic physical purge.
+              School and district administrators require a higher-scope reviewer. Platform
+              administrators may submit and advance the workflow themselves after password
+              confirmation; every transition and evidence reference remains audited. Platform
+              approval deactivates the tenant and its accounts, but StormHub does not perform an
+              automatic physical purge.
             </div>
             <Button
               type="submit"

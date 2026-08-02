@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Copy, KeyRound, Loader2, RefreshCw } from "lucide-react";
-import { rotateSchoolSignupAccessCode } from "@/lib/actions";
+import { Check, Copy, KeyRound, Loader2, RefreshCw, Save } from "lucide-react";
+import { rotateSchoolSignupAccessCode, setSchoolSignupAccessCode } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import {
   beginAdminReauthentication,
@@ -23,6 +25,7 @@ export function SchoolAccessCodeSettings({
   initialRotatedAt?: string | null;
 }) {
   const [code, setCode] = useState(initialCode);
+  const [customCode, setCustomCode] = useState(initialCode ?? "");
   const [rotatedAt, setRotatedAt] = useState(initialRotatedAt ?? null);
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -56,10 +59,36 @@ export function SchoolAccessCodeSettings({
         return;
       }
       setCode(result.accessCode);
+      setCustomCode(result.accessCode);
       setRotatedAt(result.rotatedAt ?? new Date().toISOString());
       toast({
         title: "School access code updated",
         description: "Share the new code only with people who belong to this school.",
+      });
+    });
+  }
+
+  function saveCustomCode() {
+    startTransition(async () => {
+      const result = await setSchoolSignupAccessCode({ schoolId, accessCode: customCode });
+      if (!result.success || !result.accessCode) {
+        if (needsAdminReauthentication(result)) {
+          beginAdminReauthentication();
+          return;
+        }
+        toast({
+          title: "Could not save access code",
+          description: result.error,
+          variant: "destructive",
+        });
+        return;
+      }
+      setCode(result.accessCode);
+      setCustomCode(result.accessCode);
+      setRotatedAt(result.rotatedAt ?? new Date().toISOString());
+      toast({
+        title: "Custom access code saved",
+        description: "The previous code stopped working immediately.",
       });
     });
   }
@@ -92,6 +121,34 @@ export function SchoolAccessCodeSettings({
             The privacy-hardening migration has not created a code for this school yet.
           </div>
         )}
+        <div className="rounded-xl border bg-muted/20 p-4">
+          <Label htmlFor={`custom-access-code-${schoolId}`}>Choose a custom code</Label>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <Input
+              id={`custom-access-code-${schoolId}`}
+              value={customCode}
+              onChange={(event) => setCustomCode(event.target.value.toUpperCase())}
+              minLength={8}
+              maxLength={32}
+              autoCapitalize="characters"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="EAGLES-2026"
+              className="font-mono uppercase"
+            />
+            <Button
+              type="button"
+              onClick={saveCustomCode}
+              disabled={pending || customCode.trim().toUpperCase() === code}
+            >
+              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save custom code
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Use 8–32 letters, numbers, or hyphen-separated words, including at least one letter and number.
+          </p>
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">
             {rotatedAt
