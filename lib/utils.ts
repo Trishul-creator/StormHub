@@ -69,6 +69,21 @@ export function isOverdue(date: string | Date | null | undefined): boolean {
   return isPast(d);
 }
 
+/**
+ * An opportunity remains current through its event date. When it has no event
+ * date, its application deadline is the best available end date. Undated or
+ * malformed legacy listings stay visible so administrators can correct them.
+ */
+export function isOpportunityCurrent(
+  opportunity: { event_date?: string | null; deadline?: string | null },
+  now: Date = new Date()
+): boolean {
+  const endDate = opportunity.event_date ?? opportunity.deadline;
+  if (!endDate) return true;
+  const endTime = new Date(endDate).getTime();
+  return Number.isNaN(endTime) || endTime >= now.getTime();
+}
+
 export const OPPORTUNITY_CATEGORIES = [
   "Competition",
   "Tryout",

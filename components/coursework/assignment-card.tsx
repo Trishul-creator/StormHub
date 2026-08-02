@@ -55,7 +55,9 @@ export function AssignmentCard({
                     status === "Graded" || status === "Turned in" || status === "Complete"
                       ? "bg-emerald-100 text-emerald-800"
                       : status === "Past due"
-                        ? "bg-red-100 text-red-800"
+                        ? managerView
+                          ? "bg-storm-light/70 text-storm-blue"
+                          : "bg-red-100 text-red-800"
                         : status === "Draft" || status === "Scheduled"
                           ? "bg-amber-100 text-amber-800"
                           : "bg-storm-light/70 text-storm-blue"
