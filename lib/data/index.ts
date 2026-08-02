@@ -42,7 +42,7 @@ import type {
 } from "@/types/database";
 import { canAccessSchoolAdmin, isAdminRole } from "@/lib/permissions";
 import { shouldServePublicDemoContent } from "@/lib/public-content";
-import { CLUB_FILTER_GROUPS } from "@/lib/utils";
+import { CLUB_FILTER_GROUPS, isOpportunityCurrent } from "@/lib/utils";
 import {
   DEFAULT_SCHOOL_ID,
   getCurrentSchool,
@@ -717,6 +717,7 @@ export async function getOpportunities(filters?: {
   if (shouldServePublicDemoContent(profile, isDemoMode())) {
     let opps = demoOpportunities.filter(
       (o) =>
+        isOpportunityCurrent(o) &&
         (adminView || (o.status === "approved" && o.visibility === "public")) &&
         o.category !== "Volunteering"
     );
@@ -732,7 +733,11 @@ export async function getOpportunities(filters?: {
     }
     if (filters?.closingSoon) {
       const week = 7 * 24 * 60 * 60 * 1000;
-      opps = opps.filter((o) => o.deadline && new Date(o.deadline).getTime() - Date.now() < week);
+      opps = opps.filter((o) => {
+        if (!o.deadline) return false;
+        const timeUntilDeadline = new Date(o.deadline).getTime() - Date.now();
+        return timeUntilDeadline >= 0 && timeUntilDeadline < week;
+      });
     }
     return opps;
   }
@@ -761,7 +766,7 @@ export async function getOpportunities(filters?: {
     console.error("[getOpportunities]", error.message);
     return [];
   }
-  return (data as Opportunity[]) || [];
+  return ((data as Opportunity[]) || []).filter((opportunity) => isOpportunityCurrent(opportunity));
 }
 
 export async function getOpportunityCategories(
@@ -769,7 +774,12 @@ export async function getOpportunityCategories(
   viewer?: Profile | null
 ): Promise<string[]> {
   if (await shouldUseDemoContent(viewer)) {
-    return [...new Set(demoOpportunities.map((opportunity) => opportunity.category).filter(Boolean) as string[])].sort();
+    return [...new Set(
+      demoOpportunities
+        .filter((opportunity) => isOpportunityCurrent(opportunity))
+        .map((opportunity) => opportunity.category)
+        .filter(Boolean) as string[]
+    )].sort();
   }
   const supabase = await createClient();
   if (!supabase) return [];
@@ -778,7 +788,7 @@ export async function getOpportunityCategories(
   const adminView = isAdminRole(viewer?.role);
   let query = supabase
     .from("opportunities")
-    .select("category")
+    .select("category,event_date,deadline")
     .neq("category", "Volunteering");
   if (resolvedSchoolId) query = query.eq("school_id", resolvedSchoolId);
   if (!adminView) query = query.eq("status", "approved").eq("visibility", "public");
@@ -787,7 +797,12 @@ export async function getOpportunityCategories(
     console.error("[getOpportunityCategories]", error.message);
     return [];
   }
-  return [...new Set((data ?? []).map((opportunity) => opportunity.category).filter(Boolean) as string[])].sort();
+  return [...new Set(
+    (data ?? [])
+      .filter((opportunity) => isOpportunityCurrent(opportunity))
+      .map((opportunity) => opportunity.category)
+      .filter(Boolean) as string[]
+  )].sort();
 }
 
 export async function getOpportunityBySlug(slug: string): Promise<Opportunity | null> {
@@ -798,7 +813,11 @@ export async function getOpportunityBySlug(slug: string): Promise<Opportunity | 
     if (
       !opp ||
       opp.category === "Volunteering" ||
-      (!adminView && (opp.status !== "approved" || opp.visibility !== "public"))
+      (!adminView && (
+        opp.status !== "approved" ||
+        opp.visibility !== "public" ||
+        !isOpportunityCurrent(opp)
+      ))
     ) return null;
     return opp;
   }
@@ -819,7 +838,9 @@ export async function getOpportunityBySlug(slug: string): Promise<Opportunity | 
     console.error("[getOpportunityBySlug]", error.message);
     return null;
   }
-  return data as Opportunity | null;
+  const opportunity = data as Opportunity | null;
+  if (!adminView && opportunity && !isOpportunityCurrent(opportunity)) return null;
+  return opportunity;
 }
 
 export async function getEvents(filters?: {
@@ -1252,10 +1273,17 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
     } catch {
       bookmarkIds = demoState.bookmarks;
     }
-    const savedOpportunities = demoOpportunities.filter((o) => bookmarkIds.has(o.id));
+    const savedOpportunities = demoOpportunities.filter(
+      (o) => bookmarkIds.has(o.id) && isOpportunityCurrent(o)
+    );
     const categories = memberships.map((m) => m.club?.category).filter(Boolean);
     const recommendedOpportunities = demoOpportunities
-      .filter((o) => categories.includes(o.category ?? "") && !bookmarkIds.has(o.id))
+      .filter(
+        (o) =>
+          isOpportunityCurrent(o) &&
+          categories.includes(o.category ?? "") &&
+          !bookmarkIds.has(o.id)
+      )
       .slice(0, 4);
 
     const recentAnnouncements = demoAnnouncements
@@ -1350,7 +1378,12 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
 
   const savedOpportunities = ((bookmarks ?? []) as { opportunities: Opportunity | Opportunity[] | null }[])
     .map((b) => (Array.isArray(b.opportunities) ? b.opportunities[0] : b.opportunities))
-    .filter((opportunity): opportunity is Opportunity => !!opportunity && opportunity.school_id === schoolId);
+    .filter(
+      (opportunity): opportunity is Opportunity =>
+        !!opportunity &&
+        opportunity.school_id === schoolId &&
+        isOpportunityCurrent(opportunity)
+    );
 
   const bookmarkIds = new Set(savedOpportunities.map((o) => o.id));
 
@@ -1366,7 +1399,7 @@ export async function getStudentDashboard(userId: string | null): Promise<Studen
       .order("created_at", { ascending: false })
       .limit(8);
     recommendedOpportunities = ((recs as Opportunity[]) ?? [])
-      .filter((o) => !bookmarkIds.has(o.id))
+      .filter((o) => isOpportunityCurrent(o) && !bookmarkIds.has(o.id))
       .slice(0, 4);
   }
 
