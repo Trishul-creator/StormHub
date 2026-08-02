@@ -15,6 +15,7 @@ import { getAllSchools } from "@/lib/schools";
 import { slugify } from "@/lib/utils";
 import type { Profile } from "@/types/database";
 import { requireRecentAdminAuthenticationOrRedirect } from "@/lib/admin-step-up";
+import { DismissibleDetails } from "@/components/ui/dismissible-details";
 
 interface DistrictPageProps {
   params: Promise<{ districtSlug: string }>;
@@ -184,7 +185,7 @@ export default async function DistrictPage({ params }: DistrictPageProps) {
               New schools created here are automatically attached to {district.name}.
             </p>
           </div>
-          <details className="group relative">
+          <DismissibleDetails className="group relative">
             <summary className="inline-flex h-9 cursor-pointer list-none items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90">
               <Plus className="h-4 w-4" />
               Create school
@@ -228,7 +229,7 @@ export default async function DistrictPage({ params }: DistrictPageProps) {
               </label>
               <Button type="submit" className="w-full">Create school</Button>
             </form>
-          </details>
+          </DismissibleDetails>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

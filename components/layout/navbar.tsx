@@ -14,6 +14,7 @@ import type { Notification } from "@/types/database";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { cn } from "@/lib/cn";
 import { ThemeToggle } from "@/components/theme/theme-controls";
+import { useDismissibleLayer } from "@/hooks/use-dismissible-layer";
 
 const baseNavLinks = [
   { href: "/", label: "Home" },
@@ -48,6 +49,7 @@ export function Navbar({
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const mobileMenuRef = useDismissibleLayer<HTMLElement>(open, () => setOpen(false));
   const primaryHref = role === "super_admin"
     ? "/admin/districts"
     : role === "district_admin"
@@ -110,7 +112,7 @@ export function Navbar({
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-card/95 shadow-sm transition-shadow duration-300 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+    <header ref={mobileMenuRef} className="sticky top-0 z-50 border-b bg-card/95 shadow-sm transition-shadow duration-300 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" data-tour="brand" className="group flex items-center gap-2 font-bold text-storm-navy">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-storm-gradient shadow-sm transition-[transform,box-shadow] duration-300 group-hover:rotate-3 group-hover:scale-105 group-hover:shadow-md motion-reduce:transform-none">
@@ -183,13 +185,20 @@ export function Navbar({
           )}
         </div>
 
-        <button data-tour="mobile-menu" className="rounded-lg p-2 transition-colors hover:bg-storm-light/60 lg:hidden" onClick={() => setOpen(!open)} aria-label="Toggle menu" aria-expanded={open}>
+        <button
+          data-tour="mobile-menu"
+          className="rounded-lg p-2 transition-colors hover:bg-storm-light/60 lg:hidden"
+          onClick={() => setOpen(!open)}
+          aria-label="Toggle menu"
+          aria-expanded={open}
+          aria-controls="mobile-navigation"
+        >
           {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
       </div>
 
       {open && (
-        <div className="animate-in border-t bg-card px-4 py-4 duration-200 fade-in slide-in-from-top-2 lg:hidden">
+        <div id="mobile-navigation" className="animate-in border-t bg-card px-4 py-4 duration-200 fade-in slide-in-from-top-2 lg:hidden">
           <nav className="flex flex-col gap-3">
             {navLinks.map((link) => (
               <Link
