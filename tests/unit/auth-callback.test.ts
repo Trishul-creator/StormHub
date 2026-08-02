@@ -134,4 +134,25 @@ describe("email verification callback", () => {
     );
     expect(mocks.createProfileIfMissing).not.toHaveBeenCalled();
   });
+
+  it("labels an invalid confirmation link as an email-link error instead of a Google error", async () => {
+    const response = await GET(new Request(
+      "https://stormhubapp.com/auth/callback?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired"
+    ));
+
+    expect(response.headers.get("location")).toBe(
+      "https://stormhubapp.com/auth/sign-in?error=invalid_or_expired_link"
+    );
+    expect(exchangeCodeForSession).not.toHaveBeenCalled();
+  });
+
+  it("keeps OAuth provider failures separate from email-link failures", async () => {
+    const response = await GET(new Request(
+      "https://stormhubapp.com/auth/callback?error=access_denied&error_description=The+user+cancelled+Google+authorization"
+    ));
+
+    expect(response.headers.get("location")).toBe(
+      "https://stormhubapp.com/auth/sign-in?error=google_sign_in_failed"
+    );
+  });
 });
