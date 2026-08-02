@@ -11,8 +11,27 @@ export interface SchoolSignupAccess {
 }
 
 export function generateSchoolSignupAccessCode(): string {
-  const token = randomBytes(6).toString("hex").toUpperCase();
+  const randomToken = randomBytes(6).toString("hex").toUpperCase();
+  const token = `${randomToken.slice(0, 11)}${randomBytes(1)[0] % 10}`;
   return `SH-${token.slice(0, 4)}-${token.slice(4, 8)}-${token.slice(8, 12)}`;
+}
+
+export function normalizeSchoolSignupAccessCode(value: string): string {
+  return value.trim().replace(/\s+/g, "-").toUpperCase();
+}
+
+export function validateSchoolSignupAccessCode(value: string): string | null {
+  const code = normalizeSchoolSignupAccessCode(value);
+  if (code.length < 8 || code.length > 32) {
+    return "Use 8 to 32 characters.";
+  }
+  if (!/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(code)) {
+    return "Use only letters, numbers, and single hyphens between words.";
+  }
+  if (!/[A-Z]/.test(code) || !/[0-9]/.test(code)) {
+    return "Include at least one letter and one number.";
+  }
+  return null;
 }
 
 export function canManageSchoolAccess(

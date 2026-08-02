@@ -40,7 +40,7 @@ import type {
   FeedbackItem,
   ApprovalContentType,
 } from "@/types/database";
-import { isAdminRole } from "@/lib/permissions";
+import { canAccessSchoolAdmin, isAdminRole } from "@/lib/permissions";
 import { shouldServePublicDemoContent } from "@/lib/public-content";
 import { CLUB_FILTER_GROUPS } from "@/lib/utils";
 import {
@@ -1945,11 +1945,33 @@ export async function getClubRoster(clubId: string): Promise<ClubMembership[]> {
   }));
 }
 
-export async function getFeedbackItems(schoolId: string): Promise<FeedbackItem[]> {
+export async function getFeedbackItems(
+  schoolId: string,
+  viewer?: Profile | null,
+): Promise<FeedbackItem[]> {
   if (isDemoMode() || !schoolId) return [];
-  const supabase = await createClient();
-  if (!supabase) return [];
-  const { data, error } = await supabase
+  const actor = viewer === undefined ? await getCurrentProfile() : viewer;
+  const admin = createAdminClient();
+  if (!actor || !admin || !isAdminRole(actor.role)) return [];
+
+  const { data: school, error: schoolError } = await admin
+    .from("schools")
+    .select("id,district_id")
+    .eq("id", schoolId)
+    .maybeSingle();
+  if (
+    schoolError
+    || !school
+    || !canAccessSchoolAdmin(actor, school.id, school.district_id)
+  ) {
+    if (schoolError) console.error("[getFeedbackItems school]", schoolError.message);
+    return [];
+  }
+
+  // Feedback is intentionally submitted for administrative review. Use the
+  // server-only client after enforcing the viewer's exact tenant scope so a
+  // profile join or private-data support gate cannot hide a successfully stored ticket.
+  const { data, error } = await admin
     .from("feedback")
     .select("*, profile:profiles(id,full_name,email,role), school:schools(id,name,slug)")
     .eq("school_id", schoolId)

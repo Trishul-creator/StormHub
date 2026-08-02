@@ -39,7 +39,10 @@ export function ContactForm({
     });
     setLoading(false);
     if (result.success) {
-      toast({ title: "Message sent!", description: "Thank you for your feedback." });
+      toast({
+        title: "Message saved in the support inbox",
+        description: result.message ?? "An administrator can now review it.",
+      });
       formElement.reset();
       setCaptchaToken(null);
     } else {

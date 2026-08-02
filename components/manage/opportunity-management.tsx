@@ -119,6 +119,7 @@ export function OpportunityManagement({
       eventDate: String(form.get("event_date") ?? ""),
       location: String(form.get("location") ?? ""),
       externalUrl: String(form.get("external_url") ?? ""),
+      eligibleGrades: form.getAll("eligible_grades").map(Number),
     });
     setBusyId(null);
     if (!result.success) {
@@ -215,6 +216,7 @@ export function OpportunityManagement({
                         {opportunity.event_date
                           ? ` · Takes place ${formatDateTime(opportunity.event_date)}`
                           : ""}
+                        {` · ${opportunity.eligibility || "All grades"}`}
                       </p>
                     </div>
 
@@ -292,6 +294,32 @@ export function OpportunityManagement({
                         <Label htmlFor={`action-${opportunity.id}`}>Button label</Label>
                         <Input id={`action-${opportunity.id}`} name="action_label" defaultValue={opportunity.action_label ?? "Sign Up"} required className="mt-1" />
                       </div>
+                      <fieldset className="rounded-xl border bg-muted/20 p-4 md:col-span-2">
+                        <legend className="px-1 text-sm font-medium text-storm-navy">Eligible grades</legend>
+                        <p className="mb-3 text-xs text-muted-foreground">Toggle every grade that may participate.</p>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                          {[9, 10, 11, 12].map((grade) => {
+                            const selectedGrades = opportunity.eligible_grades?.length
+                              ? opportunity.eligible_grades
+                              : Array.from(
+                                  { length: (opportunity.grade_max ?? 12) - (opportunity.grade_min ?? 9) + 1 },
+                                  (_, index) => (opportunity.grade_min ?? 9) + index,
+                                );
+                            return (
+                              <label key={grade} className="flex cursor-pointer items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-medium text-foreground hover:border-storm-electric/40">
+                                <input
+                                  type="checkbox"
+                                  name="eligible_grades"
+                                  value={grade}
+                                  defaultChecked={selectedGrades.includes(grade)}
+                                  className="h-4 w-4 accent-storm-electric"
+                                />
+                                Grade {grade}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </fieldset>
                       <div>
                         <Label htmlFor={`deadline-${opportunity.id}`}>Deadline</Label>
                         <Input id={`deadline-${opportunity.id}`} name="deadline" type="datetime-local" defaultValue={datetimeLocalValue(opportunity.deadline)} className="mt-1" />

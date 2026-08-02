@@ -79,7 +79,10 @@ function allowedTransitions(
   actorUserId: string,
   request: RequestRow
 ): ReviewStatus[] {
-  if (request.requested_by === actorUserId || terminalStatuses.includes(request.status)) return [];
+  if (
+    terminalStatuses.includes(request.status)
+    || (request.requested_by === actorUserId && role !== "super_admin")
+  ) return [];
 
   if (role === "super_admin") {
     if (request.status === "requested") return ["under_review", "rejected"];

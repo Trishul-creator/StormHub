@@ -45,6 +45,7 @@ export function ContentForm({ type, clubSlug, schoolId, canPublish = true, class
       event_date: String(form.get("event_date") ?? "") || undefined,
       external_url: String(form.get("external_url") ?? "") || undefined,
       action_label: String(form.get("action_label") ?? "") || undefined,
+      eligible_grades: form.getAll("eligible_grades").map(Number),
       resource_url: String(form.get("resource_url") ?? "") || undefined,
       resource_label: String(form.get("resource_label") ?? "") || undefined,
       importance,
@@ -172,6 +173,26 @@ export function ContentForm({ type, clubSlug, schoolId, canPublish = true, class
               />
             </div>
           </div>
+          <fieldset className="rounded-xl border bg-storm-light/20 p-4">
+            <legend className="px-1 text-sm font-medium text-storm-navy">Eligible grades</legend>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Toggle every grade that may participate. At least one grade is required.
+            </p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[9, 10, 11, 12].map((grade) => (
+                <label key={grade} className="flex cursor-pointer items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-medium text-foreground hover:border-storm-electric/40">
+                  <input
+                    type="checkbox"
+                    name="eligible_grades"
+                    value={grade}
+                    defaultChecked
+                    className="h-4 w-4 accent-storm-electric"
+                  />
+                  Grade {grade}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="deadline">Sign-up deadline</Label>

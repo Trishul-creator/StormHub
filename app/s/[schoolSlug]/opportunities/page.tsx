@@ -36,7 +36,10 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
     getOpportunityCategories(school.id, profile),
   ]);
   const opportunities = Number.isFinite(selectedGrade)
-    ? allOpportunities.filter((opportunity) => {
+      ? allOpportunities.filter((opportunity) => {
+        if (opportunity.eligible_grades?.length) {
+          return opportunity.eligible_grades.includes(selectedGrade!);
+        }
         const min = opportunity.grade_min ?? 9;
         const max = opportunity.grade_max ?? 12;
         return selectedGrade! >= min && selectedGrade! <= max;

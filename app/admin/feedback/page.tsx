@@ -51,7 +51,7 @@ export default async function SupportInboxPage({ searchParams }: SupportInboxPag
   // scoped ticket does not expose private coursework, attendance, or rosters and
   // therefore must not depend on a temporary private-data support session.
   const items = selectedSchool
-    ? await getFeedbackItems(selectedSchool.id)
+    ? await getFeedbackItems(selectedSchool.id, profile)
     : [];
   const visibleItems = selectedStatus
     ? items.filter((item) => item.status === selectedStatus)

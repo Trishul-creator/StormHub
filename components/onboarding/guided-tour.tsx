@@ -33,7 +33,7 @@ interface TargetBox {
   height: number;
 }
 
-const TOUR_VERSION = "pilot-v2";
+const TOUR_VERSION = "pilot-v3";
 
 function navigationStep(
   selector: string,
@@ -72,128 +72,16 @@ function isRoleHomePath(pathname: string, role: UserRole): boolean {
   return pathname === "/dashboard";
 }
 
-function buildTourSteps(role: UserRole, canManage: boolean): TourStep[] {
-  const primaryTitle =
-    role === "super_admin"
-      ? "Platform administration"
-      : role === "district_admin"
-        ? "District administration"
-      : role === "student"
-        ? "Your dashboard"
-        : "Your management home";
-  const primaryDescription =
-    role === "super_admin"
-      ? "This is your platform district chooser. Open a district, then select a school before working with school-scoped data."
-      : role === "district_admin"
-        ? "This workspace shows only your district. Open a school for its users, settings, and school-level statistics."
-      : role === "admin"
-        ? "Management is your school operations home for approvals, assigned clubs, and administrative work."
-        : role === "teacher"
-          ? "Management is your command center for assigned clubs, coursework, rosters, and approvals."
-          : "Your dashboard gathers your joined clubs, classwork, events, and saved opportunities.";
+function welcomeStep(roleLabel: string): TourStep {
+  return {
+    selector: '[data-tour="brand"]',
+    title: "Welcome to StormHub",
+    description: `This ${roleLabel} walkthrough uses the real navigation. The StormHub logo always returns to the public home page.`,
+  };
+}
 
-  const openingSteps: TourStep[] = [
-    {
-      selector: '[data-tour="brand"]',
-      title: "Welcome to StormHub",
-      description: "This walkthrough takes you through the real navigation. The StormHub logo always returns to the public home page.",
-    },
-    {
-      selector: '[data-tour="role-overview"]',
-      title: primaryTitle,
-      description: primaryDescription,
-    },
-    {
-      selector: '[data-tour="dashboard-priorities"]',
-      title: "Start with what needs attention",
-      description:
-        role === "student"
-          ? "This short queue combines your closest assignment, opportunity, and event deadlines. It never shows more than four items."
-          : role === "super_admin" || role === "district_admin"
-            ? "District and school cards keep organizational setup one click away."
-            : role === "teacher"
-              ? "This short queue combines submissions to grade, approaching coursework, and club events."
-              : "This short queue combines pending approvals and upcoming school activity.",
-      optional: true,
-    },
-    {
-      selector: '[data-tour="dashboard-summary"]',
-      title: "Use the quick summary",
-      description: "These three numbers are shortcuts. Click one whenever you want the complete view behind it.",
-      optional: true,
-    },
-    {
-      selector: '[data-tour="role-checklist"]',
-      title: "Open setup only when needed",
-      description: "The optional checklist is collapsed to keep your dashboard focused. Expand it whenever you want setup guidance.",
-      optional: true,
-    },
-    ...(role === "student"
-      ? [
-          {
-            selector: '[data-tour="student-clubs"]',
-            title: "Your club workspaces",
-            description: "Joined clubs appear here. Open one to reach its stream, assignments, people, events, and resources.",
-            optional: true,
-          },
-          ...(canManage
-            ? [
-                {
-                  selector: '[data-tour="leadership-overview"]',
-                  title: "Your leadership shortcut",
-                  description: "Presidents and Vice Presidents can jump from the student dashboard into the clubs they help manage.",
-                  optional: true,
-                },
-              ]
-            : []),
-        ]
-      : role === "super_admin"
-        ? [
-            {
-              selector: '[data-tour="district-workspaces"]',
-              title: "Choose a district workspace",
-              description: "Platform administrators open a district before selecting one of its school workspaces.",
-            },
-          ]
-        : role === "district_admin"
-          ? [
-              {
-                selector: '[data-tour="district-schools"]',
-                title: "Choose a school in your district",
-                description: "Every school here is inside your assigned district. Open one for scoped settings, users, previews, and statistics.",
-              },
-            ]
-        : [
-            {
-              selector: '[data-tour="managed-clubs"]',
-              title: "Open a managed club",
-              description: "Each assigned club has one workspace for posts, coursework, people, events, resources, attendance, and settings.",
-              optional: true,
-            },
-            {
-              selector: '[data-tour="management-tools"]',
-              title: "Management tools",
-              description: "This secondary menu contains focused workflows such as approvals and the school digest. Club-specific tools stay inside each club workspace.",
-              optional: true,
-            },
-          ]),
-  ];
-
-  if (role === "super_admin" || role === "district_admin") {
-    return [
-      ...openingSteps,
-      {
-        selector: '[data-tour="admin-tools"]',
-        title: role === "super_admin" ? "Platform administration menu" : "District administration menu",
-        description: role === "super_admin"
-          ? "Use this menu for districts, statistics, users and roles, moderation, support, deletion requests, and the audit log."
-          : "Use this menu for your district, scoped statistics, school-level users and roles, deletion requests, and the audit log.",
-      },
-      ...accountSteps(role),
-    ];
-  }
-
-  const directorySteps: TourStep[] = [
+function directorySteps(role: "student" | "teacher" | "admin", primaryTitle: string): TourStep[] {
+  return [
     mobileMenuStep("Open the main menu"),
     navigationStep(
       '[data-tour="clubs-nav"]',
@@ -228,7 +116,9 @@ function buildTourSteps(role: UserRole, canManage: boolean): TourStep[] {
     {
       selector: '[data-tour="club-detail-action"]',
       title: "Use the role-appropriate action",
-      description: "Students can request to join or open joined clubs. Teachers and administrators see only the actions allowed by their role.",
+      description: role === "student"
+        ? "Request to join a club, or open the member workspace after approval."
+        : "Review the public club profile without student join controls.",
       optional: true,
     },
     mobileMenuStep("Open the main menu again"),
@@ -289,51 +179,281 @@ function buildTourSteps(role: UserRole, canManage: boolean): TourStep[] {
       `Open ${primaryTitle}`
     ),
   ];
+}
 
-  const leadershipSteps: TourStep[] =
-    canManage && role === "student"
-      ? [
-          mobileMenuStep("Open leadership navigation"),
-          {
-            selector: '[data-tour="manage-nav"]',
-            title: "Open your leadership workspace",
-            description: "Presidents and Vice Presidents use Manage for the club tools permitted to their role.",
-            interaction: "click",
-            interactionLabel: "Open Manage",
-          },
-          {
-            selector: '[data-tour="managed-clubs"]',
-            title: "Choose the club you lead",
-            description: "Open a managed club to create or draft content, review work, maintain the roster, or manage events according to your club role.",
-          },
-        ]
-      : [];
-
-  const administrationSteps: TourStep[] =
-    role === "admin"
-      ? [
-          mobileMenuStep("Open administration navigation"),
-          navigationStep(
-            '[data-tour="administration-nav"]',
-            "Open school administration",
-            "Administration is separate from day-to-day club management and remains restricted to your assigned school.",
-            "Open Administration"
-          ),
-          {
-            selector: '[data-tour="admin-tools"]',
-            title: "Use the administration menu",
-            description: "This menu keeps statistics, users and roles, moderation, deletion requests, and audit history together.",
-          },
-        ]
-      : [];
-
+function studentTourSteps(canManage: boolean): TourStep[] {
   return [
-    ...openingSteps,
-    ...directorySteps,
-    ...leadershipSteps,
-    ...administrationSteps,
-    ...accountSteps(role),
+    welcomeStep("student"),
+    {
+      selector: '[data-tour="role-overview"]',
+      title: "Your dashboard",
+      description: "Your dashboard gathers joined clubs, classwork, events, and saved opportunities without crowding the page.",
+    },
+    {
+      selector: '[data-tour="dashboard-priorities"]',
+      title: "Start with what needs attention",
+      description: "This short queue combines your closest assignment, opportunity, and event deadlines. It never shows more than four items.",
+      optional: true,
+    },
+    {
+      selector: '[data-tour="dashboard-summary"]',
+      title: "Use the quick summary",
+      description: "These numbers link to the complete club, event, and opportunity views behind them.",
+      optional: true,
+    },
+    {
+      selector: '[data-tour="role-checklist"]',
+      title: "Open setup only when needed",
+      description: "The optional checklist stays collapsed after setup so the dashboard remains focused.",
+      optional: true,
+    },
+    {
+      selector: '[data-tour="student-clubs"]',
+      title: "Your club workspaces",
+      description: "Open a joined club for its stream, assignments, people, events, and resources.",
+      optional: true,
+    },
+    ...(canManage ? [
+      {
+        selector: '[data-tour="leadership-overview"]',
+        title: "Your leadership shortcut",
+        description: "Presidents and Vice Presidents can jump into the clubs they help manage.",
+        optional: true,
+      },
+    ] : []),
+    ...directorySteps("student", "your dashboard"),
+    ...(canManage ? [
+      mobileMenuStep("Open leadership navigation"),
+      navigationStep(
+        '[data-tour="manage-nav"]',
+        "Open your leadership workspace",
+        "Presidents and Vice Presidents use Manage for the tools granted by their club role.",
+        "Open Manage",
+      ),
+      {
+        selector: '[data-tour="managed-clubs"]',
+        title: "Choose the club you lead",
+        description: "Open a club to draft content, track work, maintain the roster, or coordinate events according to your role.",
+      },
+    ] : []),
+    ...accountSteps("student"),
   ];
+}
+
+function teacherTourSteps(): TourStep[] {
+  return [
+    welcomeStep("Advisor"),
+    {
+      selector: '[data-tour="role-overview"]',
+      title: "Your management home",
+      description: "Your assigned clubs, grading work, deadlines, and approvals begin here.",
+    },
+    {
+      selector: '[data-tour="dashboard-priorities"]',
+      title: "Review urgent club work",
+      description: "See submissions to grade, approaching coursework, and club events before opening a full workspace.",
+      optional: true,
+    },
+    {
+      selector: '[data-tour="dashboard-summary"]',
+      title: "Scan your workload",
+      description: "Use these shortcuts to open the complete view behind each count.",
+      optional: true,
+    },
+    {
+      selector: '[data-tour="role-checklist"]',
+      title: "Advisor setup guide",
+      description: "Expand this only when you need help finishing your Advisor setup.",
+      optional: true,
+    },
+    {
+      selector: '[data-tour="managed-clubs"]',
+      title: "Open a sponsored club",
+      description: "Each club has one workspace for posts, coursework, grading, people, events, resources, and attendance. School admins—not Advisors—archive clubs.",
+      optional: true,
+    },
+    {
+      selector: '[data-tour="management-tools"]',
+      title: "Advisor-wide tools",
+      description: "Use this menu for cross-club approvals and digest work; club-specific tasks stay inside the club.",
+      optional: true,
+    },
+    ...directorySteps("teacher", "your management home"),
+    ...accountSteps("teacher"),
+  ];
+}
+
+function adminTourSteps(): TourStep[] {
+  return [
+    welcomeStep("school administrator"),
+    {
+      selector: '[data-tour="role-overview"]',
+      title: "School operations",
+      description: "Begin with approvals, assigned clubs, school activity, and issues that need administrator attention.",
+    },
+    {
+      selector: '[data-tour="dashboard-priorities"]',
+      title: "Handle the priority queue",
+      description: "Pending approvals and near-term school activity are limited to the most important items.",
+      optional: true,
+    },
+    {
+      selector: '[data-tour="dashboard-summary"]',
+      title: "Open complete school views",
+      description: "The summary stays compact; each number is a shortcut to the full workflow.",
+      optional: true,
+    },
+    {
+      selector: '[data-tour="managed-clubs"]',
+      title: "Manage school clubs",
+      description: "Open a club workspace for content, assignments, people, attendance, settings, or administrator-only archival.",
+      optional: true,
+    },
+    {
+      selector: '[data-tour="management-tools"]',
+      title: "Use school management tools",
+      description: "Approvals and school-wide opportunity management live here; individual club tools stay in their club.",
+      optional: true,
+    },
+    ...directorySteps("admin", "school operations"),
+    mobileMenuStep("Open administration navigation"),
+    navigationStep(
+      '[data-tour="administration-nav"]',
+      "Open school administration",
+      "Administration contains tenant-level settings and remains restricted to your school.",
+      "Open Administration",
+    ),
+    {
+      selector: '[data-tour="admin-tools"]',
+      title: "School administration menu",
+      description: "Statistics, users, moderation, support, offboarding, deletion requests, and the audit log remain together here.",
+    },
+    {
+      selector: '[data-tour="admin-users"]',
+      title: "Users and roles",
+      description: "Assign teacher or student roles, manage account status, and keep every action inside your school.",
+    },
+    {
+      selector: '[data-tour="admin-moderation"]',
+      title: "Moderation and approvals",
+      description: "Review pending school content from one approval queue.",
+    },
+    {
+      selector: '[data-tour="admin-support"]',
+      title: "Support inbox",
+      description: "Contact-form messages submitted to your school appear here without a private-data support session.",
+    },
+    ...accountSteps("admin"),
+  ];
+}
+
+function districtAdminTourSteps(): TourStep[] {
+  return [
+    welcomeStep("district administrator"),
+    {
+      selector: '[data-tour="role-overview"]',
+      title: "Your district workspace",
+      description: "Every school and statistic remains limited to your assigned district.",
+    },
+    {
+      selector: '[data-tour="district-schools"]',
+      title: "Open a school workspace",
+      description: "Choose a school for its settings, users, opportunities, previews, and school-level statistics.",
+    },
+    {
+      selector: '[data-tour="admin-tools"]',
+      title: "District administration menu",
+      description: "Move between district structure, scoped statistics, users, moderation, support, offboarding, and audit history.",
+    },
+    {
+      selector: '[data-tour="admin-statistics"]',
+      title: "District statistics",
+      description: "Compare adoption and club activity across schools without leaving your district scope.",
+    },
+    {
+      selector: '[data-tour="admin-users"]',
+      title: "District user management",
+      description: "Choose a school, then assign its teachers and school administrators with confirmation for important changes.",
+    },
+    {
+      selector: '[data-tour="admin-support"]',
+      title: "School-routed support",
+      description: "Choose a school to read its submitted support tickets; private student data remains separately protected.",
+    },
+    {
+      selector: '[data-tour="admin-offboarding"]',
+      title: "Protected offboarding",
+      description: "Submit school or district instructions and prepare exports; final approval remains a platform authority action.",
+    },
+    ...accountSteps("district_admin"),
+  ];
+}
+
+function superAdminTourSteps(): TourStep[] {
+  return [
+    welcomeStep("platform administrator"),
+    {
+      selector: '[data-tour="role-overview"]',
+      title: "Platform administration",
+      description: "Start from the district chooser, then enter a school only when school-scoped work is required.",
+    },
+    {
+      selector: '[data-tour="district-workspaces"]',
+      title: "Manage the tenant hierarchy",
+      description: "Create or edit districts, open district workspaces, and manage the schools inside them.",
+    },
+    {
+      selector: '[data-tour="admin-tools"]',
+      title: "Platform administration menu",
+      description: "All platform controls are grouped here rather than scattered across unrelated buttons.",
+    },
+    {
+      selector: '[data-tour="admin-statistics"]',
+      title: "Platform and district statistics",
+      description: "Begin with platform totals, then narrow to one district or school when needed.",
+    },
+    {
+      selector: '[data-tour="admin-users"]',
+      title: "Platform users and roles",
+      description: "Manage in-scope accounts and assign district administrators with step-up confirmation.",
+    },
+    {
+      selector: '[data-tour="admin-moderation"]',
+      title: "Platform moderation overview",
+      description: "Inspect approval activity while school and district operators retain their scoped responsibilities.",
+    },
+    {
+      selector: '[data-tour="admin-support"]',
+      title: "Support inbox",
+      description: "Choose a school to read its submitted ticket. Start private-data access only when resolving it truly requires protected records.",
+    },
+    {
+      selector: '[data-tour="admin-offboarding"]',
+      title: "Complete tenant offboarding",
+      description: "You may submit and advance the audited workflow yourself after password confirmation; evidence and retention safeguards still apply.",
+    },
+    {
+      selector: '[data-tour="admin-system-health"]',
+      title: "Production health",
+      description: "Check database migrations, email delivery, scheduled jobs, and other release-critical configuration.",
+    },
+    ...accountSteps("super_admin"),
+  ];
+}
+
+export function buildTourSteps(role: UserRole, canManage: boolean): TourStep[] {
+  switch (role) {
+    case "super_admin":
+      return superAdminTourSteps();
+    case "district_admin":
+      return districtAdminTourSteps();
+    case "admin":
+      return adminTourSteps();
+    case "teacher":
+      return teacherTourSteps();
+    default:
+      return studentTourSteps(canManage);
+  }
 }
 
 function accountSteps(role: UserRole): TourStep[] {
