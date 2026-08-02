@@ -33,6 +33,7 @@ export function friendlyAuthEmailError(
   if (!error) return fallback;
 
   const message = errorMessage(error).toLowerCase();
+  const code = errorProperty(error, "code").toLowerCase();
   const name = errorProperty(error, "name");
   const status = Number(errorProperty(error, "status"));
   const isMailerFailure =
@@ -44,6 +45,9 @@ export function friendlyAuthEmailError(
     name === "AuthRetryableFetchError"
     && status >= 500;
 
+  if (code === "captcha_failed" || message.includes("captcha")) {
+    return "The CAPTCHA expired or was already used. Complete the new CAPTCHA and try again.";
+  }
   if (message.includes("email rate limit exceeded") || status === 429) {
     return "Too many verification emails have been requested. Wait a few minutes before trying again.";
   }

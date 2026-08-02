@@ -171,6 +171,26 @@ describe("supabaseSignUp", () => {
     });
   });
 
+  it("treats a retry as successful when the first request already created the profile", async () => {
+    const { signUp } = setupClients({
+      recentProfile: { id: "user-1" },
+      signup: {
+        data: { user: null, session: null },
+        error: {
+          name: "AuthApiError",
+          message: "captcha protection: request disallowed (already-seen-response)",
+          status: 400,
+          code: "captcha_failed",
+        },
+      },
+    });
+
+    const result = await submitSignup();
+
+    expect(result).toEqual({ success: true, needsConfirmation: true });
+    expect(signUp).toHaveBeenCalledOnce();
+  });
+
   it("rejects mismatched password confirmation before contacting Auth", async () => {
     const { signUp } = setupClients();
 
@@ -204,6 +224,7 @@ function setupClients(input: {
   school?: QueryResult;
   signupConfig?: QueryResult;
   accessCodeValid?: boolean;
+  recentProfile?: Record<string, unknown> | null;
   acceptanceError?: { code?: string; message: string } | null;
   signup?: {
     data: {
@@ -214,6 +235,7 @@ function setupClients(input: {
       name?: string;
       message: string;
       status?: number;
+      code?: string;
     } | null;
   };
 } = {}) {
@@ -244,6 +266,22 @@ function setupClients(input: {
       if (table === "schools") return { select: schoolSelect };
       if (table === "policy_acceptances") {
         return { upsert: vi.fn().mockResolvedValue({ error: input.acceptanceError ?? null }) };
+      }
+      if (table === "profiles") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                gte: vi.fn(() => ({
+                  maybeSingle: vi.fn().mockResolvedValue({
+                    data: input.recentProfile ?? null,
+                    error: null,
+                  }),
+                })),
+              })),
+            })),
+          })),
+        };
       }
       throw new Error(`Unexpected admin table: ${table}`);
     }),

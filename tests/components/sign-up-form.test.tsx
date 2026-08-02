@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpForm } from "@/components/auth/sign-up-form";
+import CheckEmailPage from "@/app/auth/check-email/page";
 import { supabaseResendConfirmation, supabaseSignUp } from "@/lib/actions";
 
 const push = vi.fn();
@@ -48,6 +49,7 @@ describe("SignUpForm", () => {
     getUser.mockResolvedValue({ data: { user: null } });
     unsubscribe.mockReset();
     onAuthStateChange.mockClear();
+    window.sessionStorage.clear();
   });
 
   it("submits signup to the server action instead of blocking in browser demo mode", async () => {
@@ -102,7 +104,8 @@ describe("SignUpForm", () => {
     });
     expect(await screen.findByText("student@example.edu")).toBeVisible();
     expect(screen.getByRole("button", { name: "Resend confirmation email" })).toBeVisible();
-    expect(push).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem("stormhub_pending_verification_email")).toBe("student@example.edu");
+    expect(push).toHaveBeenCalledWith("/auth/check-email");
   });
 
   it("always requires the selected school's access code", () => {
@@ -182,5 +185,14 @@ describe("SignUpForm", () => {
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/dashboard"));
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("restores the dedicated check-email page after signup navigation", async () => {
+    window.sessionStorage.setItem("stormhub_pending_verification_email", "student@example.edu");
+
+    render(<CheckEmailPage />);
+
+    expect(await screen.findByText("student@example.edu")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Resend confirmation email" })).toBeVisible();
   });
 });

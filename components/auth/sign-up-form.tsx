@@ -96,8 +96,11 @@ export function SignUpForm({
     setLoading(false);
     if (result.success) {
       if (result.needsConfirmation) {
+        const normalizedPendingEmail = email.trim().toLowerCase();
+        window.sessionStorage.setItem("stormhub_pending_verification_email", normalizedPendingEmail);
         toast({ title: "Check your email", description: "Confirm your email address to complete signup." });
-        setPendingEmail(email.trim().toLowerCase());
+        setPendingEmail(normalizedPendingEmail);
+        router.push("/auth/check-email");
       } else {
         toast({ title: "Welcome to StormHub!", description: "Your account has been created." });
         router.push("/dashboard");
@@ -256,7 +259,7 @@ export function SignUpForm({
   );
 }
 
-function EmailVerificationNotice({ email }: { email: string }) {
+export function EmailVerificationNotice({ email }: { email: string }) {
   const router = useRouter();
   const [resending, setResending] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
@@ -273,6 +276,7 @@ function EmailVerificationNotice({ email }: { email: string }) {
       const { data } = await auth.getUser();
       if (!active || !data.user) return;
       setConfirmed(true);
+      window.sessionStorage.removeItem("stormhub_pending_verification_email");
       router.replace("/dashboard");
       router.refresh();
     }

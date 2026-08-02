@@ -4291,6 +4291,26 @@ export async function supabaseSignUp(
     },
   });
   if (error) {
+    const errorCode = error.code?.toLowerCase() ?? "";
+    const errorMessage = error.message.toLowerCase();
+    const mayBeRetryAfterSuccessfulSignup =
+      errorCode === "captcha_failed"
+      || errorCode === "over_email_send_rate_limit"
+      || error.status === 429
+      || errorMessage.includes("already-seen-response");
+    if (admin && mayBeRetryAfterSuccessfulSignup) {
+      const recentlyCreatedAt = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const { data: recentProfile } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("email", normalizedEmail)
+        .eq("school_id", schoolId)
+        .gte("created_at", recentlyCreatedAt)
+        .maybeSingle();
+      if (recentProfile) {
+        return { success: true, needsConfirmation: true };
+      }
+    }
     console.error("[supabaseSignUp] Supabase Auth signup failed:", {
       name: error.name,
       code: error.code,
