@@ -3,6 +3,17 @@ import { createProfileIfMissing, defaultPathForProfile } from "@/lib/auth";
 import { safeAuthRedirectPath } from "@/lib/auth-redirect";
 import { NextResponse } from "next/server";
 
+function isEmailLinkError(searchParams: URLSearchParams): boolean {
+  const errorCode = searchParams.get("error_code")?.toLowerCase() ?? "";
+  const description = searchParams.get("error_description")?.toLowerCase() ?? "";
+  return errorCode.includes("otp")
+    || errorCode.includes("link")
+    || description.includes("email link")
+    || description.includes("one-time token")
+    || description.includes("otp")
+    || description.includes("expired");
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
@@ -31,7 +42,10 @@ export async function GET(request: Request) {
 
   const signIn = new URL("/auth/sign-in", origin);
   if (searchParams.get("error")) {
-    signIn.searchParams.set("error", "google_sign_in_failed");
+    signIn.searchParams.set(
+      "error",
+      isEmailLinkError(searchParams) ? "invalid_or_expired_link" : "google_sign_in_failed"
+    );
   } else if (code) {
     signIn.searchParams.set("error", "invalid_or_expired_link");
   }

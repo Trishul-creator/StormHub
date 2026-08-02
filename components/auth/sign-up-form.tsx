@@ -36,6 +36,7 @@ export function SignUpForm({
   const [loading, setLoading] = useState(false);
   const [loadedAt] = useState(() => Date.now());
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaAttempt, setCaptchaAttempt] = useState(0);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -103,6 +104,10 @@ export function SignUpForm({
         router.refresh();
       }
     } else {
+      // hCaptcha response tokens are single-use. Render a fresh challenge after
+      // any server-side rejection so a retry cannot reuse the consumed token.
+      setCaptchaToken(null);
+      setCaptchaAttempt((attempt) => attempt + 1);
       toast({ title: "Sign up failed", description: result.error, variant: "destructive" });
     }
   }
@@ -219,7 +224,7 @@ export function SignUpForm({
             <Input id="website" name="website" tabIndex={-1} autoComplete="off" />
           </div>
           <input type="hidden" name="loadedAt" value={loadedAt} />
-          <Captcha onToken={setCaptchaToken} />
+          <Captcha key={captchaAttempt} onToken={setCaptchaToken} />
           <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
             <input name="ageAssurance" type="checkbox" required className="mt-1 h-4 w-4 rounded border-input" />
             <span>
