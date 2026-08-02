@@ -131,11 +131,25 @@ export function PlatformSupportAccess({
           <CardTitle className="text-lg">Private-data support access</CardTitle>
         </div>
         <CardDescription>
-          Platform admins can manage ordinary workspace settings without this. Start a temporary,
-          read-only session only when troubleshooting real student coursework.
+          Use this only after a support ticket requires inspection of private school records. The
+          support inbox itself never requires a private-data session.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-5">
+        <div className="rounded-xl border bg-muted/40 p-4">
+          <p className="font-semibold text-foreground">How private-data support works</p>
+          <ol className="mt-3 space-y-2 text-sm text-muted-foreground">
+            <li><strong className="text-foreground">1. Read the ticket first.</strong> Most account, navigation, and configuration issues do not require private records.</li>
+            <li><strong className="text-foreground">2. Start access only when necessary.</strong> Enter the exact problem and choose the shortest practical session.</li>
+            <li><strong className="text-foreground">3. Inspect the minimum data.</strong> The session permits read-only roster, attendance, coursework, and attachment troubleshooting. Views are recorded.</li>
+            <li><strong className="text-foreground">4. End access when finished.</strong> Access also expires automatically at the selected time.</li>
+          </ol>
+          <Button asChild variant="outline" size="sm" className="mt-4">
+            <Link href={`/admin/feedback?school=${encodeURIComponent(schoolSlug)}`}>
+              Open support inbox <Inbox className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
         {!supportAvailable ? (
           <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
             <p className="flex items-center gap-2 font-semibold">
@@ -160,11 +174,6 @@ export function PlatformSupportAccess({
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button asChild>
-                <Link href={`/admin/feedback?school=${encodeURIComponent(schoolSlug)}`}>
-                  Open support inbox <Inbox className="h-4 w-4" />
-                </Link>
-              </Button>
               <Button asChild>
                 <Link href={`/admin/schools/${schoolSlug}/support`} className="gap-2">
                   Open read-only workspace <ArrowRight className="h-4 w-4" />

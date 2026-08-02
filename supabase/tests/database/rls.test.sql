@@ -1239,8 +1239,8 @@ SELECT throws_ok(
 );
 SELECT is(
   (SELECT count(*) FROM public.feedback),
-  0::BIGINT,
-  'platform admins cannot read support-message content without a school support session'
+  2::BIGINT,
+  'platform admins can read submitted support tickets without opening private school records'
 );
 SELECT throws_ok(
   $$SELECT * FROM public.get_club_member_directory('a1000000-0000-4000-8000-000000000001')$$,
@@ -1338,8 +1338,8 @@ SELECT ok(
 );
 SELECT is(
   (SELECT count(*) FROM public.feedback),
-  1::BIGINT,
-  'a platform support session exposes feedback only for its exact school'
+  2::BIGINT,
+  'a private-data support session does not change platform support-ticket visibility'
 );
 SELECT is(
   (
@@ -1347,8 +1347,8 @@ SELECT is(
     FROM public.feedback
     WHERE school_id = 'b0000000-0000-4000-8000-000000000002'
   ),
-  0::BIGINT,
-  'a platform support session does not expose another school support request'
+  1::BIGINT,
+  'platform support can still read another school ticket without private-data access'
 );
 SELECT throws_ok(
   $$SELECT public.review_feedback_status(

@@ -44,6 +44,11 @@ describe("platform support access", () => {
     );
 
     expect(screen.getByText("Database update required")).toBeVisible();
+    expect(screen.getByText("How private-data support works")).toBeVisible();
+    expect(screen.getByRole("link", { name: /Open support inbox/i })).toHaveAttribute(
+      "href",
+      "/admin/feedback?school=example-high"
+    );
     expect(screen.queryByRole("button", { name: /Start read-only support/i })).not.toBeInTheDocument();
   });
 

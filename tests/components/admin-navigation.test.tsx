@@ -13,6 +13,7 @@ describe("AdminNavigation", () => {
     expect(screen.getByRole("navigation", { name: "Administration" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Districts" })).toHaveAttribute("href", "/admin/districts");
     expect(screen.getByRole("link", { name: "Support inbox" })).toHaveAttribute("href", "/admin/feedback");
+    expect(screen.getByRole("link", { name: "Moderation" })).toHaveAttribute("href", "/admin/content");
     expect(screen.getByRole("link", { name: "Statistics" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Deletion requests" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Tenant offboarding" })).toHaveAttribute(
@@ -32,6 +33,7 @@ describe("AdminNavigation", () => {
     expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/admin");
     expect(screen.queryByRole("link", { name: "Districts" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Support inbox" })).toHaveAttribute("href", "/admin/feedback");
+    expect(screen.getByRole("link", { name: "Moderation" })).toHaveAttribute("href", "/admin/content");
     expect(screen.getByRole("link", { name: "Tenant offboarding" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "System health" })).not.toBeInTheDocument();
   });
@@ -41,6 +43,7 @@ describe("AdminNavigation", () => {
 
     expect(screen.getByRole("link", { name: "District" })).toHaveAttribute("href", "/admin/districts");
     expect(screen.getByRole("link", { name: "Support inbox" })).toHaveAttribute("href", "/admin/feedback");
+    expect(screen.getByRole("link", { name: "Moderation" })).toHaveAttribute("href", "/admin/content");
     expect(screen.getByRole("link", { name: "Tenant offboarding" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "System health" })).not.toBeInTheDocument();
   });

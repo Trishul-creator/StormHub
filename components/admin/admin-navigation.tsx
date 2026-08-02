@@ -38,7 +38,7 @@ export function AdminNavigation({ role }: AdminNavigationProps) {
         ? { href: "/admin/districts", label: "District", icon: Building2 }
       : { href: "/admin", label: "Overview", icon: LayoutDashboard },
     ...sharedLinks.slice(0, 2),
-    ...(!isDistrictAdmin ? [sharedLinks[2]] : []),
+    sharedLinks[2],
     { href: "/admin/feedback", label: "Support inbox", icon: Inbox },
     { href: "/admin/offboarding", label: "Tenant offboarding", icon: ArchiveX },
     ...sharedLinks.slice(3),
