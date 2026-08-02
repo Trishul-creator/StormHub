@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Navbar } from "@/components/layout/navbar";
 
@@ -67,5 +67,19 @@ describe("Navbar", () => {
     expect(screen.getByRole("link", { name: "Clubs" })).toHaveAttribute("href", "/s/elkhorn-south/clubs");
     expect(screen.getByRole("link", { name: "Opportunities" })).toHaveAttribute("href", "/s/elkhorn-south/opportunities");
     expect(screen.queryByRole("link", { name: "Administration" })).not.toBeInTheDocument();
+  });
+
+  it("dismisses the mobile navigation on outside click and Escape", () => {
+    render(<Navbar isLoggedIn role="student" schoolSlug="elkhorn-south" />);
+    const trigger = screen.getByRole("button", { name: "Toggle menu" });
+
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    fireEvent.pointerDown(document.body);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(trigger);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
   });
 });

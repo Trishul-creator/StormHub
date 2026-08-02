@@ -16,6 +16,7 @@ import { getAllSchools } from "@/lib/schools";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify } from "@/lib/utils";
 import { requireRecentAdminAuthenticationOrRedirect } from "@/lib/admin-step-up";
+import { DismissibleDetails } from "@/components/ui/dismissible-details";
 
 async function createDistrictAction(formData: FormData) {
   "use server";
@@ -125,7 +126,7 @@ export default async function AdminDistrictsPage() {
               Platform administrators retain access across every district.
             </p>
           </div>
-          {districtSchemaAvailable && <details className="group relative">
+          {districtSchemaAvailable && <DismissibleDetails className="group relative">
             <summary className="inline-flex h-9 cursor-pointer list-none items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90">
               <Plus className="h-4 w-4" />
               Create district
@@ -159,7 +160,7 @@ export default async function AdminDistrictsPage() {
               </label>
               <Button type="submit" className="w-full">Create district</Button>
             </form>
-          </details>}
+          </DismissibleDetails>}
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-tour="district-workspaces">

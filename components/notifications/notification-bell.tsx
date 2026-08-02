@@ -10,6 +10,7 @@ import { markAllNotificationsRead, markNotificationRead } from "@/lib/actions";
 import type { Notification } from "@/types/database";
 import { useRouter } from "next/navigation";
 import { humanizeLabel } from "@/lib/utils";
+import { useDismissibleLayer } from "@/hooks/use-dismissible-layer";
 
 export function NotificationBell({
   notifications,
@@ -21,6 +22,7 @@ export function NotificationBell({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const rootRef = useDismissibleLayer<HTMLDivElement>(open, () => setOpen(false));
 
   function openNotification(notification: Notification) {
     startTransition(async () => {
@@ -32,13 +34,15 @@ export function NotificationBell({
   }
 
   return (
-    <div className="relative">
+    <div ref={rootRef} className="relative">
       <Button
         data-tour="notifications-trigger"
         variant="ghost"
         size="sm"
         onClick={() => setOpen((value) => !value)}
         aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
+        aria-expanded={open}
+        aria-controls="notification-menu"
         className="relative px-2"
       >
         <Bell className="h-4 w-4" />
@@ -50,7 +54,11 @@ export function NotificationBell({
       </Button>
 
       {open && (
-        <div data-tour="notification-panel" className="absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl">
+        <div
+          id="notification-menu"
+          data-tour="notification-panel"
+          className="absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl"
+        >
           <div className="flex items-center justify-between border-b p-3">
             <div>
               <p className="font-semibold text-storm-navy">Notifications</p>
