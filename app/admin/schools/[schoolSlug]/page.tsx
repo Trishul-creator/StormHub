@@ -104,13 +104,11 @@ export default async function AdminSchoolPage({ params }: AdminSchoolPageProps) 
         <ActionCard href={`/s/${school.slug}/calendar`} icon={Calendar} title="Preview calendar" description="View this school’s calendar entries." />
         <ActionCard href={`/admin/users?school=${school.slug}`} icon={Settings} title="Users and roles" description="Assign school admins, teachers, and students for this school." />
         <ActionCard
-          href={profile.role === "super_admin"
-            ? `/admin/schools/${school.slug}#support-access`
-            : `/admin/feedback?school=${encodeURIComponent(school.slug)}`}
+          href={`/admin/feedback?school=${encodeURIComponent(school.slug)}`}
           icon={Inbox}
-          title={profile.role === "super_admin" ? "Support access" : "Support inbox"}
+          title="Support inbox"
           description={profile.role === "super_admin"
-            ? "Start recorded read-only access, then open this school’s support inbox."
+            ? "Read this school’s submitted support requests without opening private student records."
             : "Review and respond to support requests from this school."}
         />
         <ActionCard href={`/admin/statistics?school=${school.slug}`} icon={BarChart3} title="Statistics" description="Review school participation and active-club trends." />

@@ -31,8 +31,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     getDistrictForProfile(profile),
   ]);
   const tourRelevantAt = profile?.onboarding_reset_at ?? profile?.created_at;
+  const tourAccountComplete = Boolean(
+    profile
+    && (!profile.account_status || profile.account_status === "active")
+    && (
+      profile.role === "super_admin"
+      || (profile.role === "district_admin" ? profile.district_id : profile.school_id)
+    )
+  );
   const tourAutoStart = Boolean(
-    tourRelevantAt
+    tourAccountComplete
+    && tourRelevantAt
     && Date.now() - new Date(tourRelevantAt).getTime() <= 30 * 24 * 60 * 60 * 1000
   );
 

@@ -5,6 +5,11 @@ import { GuidedTour } from "@/components/onboarding/guided-tour";
 import { GuidedTourSettings } from "@/components/settings/guided-tour-settings";
 
 const tourKey = "stormhub:tour:pilot-v2:user-1:student:initial";
+const navigationState = vi.hoisted(() => ({ pathname: "/dashboard" }));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => navigationState.pathname,
+}));
 
 function TourTargets() {
   return (
@@ -47,6 +52,7 @@ function InteractiveTourTargets() {
 
 describe("guided walkthrough", () => {
   beforeEach(() => {
+    navigationState.pathname = "/dashboard";
     window.localStorage.clear();
     window.history.replaceState({}, "", "/dashboard");
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
@@ -119,6 +125,50 @@ describe("guided walkthrough", () => {
       "href",
       "/manage?tour=1"
     );
+  });
+
+  it("waits until account setup is complete before starting automatically", async () => {
+    navigationState.pathname = "/auth/complete-profile";
+    const view = render(
+      <>
+        <TourTargets />
+        <GuidedTour userId="user-1" role="student" canManage={false} autoStart />
+      </>
+    );
+
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(window.localStorage.getItem(tourKey)).toBeNull();
+
+    navigationState.pathname = "/dashboard";
+    view.rerender(
+      <>
+        <TourTargets />
+        <GuidedTour userId="user-1" role="student" canManage={false} autoStart />
+      </>
+    );
+
+    expect(await screen.findByRole("dialog", {}, { timeout: 2000 })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Welcome to StormHub" })).toBeVisible();
+  });
+
+  it("keeps an unavailable step visible instead of rapidly skipping ahead", async () => {
+    render(
+      <>
+        <TourTargets />
+        <GuidedTour userId="user-1" role="student" canManage={false} autoStart />
+      </>
+    );
+
+    expect(await screen.findByRole("heading", { name: "Welcome to StormHub" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    expect(await screen.findByRole("heading", { name: "Your dashboard" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+
+    expect(await screen.findByText(/tour will not skip ahead on its own/i, {}, { timeout: 3000 })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Start with what needs attention" })).toBeVisible();
+    await new Promise((resolve) => window.setTimeout(resolve, 600));
+    expect(screen.getByRole("heading", { name: "Start with what needs attention" })).toBeVisible();
   });
 
   it("requires users to open a top-level destination and follows the page change", async () => {

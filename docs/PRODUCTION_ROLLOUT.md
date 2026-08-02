@@ -43,6 +43,8 @@ production. The current release must contain every migration through:
 20260730270000_cross_tenant_transition_integrity.sql
 20260730280000_platform_support_access_logging.sql
 20260730290000_admin_step_up_authentication.sql
+20260801010000_fix_deferred_tenant_trigger_permissions.sql
+20260802100000_support_inbox_without_private_session.sql
 ```
 
 Use one linked-project workflow per environment:

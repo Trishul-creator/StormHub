@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Building2, Clock3, Eye, Inbox, LockKeyhole } from "lucide-react";
+import { Building2, Inbox, ShieldCheck } from "lucide-react";
 import { FeedbackStatusActions } from "@/components/admin/feedback-status-actions";
-import { PlatformSupportExpiryGuard } from "@/components/admin/platform-support-expiry-guard";
 import { SupportSchoolSelector } from "@/components/admin/support-school-selector";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -16,10 +15,6 @@ import {
   getAdminScopeSchools,
   getSchoolForProfile,
 } from "@/lib/schools";
-import {
-  getActivePlatformSupportSession,
-  recordPlatformSupportAccess,
-} from "@/lib/support-access";
 import { formatDateTime, humanizeLabel } from "@/lib/utils";
 import type { FeedbackStatus, School } from "@/types/database";
 
@@ -52,28 +47,10 @@ export default async function SupportInboxPage({ searchParams }: SupportInboxPag
 
   if (requestedSchoolSlug && !selectedSchool) notFound();
 
-  const supportSession = profile.role === "super_admin" && selectedSchool
-    ? await getActivePlatformSupportSession(profile, selectedSchool.id)
-    : null;
-
-  let supportAccessRecorded = false;
-  if (profile.role === "super_admin" && selectedSchool && supportSession) {
-    supportAccessRecorded = await recordPlatformSupportAccess({
-      actor: profile,
-      schoolId: selectedSchool.id,
-      action: "view",
-      resourceType: "support_feedback_inbox",
-    });
-  }
-
-  const canReadMessages = Boolean(
-    selectedSchool
-    && (
-      profile.role !== "super_admin"
-      || (supportSession && supportAccessRecorded)
-    )
-  );
-  const items = canReadMessages && selectedSchool
+  // A support request is deliberately submitted to administrators. Reading the
+  // scoped ticket does not expose private coursework, attendance, or rosters and
+  // therefore must not depend on a temporary private-data support session.
+  const items = selectedSchool
     ? await getFeedbackItems(selectedSchool.id)
     : [];
   const visibleItems = selectedStatus
@@ -84,7 +61,7 @@ export default async function SupportInboxPage({ searchParams }: SupportInboxPag
     <div className="container mx-auto px-4 py-8">
       <PageHeader
         title="Support inbox"
-        description="Review support requests inside the school scope where they were submitted. External email receives only a generic new-request alert."
+        description="Review support requests inside the school where they were submitted. Tickets are separate from temporary access to private school records."
       />
 
       <SupportScope
@@ -106,69 +83,25 @@ export default async function SupportInboxPage({ searchParams }: SupportInboxPag
             request you are authorized to review.
           </CardContent>
         </Card>
-      ) : profile.role === "super_admin" && !supportSession ? (
-        <Card className="border-amber-300 dark:border-amber-800">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <LockKeyhole className="h-5 w-5 text-amber-600 dark:text-amber-300" />
-              Read-only support session required
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <p>
-              Platform administrators cannot read school support messages through a global inbox.
-              Start a recorded, time-limited session for {selectedSchool.name} to inspect this
-              school&apos;s requests in read-only mode.
-            </p>
-            <Button asChild>
-              <Link href={`/admin/schools/${selectedSchool.slug}#support-access`}>
-                Open {selectedSchool.name} support controls
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      ) : profile.role === "super_admin" && !supportAccessRecorded ? (
-        <Card className="border-amber-300 dark:border-amber-800">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <LockKeyhole className="h-5 w-5 text-amber-600 dark:text-amber-300" />
-              Support messages stayed locked
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <p>
-              The required audit entry could not be recorded, so no message content was loaded.
-              Return to this school&apos;s support controls and try again.
-            </p>
-            <Button asChild>
-              <Link href={`/admin/schools/${selectedSchool.slug}#support-access`}>
-                Open {selectedSchool.name} support controls
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
       ) : (
         <>
-          {profile.role === "super_admin" && supportSession && supportAccessRecorded && (
-            <PlatformSupportExpiryGuard
-              expiresAt={supportSession.expires_at}
-              returnTo={`/admin/feedback?school=${encodeURIComponent(selectedSchool.slug)}`}
-            />
-          )}
-          {profile.role === "super_admin" && supportSession && supportAccessRecorded && (
-            <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-              <Eye className="mt-0.5 h-4 w-4 shrink-0" />
-              <div>
-                <p className="font-semibold">Temporary read-only support is active</p>
-                <p className="mt-1">
-                  This inbox view is recorded for {selectedSchool.name}. Platform support cannot
-                  reply, change status, or resolve requests.
-                </p>
-                <p className="mt-2 flex items-center gap-1.5 text-xs">
-                  <Clock3 className="h-3.5 w-3.5" />
-                  Ends automatically {new Date(supportSession.expires_at).toLocaleString()}
-                </p>
+          {profile.role === "super_admin" && (
+            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-semibold">Support tickets are available without private-data access</p>
+                  <p className="mt-1 text-blue-900/80 dark:text-blue-100/80">
+                    Read this ticket first. Start a recorded support session only if resolving it
+                    requires private rosters, attendance, coursework, or attachments.
+                  </p>
+                </div>
               </div>
+              <Button asChild size="sm" variant="outline" className="shrink-0 bg-background">
+                <Link href={`/admin/schools/${selectedSchool.slug}#support-access`}>
+                  Private-data instructions
+                </Link>
+              </Button>
             </div>
           )}
 

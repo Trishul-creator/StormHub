@@ -1707,7 +1707,14 @@ export async function getPendingApprovals(): Promise<PendingApprovalItem[]> {
     ];
   }
 
-  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  // Platform moderation is a read-only cross-tenant inventory. Load it with the
+  // trusted server client so it does not disappear behind the higher-assurance
+  // write guard; approval and rejection actions remain unavailable to platform
+  // administrators and continue to enforce their own role checks.
+  const supabase = profile?.role === "super_admin"
+    ? createAdminClient() ?? await createClient()
+    : await createClient();
   if (!supabase) return [];
 
   const [

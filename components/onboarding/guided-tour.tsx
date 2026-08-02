@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -20,6 +21,7 @@ interface TourStep {
   interaction?: "click";
   interactionLabel?: string;
   optional?: boolean;
+  skipWhenMissing?: boolean;
 }
 
 interface TargetBox {
@@ -56,7 +58,18 @@ function mobileMenuStep(title: string): TourStep {
     interaction: "click",
     interactionLabel: "Open menu",
     optional: true,
+    skipWhenMissing: true,
   };
+}
+
+function isAccountSetupPath(pathname: string): boolean {
+  return pathname.startsWith("/auth/") || pathname === "/account-status";
+}
+
+function isRoleHomePath(pathname: string, role: UserRole): boolean {
+  if (role === "super_admin" || role === "district_admin") return pathname === "/admin/districts";
+  if (role === "admin" || role === "teacher") return pathname === "/manage";
+  return pathname === "/dashboard";
 }
 
 function buildTourSteps(role: UserRole, canManage: boolean): TourStep[] {
@@ -395,12 +408,14 @@ export function GuidedTour({
   autoStart: boolean;
   revision?: string | null;
 }) {
+  const pathname = usePathname();
   const steps = useMemo(() => buildTourSteps(role, canManage), [canManage, role]);
   const storageKey = `stormhub:tour:${TOUR_VERSION}:${userId}:${role}:${revision ?? "initial"}`;
   const [mounted, setMounted] = useState(false);
   const [active, setActive] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [targetBox, setTargetBox] = useState<TargetBox | null>(null);
+  const [targetUnavailable, setTargetUnavailable] = useState(false);
   const [position, setPosition] = useState<"above" | "below">("below");
   const primaryButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -420,6 +435,7 @@ export function GuidedTour({
     }
     setActive(false);
     setTargetBox(null);
+    setTargetUnavailable(false);
   }, [storageKey]);
 
   const goTo = useCallback((requestedIndex: number) => {
@@ -430,6 +446,7 @@ export function GuidedTour({
     const nextIndex = Math.max(0, requestedIndex);
     persistProgress(nextIndex);
     setTargetBox(null);
+    setTargetUnavailable(false);
     setStepIndex(nextIndex);
   }, [finish, persistProgress, steps.length]);
 
@@ -441,6 +458,11 @@ export function GuidedTour({
       url.searchParams.delete("tour");
       window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     }
+
+    // A profile can exist briefly while Google onboarding, policy acceptance, or
+    // account-status handling is still in progress. Never place the product tour
+    // over those account-completion screens.
+    if (isAccountSetupPath(pathname)) return;
 
     let savedValue: string | null = null;
     try {
@@ -464,7 +486,7 @@ export function GuidedTour({
         resumeIndex = 0;
       }
     }
-    if (!forceStart && !autoStart && !hasActiveProgress) return;
+    if (!forceStart && !hasActiveProgress && (!autoStart || !isRoleHomePath(pathname, role))) return;
 
     const timeout = window.setTimeout(() => {
       persistProgress(resumeIndex);
@@ -472,7 +494,7 @@ export function GuidedTour({
       setActive(true);
     }, 200);
     return () => window.clearTimeout(timeout);
-  }, [autoStart, persistProgress, steps.length, storageKey]);
+  }, [autoStart, pathname, persistProgress, role, steps.length, storageKey]);
 
   useEffect(() => {
     if (!active) return;
@@ -503,6 +525,7 @@ export function GuidedTour({
       target = findVisibleTarget(step.selector);
       if (target) {
         window.clearInterval(interval);
+        setTargetUnavailable(false);
         target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
         updatePosition();
         window.addEventListener("resize", updatePosition);
@@ -511,10 +534,17 @@ export function GuidedTour({
       }
 
       attempts += 1;
-      const maxAttempts = step.optional ? 4 : 30;
+      const maxAttempts = step.optional ? 12 : 40;
       if (attempts >= maxAttempts) {
         window.clearInterval(interval);
-        goTo(stepIndex + 1);
+        if (step.skipWhenMissing) {
+          goTo(stepIndex + 1);
+        } else {
+          // Missing data (for example no clubs or priorities yet) should not race
+          // through the walkthrough. Keep the step visible and let the user move
+          // on when they have read the explanation.
+          setTargetUnavailable(true);
+        }
       }
     };
 
@@ -528,15 +558,19 @@ export function GuidedTour({
   }, [active, goTo, stepIndex, steps]);
 
   useEffect(() => {
-    if (!active || !targetBox) return;
+    if (!active || (!targetBox && !targetUnavailable)) return;
     const step = steps[stepIndex];
+    if (targetUnavailable) {
+      primaryButtonRef.current?.focus();
+      return;
+    }
     const target = findVisibleTarget(step.selector);
     if (!target || step.interaction !== "click") return;
 
     const handleTargetClick = () => goTo(stepIndex + 1);
     target.addEventListener("click", handleTargetClick, { once: true });
     return () => target.removeEventListener("click", handleTargetClick);
-  }, [active, goTo, stepIndex, steps, targetBox]);
+  }, [active, goTo, stepIndex, steps, targetBox, targetUnavailable]);
 
   useEffect(() => {
     if (!active || !targetBox) return;
@@ -546,75 +580,72 @@ export function GuidedTour({
     } else {
       primaryButtonRef.current?.focus();
     }
-  }, [active, stepIndex, steps, targetBox]);
+  }, [active, stepIndex, steps, targetBox, targetUnavailable]);
 
   useEffect(() => {
     if (!active) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") finish();
-      if (event.key === "ArrowRight" && steps[stepIndex].interaction !== "click") {
+      if (
+        event.key === "ArrowRight"
+        && (steps[stepIndex].interaction !== "click" || targetUnavailable)
+      ) {
         goTo(stepIndex + 1);
       }
       if (
         event.key === "ArrowLeft"
         && stepIndex > 0
-        && findVisibleTarget(steps[stepIndex - 1].selector)
       ) {
         goTo(stepIndex - 1);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [active, finish, goTo, stepIndex, steps]);
+  }, [active, finish, goTo, stepIndex, steps, targetUnavailable]);
 
-  if (!mounted || !active || !targetBox) return null;
+  if (!mounted || !active || (!targetBox && !targetUnavailable)) return null;
 
   const step = steps[stepIndex];
-  const hasPrevious = stepIndex > 0 && Boolean(findVisibleTarget(steps[stepIndex - 1].selector));
+  const hasPrevious = stepIndex > 0;
+  const clickTargetAvailable = step.interaction === "click" && Boolean(targetBox);
   const tooltipStyle =
-    window.innerWidth < 640
+    targetUnavailable
+      ? window.innerWidth < 640
+        ? { left: 16, right: 16, top: "50%", transform: "translateY(-50%)" }
+        : { left: "50%", top: "50%", width: 380, transform: "translate(-50%, -50%)" }
+    : window.innerWidth < 640
       ? { left: 16, right: 16, bottom: 16 }
       : {
-          left: Math.min(Math.max(16, targetBox.left), window.innerWidth - 396),
+          left: Math.min(Math.max(16, targetBox!.left), window.innerWidth - 396),
           top: position === "below"
-            ? Math.min(targetBox.bottom + 16, window.innerHeight - 300)
-            : Math.max(16, targetBox.top - 284),
+            ? Math.min(targetBox!.bottom + 16, window.innerHeight - 300)
+            : Math.max(16, targetBox!.top - 284),
           width: 380,
         };
 
   return createPortal(
     <div aria-live="polite">
-      <div
-        className="fixed inset-x-0 top-0 z-[70] bg-slate-950/75"
-        style={{ height: targetBox.top }}
-        aria-hidden="true"
-      />
-      <div
-        className="fixed inset-x-0 z-[70] bg-slate-950/75"
-        style={{ top: targetBox.bottom, bottom: 0 }}
-        aria-hidden="true"
-      />
-      <div
-        className="fixed left-0 z-[70] bg-slate-950/75"
-        style={{ top: targetBox.top, width: targetBox.left, height: targetBox.height }}
-        aria-hidden="true"
-      />
-      <div
-        className="fixed right-0 z-[70] bg-slate-950/75"
-        style={{ top: targetBox.top, left: targetBox.right, height: targetBox.height }}
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none fixed z-[80] rounded-xl ring-2 ring-white ring-offset-2 ring-offset-storm-electric transition-all duration-300"
-        style={{
-          top: targetBox.top,
-          left: targetBox.left,
-          width: targetBox.width,
-          height: targetBox.height,
-          boxShadow: "0 12px 36px rgb(2 6 23 / 0.34)",
-        }}
-        aria-hidden="true"
-      />
+      {targetBox ? (
+        <>
+          <div className="fixed inset-x-0 top-0 z-[70] bg-slate-950/75" style={{ height: targetBox.top }} aria-hidden="true" />
+          <div className="fixed inset-x-0 z-[70] bg-slate-950/75" style={{ top: targetBox.bottom, bottom: 0 }} aria-hidden="true" />
+          <div className="fixed left-0 z-[70] bg-slate-950/75" style={{ top: targetBox.top, width: targetBox.left, height: targetBox.height }} aria-hidden="true" />
+          <div className="fixed right-0 z-[70] bg-slate-950/75" style={{ top: targetBox.top, left: targetBox.right, height: targetBox.height }} aria-hidden="true" />
+          <div
+            className="pointer-events-none fixed z-[80] rounded-xl ring-2 ring-white ring-offset-2 ring-offset-storm-electric transition-all duration-300"
+            style={{
+              top: targetBox.top,
+              left: targetBox.left,
+              width: targetBox.width,
+              height: targetBox.height,
+              boxShadow: "0 12px 36px rgb(2 6 23 / 0.34)",
+            }}
+            aria-hidden="true"
+          />
+        </>
+      ) : (
+        <div className="fixed inset-0 z-[70] bg-slate-950/75" aria-hidden="true" />
+      )}
       <section
         role="dialog"
         aria-modal="false"
@@ -654,10 +685,17 @@ export function GuidedTour({
           <p id="guided-tour-description" className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {step.description}
           </p>
-          {step.interaction === "click" && (
+          {clickTargetAvailable && (
             <p className="mt-3 flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-900 dark:bg-blue-950/50 dark:text-blue-200">
               <MousePointerClick className="h-4 w-4 shrink-0" />
               Click the highlighted control to continue.
+            </p>
+          )}
+          {targetUnavailable && (
+            <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+              This section is not available on the current screen yet. It may appear after your
+              school adds content or after you receive the related permission. Continue when you
+              are ready—the tour will not skip ahead on its own.
             </p>
           )}
           <div className="mt-5 flex items-center justify-between gap-3">
@@ -679,7 +717,7 @@ export function GuidedTour({
                   <ArrowLeft className="h-4 w-4" /> Back
                 </Button>
               )}
-              {step.interaction === "click" ? (
+              {clickTargetAvailable ? (
                 <>
                   <Button type="button" variant="ghost" size="sm" onClick={() => goTo(stepIndex + 1)}>
                     Skip step
