@@ -1,6 +1,6 @@
 import "server-only";
 
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Profile } from "@/types/database";
 
@@ -12,7 +12,7 @@ export interface SchoolSignupAccess {
 
 export function generateSchoolSignupAccessCode(): string {
   const randomToken = randomBytes(6).toString("hex").toUpperCase();
-  const token = `${randomToken.slice(0, 11)}${randomBytes(1)[0] % 10}`;
+  const token = `${randomToken.slice(0, 11)}${randomInt(10)}`;
   return `SH-${token.slice(0, 4)}-${token.slice(4, 8)}-${token.slice(8, 12)}`;
 }
 
