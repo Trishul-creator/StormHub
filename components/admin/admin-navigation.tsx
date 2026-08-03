@@ -39,8 +39,12 @@ export function AdminNavigation({ role }: AdminNavigationProps) {
       : { href: "/admin", label: "Overview", icon: LayoutDashboard, tourId: "admin-overview" },
     ...sharedLinks.slice(0, 2),
     sharedLinks[2],
-    { href: "/admin/feedback", label: "Support inbox", icon: Inbox, tourId: "admin-support" },
-    { href: "/admin/offboarding", label: "Tenant offboarding", icon: ArchiveX, tourId: "admin-offboarding" },
+    ...(isSuperAdmin
+      ? [
+          { href: "/admin/feedback", label: "Support inbox", icon: Inbox, tourId: "admin-support" },
+          { href: "/admin/offboarding", label: "Tenant offboarding", icon: ArchiveX, tourId: "admin-offboarding" },
+        ]
+      : []),
     ...sharedLinks.slice(3),
     ...(isSuperAdmin
       ? [{ href: "/admin/system-health", label: "System health", icon: Activity, tourId: "admin-system-health" }]

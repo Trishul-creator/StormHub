@@ -529,10 +529,7 @@ CREATE POLICY "feedback_insert" ON feedback FOR INSERT
     (auth.uid() IS NULL AND user_id IS NULL)
     OR (auth.uid() IS NOT NULL AND (user_id IS NULL OR user_id = auth.uid()))
   );
-CREATE POLICY "feedback_admin_read" ON feedback FOR SELECT USING (can_admin_school(school_id));
-CREATE POLICY "feedback_admin_update" ON feedback FOR UPDATE
-  USING (can_admin_school(school_id))
-  WITH CHECK (can_admin_school(school_id));
+CREATE POLICY "feedback_admin_read" ON feedback FOR SELECT USING (is_super_admin());
 
 CREATE POLICY "notifications_read_own" ON notifications FOR SELECT
   USING (recipient_user_id = auth.uid());

@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(21);
+SELECT plan(23);
 
 SELECT has_function(
   'public',
@@ -46,6 +46,26 @@ SELECT isnt(
   ),
   TRUE,
   'authenticated callers cannot bypass the offboarding restore barriers'
+);
+
+SELECT isnt(
+  has_function_privilege(
+    'authenticated',
+    'public.review_tenant_offboarding_request_scoped_internal(uuid,text,text,text,timestamptz,text)',
+    'EXECUTE'
+  ),
+  TRUE,
+  'authenticated callers cannot bypass the platform-only review wrapper'
+);
+
+SELECT isnt(
+  has_function_privilege(
+    'authenticated',
+    'public.cancel_tenant_offboarding_request_scoped_internal(uuid,text)',
+    'EXECUTE'
+  ),
+  TRUE,
+  'authenticated callers cannot bypass the platform-only cancellation wrapper'
 );
 
 INSERT INTO public.districts (id, name, slug, city, state, is_active)
@@ -251,28 +271,28 @@ SELECT is(
 
 SELECT ok(
   pg_get_functiondef(
-    'public.review_tenant_offboarding_request(uuid,text,text,text,timestamptz,text)'::REGPROCEDURE
+    'public.review_tenant_offboarding_request_scoped_internal(uuid,text,text,text,timestamptz,text)'::REGPROCEDURE
   ) LIKE '%stormhub:legal-hold-execution-barrier%',
   'offboarding review acquires the legal-hold transition barrier'
 );
 
 SELECT ok(
   pg_get_functiondef(
-    'public.review_tenant_offboarding_request(uuid,text,text,text,timestamptz,text)'::REGPROCEDURE
+    'public.review_tenant_offboarding_request_scoped_internal(uuid,text,text,text,timestamptz,text)'::REGPROCEDURE
   ) LIKE '%tenant_offboarding_scope_lock_key%',
   'offboarding review acquires the tenant-tree transition barrier before work'
 );
 
 SELECT ok(
   pg_get_functiondef(
-    'public.cancel_tenant_offboarding_request(uuid,text)'::REGPROCEDURE
+    'public.cancel_tenant_offboarding_request_scoped_internal(uuid,text)'::REGPROCEDURE
   ) LIKE '%stormhub:legal-hold-execution-barrier%',
   'offboarding restoration acquires the legal-hold transition barrier'
 );
 
 SELECT ok(
   pg_get_functiondef(
-    'public.cancel_tenant_offboarding_request(uuid,text)'::REGPROCEDURE
+    'public.cancel_tenant_offboarding_request_scoped_internal(uuid,text)'::REGPROCEDURE
   ) LIKE '%tenant_offboarding_scope_lock_key%',
   'offboarding restoration acquires the tenant-tree transition barrier before work'
 );

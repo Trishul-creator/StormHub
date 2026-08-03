@@ -125,8 +125,9 @@ export function TenantOffboardingWorkflow({
             <CardTitle>Start a tenant offboarding request</CardTitle>
           </div>
           <CardDescription>
-            Record a school or district export/deletion instruction. Submitting this form never
-            deletes, deactivates, or hides tenant data.
+            Platform administrators can record a school or district export/deletion instruction,
+            preserve an export, approve it, and schedule the deletion date and time. Submitting
+            this first form never deletes, deactivates, or hides tenant data.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -166,11 +167,10 @@ export function TenantOffboardingWorkflow({
               />
             </div>
             <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-              School and district administrators require a higher-scope reviewer. Platform
-              administrators may submit and advance the workflow themselves after password
-              confirmation; every transition and evidence reference remains audited. Platform
-              approval deactivates the tenant and its accounts, but StormHub does not perform an
-              automatic physical purge.
+              This platform-owner workflow requires identity confirmation for every change. The
+              deletion date and time is chosen after the protected export is recorded and the
+              request is approved. Every transition and evidence reference remains audited.
+              StormHub records the schedule but does not perform an automatic physical purge.
             </div>
             <Button
               type="submit"
@@ -187,12 +187,12 @@ export function TenantOffboardingWorkflow({
         <div className="mb-3 flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-storm-electric" />
           <h2 id="offboarding-requests-heading" className="text-lg font-semibold text-storm-navy">
-            Scoped request history
+            Platform offboarding history
           </h2>
         </div>
         {requests.length === 0 ? (
           <div className="rounded-xl border border-dashed p-8 text-center">
-            <p className="font-medium">No offboarding requests in your scope</p>
+            <p className="font-medium">No tenant offboarding requests</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Requests and their review history will remain available here.
             </p>
@@ -227,6 +227,17 @@ function TenantOffboardingRequestCard({
 
   function review() {
     if (!nextStatus) return;
+    if (
+      nextStatus === "scheduled"
+      && (!scheduledPurgeAt || Number.isNaN(Date.parse(scheduledPurgeAt)) || Date.parse(scheduledPurgeAt) <= Date.now())
+    ) {
+      toast({
+        title: "Choose a future deletion date and time",
+        description: "The deletion schedule must be later than the current time.",
+        variant: "destructive",
+      });
+      return;
+    }
     startTransition(async () => {
       const normalizedSchedule = scheduledPurgeAt
         ? new Date(scheduledPurgeAt).toISOString()
@@ -389,9 +400,9 @@ function TenantOffboardingRequestCard({
                   </div>
                 )}
                 {nextStatus === "scheduled" && (
-                  <div>
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
                     <Label htmlFor={`offboarding-window-${request.id}`}>
-                      Future deletion window
+                      Deletion date and time
                     </Label>
                     <input
                       id={`offboarding-window-${request.id}`}
@@ -401,6 +412,10 @@ function TenantOffboardingRequestCard({
                       required
                       className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground sm:w-72"
                     />
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Choose the exact future time recorded in the offboarding schedule. This does
+                      not automatically purge the tenant.
+                    </p>
                   </div>
                 )}
                 {nextStatus === "completed" && (
@@ -432,12 +447,23 @@ function TenantOffboardingRequestCard({
                     || !nextStatus
                     || (nextStatus === "rejected" && notes.trim().length < 10)
                     || (nextStatus === "export_ready" && exportReference.trim().length === 0)
-                    || (nextStatus === "scheduled" && scheduledPurgeAt.length === 0)
+                    || (
+                      nextStatus === "scheduled"
+                      && (
+                        scheduledPurgeAt.length === 0
+                        || Number.isNaN(Date.parse(scheduledPurgeAt))
+                        || Date.parse(scheduledPurgeAt) <= Date.now()
+                      )
+                    )
                     || (nextStatus === "completed" && completionReference.trim().length < 20)
                   }
                 >
                   {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Record review step
+                  {nextStatus === "scheduled"
+                    ? "Schedule deletion"
+                    : nextStatus === "completed"
+                      ? "Record completed deletion"
+                      : "Record review step"}
                 </Button>
               </>
             )}

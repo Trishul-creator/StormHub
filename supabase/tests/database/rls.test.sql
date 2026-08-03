@@ -936,8 +936,8 @@ SELECT is((SELECT count(*) FROM public.account_deletion_requests), 1::BIGINT, 'c
 SELECT is((SELECT count(*) FROM public.opportunity_signups), 1::BIGINT, 'school admins can review opportunity signups in their own school');
 SELECT is(
   (SELECT count(*) FROM public.feedback),
-  1::BIGINT,
-  'school admins can read support requests only from their assigned school'
+  0::BIGINT,
+  'school admins cannot read platform support requests'
 );
 SELECT is(
   (
@@ -961,14 +961,15 @@ SELECT throws_ok(
   'Administrator access required for this school',
   'school administrators cannot request another school user inventory'
 );
-SELECT is(
-  public.review_feedback_status(
-    'a7000000-0000-4000-8000-000000000001',
-    'a0000000-0000-4000-8000-000000000001',
-    'reviewed'
-  ),
-  TRUE,
-  'school admins can triage a support request from their assigned school'
+SELECT throws_ok(
+  $$SELECT public.review_feedback_status(
+      'a7000000-0000-4000-8000-000000000001',
+      'a0000000-0000-4000-8000-000000000001',
+      'reviewed'
+    )$$,
+  'P0001',
+  'Platform administrator access required',
+  'school admins cannot triage platform support requests'
 );
 SELECT throws_ok(
   $$UPDATE public.feedback
@@ -985,7 +986,7 @@ SELECT throws_ok(
       'reviewed'
     )$$,
   'P0001',
-  'School or district administrator access required',
+  'Platform administrator access required',
   'school admins cannot triage another school support request'
 );
 SELECT lives_ok(
@@ -1350,15 +1351,14 @@ SELECT is(
   1::BIGINT,
   'platform support can still read another school ticket without private-data access'
 );
-SELECT throws_ok(
-  $$SELECT public.review_feedback_status(
+SELECT is(
+  public.review_feedback_status(
       'a7000000-0000-4000-8000-000000000001',
       'a0000000-0000-4000-8000-000000000001',
       'resolved'
-    )$$,
-  'P0001',
-  'Platform support access is read-only',
-  'platform support cannot change feedback during a read-only session'
+    ),
+  TRUE,
+  'platform administrators can resolve support tickets without private-data access'
 );
 SELECT ok(
   (SELECT count(*) FROM public.club_assignment_submissions) > 0,
@@ -1549,8 +1549,8 @@ SELECT is(
 );
 SELECT is(
   (SELECT count(*) FROM public.feedback),
-  1::BIGINT,
-  'district admins read support requests only from schools in their district'
+  0::BIGINT,
+  'district admins cannot read platform support requests'
 );
 SELECT is(
   (
@@ -1561,14 +1561,15 @@ SELECT is(
   0::BIGINT,
   'district admins cannot read another district support request'
 );
-SELECT is(
-  public.review_feedback_status(
-    'b7000000-0000-4000-8000-000000000002',
-    'b0000000-0000-4000-8000-000000000002',
-    'reviewed'
-  ),
-  TRUE,
-  'district admins can triage support requests inside their district'
+SELECT throws_ok(
+  $$SELECT public.review_feedback_status(
+      'b7000000-0000-4000-8000-000000000002',
+      'b0000000-0000-4000-8000-000000000002',
+      'reviewed'
+    )$$,
+  'P0001',
+  'Platform administrator access required',
+  'district admins cannot triage platform support requests'
 );
 RESET ROLE;
 

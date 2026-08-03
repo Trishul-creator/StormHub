@@ -117,6 +117,9 @@ export default async function TenantOffboardingPage({
   searchParams: Promise<{ historyPage?: string }>;
 }) {
   const { profile } = await requireAdmin();
+  if (profile.role !== "super_admin") {
+    redirect("/admin?error=super_admin_required");
+  }
   const supabase = await createClient();
   const params = await searchParams;
   const requestedHistoryPage = /^\d+$/.test(params.historyPage ?? "")
@@ -230,7 +233,7 @@ export default async function TenantOffboardingPage({
     <main className="container mx-auto px-4 py-8">
       <PageHeader
         title="Tenant offboarding"
-        description="Record, review, and safely recover school or district deletion workflows."
+        description="Record, review, schedule, and safely recover school or district deletion workflows."
       >
         <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs text-muted-foreground">
           <ArchiveX className="h-3.5 w-3.5" />

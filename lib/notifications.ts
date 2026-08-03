@@ -416,6 +416,41 @@ export async function createAdminAttentionNotification(input: {
   );
 }
 
+export async function createPlatformAdminAttentionNotification(input: {
+  title: string;
+  message: string;
+  link: string;
+  importance?: NotificationImportance;
+  type?: NotificationType;
+}): Promise<void> {
+  if (isDemoMode()) return;
+  const admin = createAdminClient();
+  if (!admin) return;
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("role", "super_admin")
+    .eq("account_status", "active");
+  if (error) {
+    console.error("[createPlatformAdminAttentionNotification]", error.message);
+    return;
+  }
+  await Promise.all(
+    (data ?? []).map((profile: { id: string }) =>
+      createNotification({
+        recipientUserId: profile.id,
+        type: input.type ?? "approval_needed",
+        importance: input.importance ?? "important",
+        title: input.title,
+        message: input.message,
+        link: input.link,
+        sendEmail: true,
+        adminAttention: true,
+      })
+    )
+  );
+}
+
 export async function createApprovalNeededNotifications(input: {
   schoolId: string;
   clubId?: string | null;
