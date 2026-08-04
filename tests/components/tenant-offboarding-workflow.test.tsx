@@ -125,7 +125,8 @@ describe("TenantOffboardingWorkflow", () => {
     );
 
     expect(screen.getByRole("option", { name: "scheduled" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Future deletion window")).toBeVisible();
+    expect(screen.getByLabelText("Deletion date and time")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Schedule deletion" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Cancel request" })).toBeVisible();
     expect(screen.getByText(/does not perform an automatic physical purge/i)).toBeVisible();
   });

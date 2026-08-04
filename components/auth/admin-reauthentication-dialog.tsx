@@ -5,7 +5,9 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { KeyRound, Loader2, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Captcha } from "@/components/auth/captcha";
 import { PasswordInput } from "@/components/auth/password-input";
+import { friendlySignInError } from "@/lib/errors";
 import { createClient } from "@/lib/supabase/client";
 
 function GoogleMark() {
@@ -33,13 +35,18 @@ export function AdminReauthenticationDialog({
   returnTo?: string;
 }) {
   const [password, setPassword] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaAttempt, setCaptchaAttempt] = useState(0);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const googleAuthEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true";
+  const captchaRequired = Boolean(process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY?.trim());
 
   useEffect(() => {
     if (!open) {
       setPassword("");
+      setCaptchaToken(null);
+      setCaptchaAttempt((attempt) => attempt + 1);
       setError(null);
       setPending(false);
     }
@@ -52,15 +59,26 @@ export function AdminReauthenticationDialog({
       setError("Authentication is not configured for this deployment.");
       return;
     }
+    if (captchaRequired && !captchaToken) {
+      setError("Complete the CAPTCHA before confirming your identity.");
+      return;
+    }
     setPending(true);
     setError(null);
     const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
+      options: captchaToken ? { captchaToken } : undefined,
     });
     if (signInError || data.user?.email?.toLowerCase() !== email.toLowerCase()) {
       setPending(false);
-      setError(signInError?.message || "That password did not confirm this administrator account.");
+      setCaptchaToken(null);
+      setCaptchaAttempt((attempt) => attempt + 1);
+      setError(
+        signInError
+          ? friendlySignInError(signInError).message
+          : "That password did not confirm this administrator account."
+      );
       return;
     }
     setPassword("");
@@ -135,12 +153,17 @@ export function AdminReauthenticationDialog({
                 className="mt-1"
               />
             </div>
+            <Captcha key={captchaAttempt} onToken={setCaptchaToken} />
             {error && (
               <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {error}
               </p>
             )}
-            <Button type="submit" className="w-full" disabled={pending || !password}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={pending || !password || (captchaRequired && !captchaToken)}
+            >
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
               Confirm with password
             </Button>

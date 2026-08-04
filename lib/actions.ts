@@ -59,6 +59,7 @@ import {
   createNotificationsForClubMembers,
   createNotificationsForClubSponsors,
   createOpportunityDeadlineReminders,
+  createPlatformAdminAttentionNotification,
 } from "@/lib/notifications";
 import { processEmailOutbox } from "@/lib/email";
 import type { NotificationImportance, NotificationPreferences } from "@/types/database";
@@ -859,10 +860,9 @@ export async function submitFeedback(data: {
   ]);
 
   await Promise.all([
-    createAdminAttentionNotification({
-      schoolId: supportSchoolId,
+    createPlatformAdminAttentionNotification({
       title: "New support request",
-      message: `A ${normalizedCategory.replaceAll("-", " ")} message was submitted to your school inbox.`,
+      message: `A ${normalizedCategory.replaceAll("-", " ")} message was submitted to the platform support inbox.`,
       link: "/admin/feedback",
       importance: "important",
       type: "system_message",
@@ -897,15 +897,12 @@ export async function updateFeedbackStatus(
   }
   const supabase = await createClient();
   const profile = await getCurrentProfile();
-  if (!supabase || !profile || !isAdminRole(profile.role)) {
-    return { success: false, error: "Administrator access required." };
-  }
-  if (profile.role === "super_admin") {
-    return { success: false, error: "Platform support access is read-only." };
+  if (!supabase || !profile || profile.role !== "super_admin") {
+    return { success: false, error: "Platform administrator access required." };
   }
   const school = await getSchoolById(schoolId.trim());
-  if (!school || !canAccessSchoolAdmin(profile, school.id, school.district_id)) {
-    return { success: false, error: "You cannot manage support requests for that school." };
+  if (!school) {
+    return { success: false, error: "Support school not found." };
   }
   const { data: updated, error } = await supabase.rpc("review_feedback_status", {
     target_feedback_id: id,
@@ -932,15 +929,12 @@ export async function respondToFeedback(
   }
   const supabase = await createClient();
   const profile = await getCurrentProfile();
-  if (!supabase || !profile || !isAdminRole(profile.role)) {
-    return { success: false, error: "Administrator access required." };
-  }
-  if (profile.role === "super_admin") {
-    return { success: false, error: "Platform support access is read-only." };
+  if (!supabase || !profile || profile.role !== "super_admin") {
+    return { success: false, error: "Platform administrator access required." };
   }
   const school = await getSchoolById(schoolId.trim());
-  if (!school || !canAccessSchoolAdmin(profile, school.id, school.district_id)) {
-    return { success: false, error: "You cannot manage support requests for that school." };
+  if (!school) {
+    return { success: false, error: "Support school not found." };
   }
 
   const { data: feedback, error: feedbackError } = await supabase
@@ -3396,6 +3390,7 @@ function friendlyTenantOffboardingError(error: unknown, fallback: string): strin
       : "";
   const safeMessages = [
     "Active administrator access required",
+    "Active platform administrator access required",
     "Choose a school or district scope",
     "Provide an offboarding reason between 10 and 2,000 characters",
     "The selected school must belong to a district",
@@ -3437,8 +3432,8 @@ export async function submitTenantOffboardingRequest(data: {
   }
   const supabase = await createClient();
   const actor = await getCurrentProfile();
-  if (!supabase || !actor || !isAdminRole(actor.role)) {
-    return { success: false, error: "Active administrator access is required." };
+  if (!supabase || !actor || actor.role !== "super_admin") {
+    return { success: false, error: "Active platform administrator access is required." };
   }
   const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
   if (reauthentication) return reauthentication;
@@ -3484,8 +3479,8 @@ export async function reviewTenantOffboardingRequest(data: {
   }
   const supabase = await createClient();
   const actor = await getCurrentProfile();
-  if (!supabase || !actor || !isAdminRole(actor.role)) {
-    return { success: false, error: "Active administrator access is required." };
+  if (!supabase || !actor || actor.role !== "super_admin") {
+    return { success: false, error: "Active platform administrator access is required." };
   }
   const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
   if (reauthentication) return reauthentication;
@@ -3538,8 +3533,8 @@ export async function cancelTenantOffboardingRequest(data: {
   }
   const supabase = await createClient();
   const actor = await getCurrentProfile();
-  if (!supabase || !actor || !isAdminRole(actor.role)) {
-    return { success: false, error: "Active administrator access is required." };
+  if (!supabase || !actor || actor.role !== "super_admin") {
+    return { success: false, error: "Active platform administrator access is required." };
   }
   const reauthentication = await requireRecentAdminAuthentication(supabase, actor.id);
   if (reauthentication) return reauthentication;

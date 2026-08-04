@@ -1985,24 +1985,20 @@ export async function getFeedbackItems(
   if (isDemoMode() || !schoolId) return [];
   const actor = viewer === undefined ? await getCurrentProfile() : viewer;
   const admin = createAdminClient();
-  if (!actor || !admin || !isAdminRole(actor.role)) return [];
+  if (!actor || !admin || actor.role !== "super_admin") return [];
 
   const { data: school, error: schoolError } = await admin
     .from("schools")
     .select("id,district_id")
     .eq("id", schoolId)
     .maybeSingle();
-  if (
-    schoolError
-    || !school
-    || !canAccessSchoolAdmin(actor, school.id, school.district_id)
-  ) {
+  if (schoolError || !school) {
     if (schoolError) console.error("[getFeedbackItems school]", schoolError.message);
     return [];
   }
 
-  // Feedback is intentionally submitted for administrative review. Use the
-  // server-only client after enforcing the viewer's exact tenant scope so a
+  // Feedback is intentionally submitted for platform support review. Use the
+  // server-only client after enforcing that the viewer is a platform administrator so a
   // profile join or private-data support gate cannot hide a successfully stored ticket.
   const { data, error } = await admin
     .from("feedback")

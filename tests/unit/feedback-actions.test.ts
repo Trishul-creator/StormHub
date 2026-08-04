@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   createEmailOutboxItem: vi.fn(),
   createNotification: vi.fn(),
+  createPlatformAdminAttentionNotification: vi.fn(),
   getCurrentProfile: vi.fn(),
   getSchoolById: vi.fn(),
   revalidatePath: vi.fn(),
@@ -41,6 +42,7 @@ vi.mock("@/lib/notifications", () => ({
   createNotificationsForClubMembers: vi.fn(),
   createNotificationsForClubSponsors: vi.fn(),
   createOpportunityDeadlineReminders: vi.fn(),
+  createPlatformAdminAttentionNotification: mocks.createPlatformAdminAttentionNotification,
 }));
 vi.mock("@/lib/captcha", () => ({
   verifyCaptchaToken: vi.fn().mockResolvedValue({ success: true }),
@@ -94,6 +96,12 @@ describe("support feedback release safeguards", () => {
       school_id: "public-school",
       user_id: null,
     }));
+    expect(mocks.createPlatformAdminAttentionNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "New support request",
+        link: "/admin/feedback",
+      })
+    );
   });
 
   it("ignores a spoofed school selection for an authenticated school user", async () => {
@@ -132,9 +140,9 @@ describe("support feedback release safeguards", () => {
       rpc,
     });
     mocks.getCurrentProfile.mockResolvedValue({
-      id: "admin-1",
-      role: "admin",
-      school_id: "school-1",
+      id: "platform-admin-1",
+      role: "super_admin",
+      school_id: null,
       account_status: "active",
     });
     mocks.getSchoolById.mockResolvedValue({
@@ -156,6 +164,28 @@ describe("support feedback release safeguards", () => {
     expect(mocks.createNotification).not.toHaveBeenCalled();
   });
 
+  it("rejects school administrators before loading a platform support ticket", async () => {
+    const from = vi.fn();
+    mocks.createClient.mockResolvedValue({ from, rpc: vi.fn() });
+    mocks.getCurrentProfile.mockResolvedValue({
+      id: "school-admin-1",
+      role: "admin",
+      school_id: "school-1",
+      account_status: "active",
+    });
+
+    await expect(respondToFeedback(
+      "feedback-1",
+      "Attempted school-admin response.",
+      "school-1"
+    )).resolves.toEqual({
+      success: false,
+      error: "Platform administrator access required.",
+    });
+    expect(from).not.toHaveBeenCalled();
+    expect(mocks.getSchoolById).not.toHaveBeenCalled();
+  });
+
   it("uses a stable dedupe key and resolves only after an outbox id exists", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: true, error: null });
     const feedback = {
@@ -171,9 +201,9 @@ describe("support feedback release safeguards", () => {
       rpc,
     });
     mocks.getCurrentProfile.mockResolvedValue({
-      id: "admin-1",
-      role: "admin",
-      school_id: "school-1",
+      id: "platform-admin-1",
+      role: "super_admin",
+      school_id: null,
       account_status: "active",
     });
     mocks.getSchoolById.mockResolvedValue({

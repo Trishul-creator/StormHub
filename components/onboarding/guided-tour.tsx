@@ -326,7 +326,7 @@ function adminTourSteps(): TourStep[] {
     {
       selector: '[data-tour="admin-tools"]',
       title: "School administration menu",
-      description: "Statistics, users, moderation, support, offboarding, deletion requests, and the audit log remain together here.",
+      description: "Statistics, users, moderation, deletion requests, and the audit log remain together here.",
     },
     {
       selector: '[data-tour="admin-users"]',
@@ -337,11 +337,6 @@ function adminTourSteps(): TourStep[] {
       selector: '[data-tour="admin-moderation"]',
       title: "Moderation and approvals",
       description: "Review pending school content from one approval queue.",
-    },
-    {
-      selector: '[data-tour="admin-support"]',
-      title: "Support inbox",
-      description: "Contact-form messages submitted to your school appear here without a private-data support session.",
     },
     ...accountSteps("admin"),
   ];
@@ -363,7 +358,7 @@ function districtAdminTourSteps(): TourStep[] {
     {
       selector: '[data-tour="admin-tools"]',
       title: "District administration menu",
-      description: "Move between district structure, scoped statistics, users, moderation, support, offboarding, and audit history.",
+      description: "Move between district structure, scoped statistics, users, moderation, deletion requests, and audit history.",
     },
     {
       selector: '[data-tour="admin-statistics"]',
@@ -374,16 +369,6 @@ function districtAdminTourSteps(): TourStep[] {
       selector: '[data-tour="admin-users"]',
       title: "District user management",
       description: "Choose a school, then assign its teachers and school administrators with confirmation for important changes.",
-    },
-    {
-      selector: '[data-tour="admin-support"]',
-      title: "School-routed support",
-      description: "Choose a school to read its submitted support tickets; private student data remains separately protected.",
-    },
-    {
-      selector: '[data-tour="admin-offboarding"]',
-      title: "Protected offboarding",
-      description: "Submit school or district instructions and prepare exports; final approval remains a platform authority action.",
     },
     ...accountSteps("district_admin"),
   ];
@@ -425,12 +410,12 @@ function superAdminTourSteps(): TourStep[] {
     {
       selector: '[data-tour="admin-support"]',
       title: "Support inbox",
-      description: "Choose a school to read its submitted ticket. Start private-data access only when resolving it truly requires protected records.",
+      description: "Choose a school to review and respond to its submitted ticket. Start private-data access only when resolving it truly requires protected records.",
     },
     {
       selector: '[data-tour="admin-offboarding"]',
       title: "Complete tenant offboarding",
-      description: "You may submit and advance the audited workflow yourself after password confirmation; evidence and retention safeguards still apply.",
+      description: "Submit and advance the audited workflow after identity confirmation, then choose the deletion date and time once the export is approved.",
     },
     {
       selector: '[data-tour="admin-system-health"]',

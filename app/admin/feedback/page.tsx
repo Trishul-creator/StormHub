@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Building2, Inbox, ShieldCheck } from "lucide-react";
 import { FeedbackStatusActions } from "@/components/admin/feedback-status-actions";
 import { SupportSchoolSelector } from "@/components/admin/support-school-selector";
@@ -13,10 +13,9 @@ import { getFeedbackItems } from "@/lib/data";
 import {
   getAllSchools,
   getAdminScopeSchools,
-  getSchoolForProfile,
 } from "@/lib/schools";
 import { formatDateTime, humanizeLabel } from "@/lib/utils";
-import type { FeedbackStatus, School } from "@/types/database";
+import type { FeedbackStatus } from "@/types/database";
 
 interface SupportInboxPageProps {
   searchParams: Promise<{ status?: string; school?: string }>;
@@ -31,19 +30,16 @@ const statuses: Array<{ label: string; value?: FeedbackStatus }> = [
 
 export default async function SupportInboxPage({ searchParams }: SupportInboxPageProps) {
   const { profile } = await requireAdmin();
+  if (profile.role !== "super_admin") {
+    redirect("/admin?error=super_admin_required");
+  }
   const params = await searchParams;
   const selectedStatus = statuses.find((item) => item.value === params.status)?.value;
   const requestedSchoolSlug = params.school?.trim() || null;
-  const canChooseSchool = profile.role === "district_admin" || profile.role === "super_admin";
-
-  const schools = canChooseSchool
-    ? getAdminScopeSchools(await getAllSchools(), profile)
-    : [];
-  const selectedSchool = canChooseSchool
-    ? requestedSchoolSlug
-      ? schools.find((school) => school.slug === requestedSchoolSlug) ?? null
-      : null
-    : await getSchoolForProfile(profile);
+  const schools = getAdminScopeSchools(await getAllSchools(), profile);
+  const selectedSchool = requestedSchoolSlug
+    ? schools.find((school) => school.slug === requestedSchoolSlug) ?? null
+    : null;
 
   if (requestedSchoolSlug && !selectedSchool) notFound();
 
@@ -61,14 +57,10 @@ export default async function SupportInboxPage({ searchParams }: SupportInboxPag
     <div className="container mx-auto px-4 py-8">
       <PageHeader
         title="Support inbox"
-        description="Review support requests inside the school where they were submitted. Tickets are separate from temporary access to private school records."
+        description="Review platform support requests by school. Tickets remain separate from temporary access to private school records."
       />
 
-      <SupportScope
-        profileRole={profile.role}
-        schools={schools}
-        selectedSchool={selectedSchool}
-      />
+      <SupportSchoolSelector schools={schools} activeSlug={selectedSchool?.slug} />
 
       {!selectedSchool ? (
         <Card className="border-blue-200 dark:border-blue-900">
@@ -85,8 +77,7 @@ export default async function SupportInboxPage({ searchParams }: SupportInboxPag
         </Card>
       ) : (
         <>
-          {profile.role === "super_admin" && (
-            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mb-6 flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
                 <div>
@@ -102,14 +93,13 @@ export default async function SupportInboxPage({ searchParams }: SupportInboxPag
                   Private-data instructions
                 </Link>
               </Button>
-            </div>
-          )}
+          </div>
 
           <div className="mb-6 flex flex-wrap gap-2" aria-label="Filter support messages">
             {statuses.map((item) => {
               const active = item.value === selectedStatus || (!item.value && !selectedStatus);
               const query = new URLSearchParams();
-              if (canChooseSchool) query.set("school", selectedSchool.slug);
+              query.set("school", selectedSchool.slug);
               if (item.value) query.set("status", item.value);
               const href = query.size > 0
                 ? `/admin/feedback?${query.toString()}`
@@ -128,9 +118,7 @@ export default async function SupportInboxPage({ searchParams }: SupportInboxPag
               description={`No matching contact-form submissions are stored for ${selectedSchool.name}.`}
               actionLabel={selectedStatus ? "View all messages" : undefined}
               actionHref={selectedStatus
-                ? canChooseSchool
-                  ? `/admin/feedback?school=${encodeURIComponent(selectedSchool.slug)}`
-                  : "/admin/feedback"
+                ? `/admin/feedback?school=${encodeURIComponent(selectedSchool.slug)}`
                 : undefined}
             />
           ) : (
@@ -152,23 +140,18 @@ export default async function SupportInboxPage({ searchParams }: SupportInboxPag
                         <p className="text-xs text-muted-foreground">
                           {selectedSchool.name} · {formatDateTime(item.created_at)}
                         </p>
-                        {replyEmail && profile.role !== "super_admin" && (
+                        {replyEmail && (
                           <a href={`mailto:${replyEmail}`} className="block break-all text-sm text-storm-electric hover:underline">
                             {replyEmail}
                           </a>
                         )}
-                        {replyEmail && profile.role === "super_admin" && (
-                          <p className="break-all text-sm text-muted-foreground">{replyEmail}</p>
-                        )}
                       </div>
-                      {profile.role !== "super_admin" && (
-                        <FeedbackStatusActions
-                          id={item.id}
-                          schoolId={selectedSchool.id}
-                          status={item.status}
-                          canReply={Boolean(replyEmail)}
-                        />
-                      )}
+                      <FeedbackStatusActions
+                        id={item.id}
+                        schoolId={selectedSchool.id}
+                        status={item.status}
+                        canReply={Boolean(replyEmail)}
+                      />
                     </CardHeader>
                     <CardContent>
                       <p className="whitespace-pre-wrap text-sm leading-6 text-storm-navy/85">{item.message}</p>
@@ -181,31 +164,5 @@ export default async function SupportInboxPage({ searchParams }: SupportInboxPag
         </>
       )}
     </div>
-  );
-}
-
-function SupportScope({
-  profileRole,
-  schools,
-  selectedSchool,
-}: {
-  profileRole: "student" | "teacher" | "admin" | "district_admin" | "super_admin";
-  schools: School[];
-  selectedSchool: School | null;
-}) {
-  if (profileRole === "admin") {
-    return (
-      <div className="mb-6 flex items-center gap-3 rounded-xl border bg-card p-4">
-        <Building2 className="h-5 w-5 text-storm-electric" />
-        <div>
-          <p className="font-semibold text-storm-navy">{selectedSchool?.name || "Assigned school"}</p>
-          <p className="text-sm text-muted-foreground">Support requests are locked to your school.</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <SupportSchoolSelector schools={schools} activeSlug={selectedSchool?.slug} />
   );
 }

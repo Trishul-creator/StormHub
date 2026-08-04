@@ -32,19 +32,19 @@ describe("AdminNavigation", () => {
 
     expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/admin");
     expect(screen.queryByRole("link", { name: "Districts" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Support inbox" })).toHaveAttribute("href", "/admin/feedback");
     expect(screen.getByRole("link", { name: "Moderation" })).toHaveAttribute("href", "/admin/content");
-    expect(screen.getByRole("link", { name: "Tenant offboarding" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Support inbox" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Tenant offboarding" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "System health" })).not.toBeInTheDocument();
   });
 
-  it("gives district administrators their district workspace and scoped support inbox", () => {
+  it("gives district administrators their district workspace without platform-owner tools", () => {
     render(<AdminNavigation role="district_admin" />);
 
     expect(screen.getByRole("link", { name: "District" })).toHaveAttribute("href", "/admin/districts");
-    expect(screen.getByRole("link", { name: "Support inbox" })).toHaveAttribute("href", "/admin/feedback");
     expect(screen.getByRole("link", { name: "Moderation" })).toHaveAttribute("href", "/admin/content");
-    expect(screen.getByRole("link", { name: "Tenant offboarding" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Support inbox" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Tenant offboarding" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "System health" })).not.toBeInTheDocument();
   });
 });
