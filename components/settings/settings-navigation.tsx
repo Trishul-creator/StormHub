@@ -1,50 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { Bell, ChevronRight, Cloud, Compass, Palette, Shield, User } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Bell, ChevronRight, Cloud, Compass, Languages, Palette, Shield, User } from "lucide-react";
 import { cn } from "@/lib/cn";
-
-const settingsSections = [
-  {
-    id: "profile",
-    label: "Profile",
-    description: "Personal details",
-    icon: User,
-  },
-  {
-    id: "notifications",
-    label: "Notifications",
-    description: "Updates and email",
-    icon: Bell,
-  },
-  {
-    id: "integrations",
-    label: "Integrations",
-    description: "Google Drive",
-    icon: Cloud,
-  },
-  {
-    id: "appearance",
-    label: "Appearance",
-    description: "Light, dark, or system",
-    icon: Palette,
-  },
-  {
-    id: "walkthrough",
-    label: "Walkthrough",
-    description: "Replay the guided tour",
-    icon: Compass,
-  },
-  {
-    id: "account",
-    label: "Account & privacy",
-    description: "Data and deletion",
-    icon: Shield,
-  },
-] as const;
+import { useLanguage } from "@/components/i18n/language-provider";
 
 export function SettingsNavigation() {
+  const { t } = useLanguage();
+  const settingsSections = useMemo(() => [
+    { id: "profile", label: t("settings.profile"), description: t("settings.profileShort"), icon: User },
+    { id: "notifications", label: t("settings.notifications"), description: t("settings.notificationsShort"), icon: Bell },
+    { id: "integrations", label: t("settings.integrations"), description: t("settings.integrationsShort"), icon: Cloud },
+    { id: "appearance", label: t("settings.appearance"), description: t("settings.appearanceShort"), icon: Palette },
+    { id: "language", label: t("common.language"), description: t("settings.languageShort"), icon: Languages },
+    { id: "walkthrough", label: t("settings.walkthrough"), description: t("settings.walkthroughShort"), icon: Compass },
+    { id: "account", label: t("settings.account"), description: t("settings.accountShort"), icon: Shield },
+  ] as const, [t]);
   const [activeSection, setActiveSection] = useState<(typeof settingsSections)[number]["id"]>("profile");
 
   useEffect(() => {
@@ -69,21 +41,21 @@ export function SettingsNavigation() {
     });
 
     return () => observer.disconnect();
-  }, []);
+  }, [settingsSections]);
 
   return (
     <aside data-tour="settings-navigation" className="min-w-0 max-w-full lg:sticky lg:top-24 lg:self-start">
       <div className="max-w-full overflow-hidden rounded-2xl border bg-card/85 p-2 shadow-sm backdrop-blur">
         <div className="hidden border-b px-3 pb-4 pt-2 lg:block">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-storm-electric">
-            Your preferences
+            {t("settings.preferences")}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Choose a section to review.
+            {t("settings.chooseSection")}
           </p>
         </div>
         <nav
-          aria-label="Settings sections"
+          aria-label={t("settings.sections")}
           className="flex w-full max-w-full gap-2 overflow-x-auto p-1 lg:mt-2 lg:flex-col lg:overflow-visible"
         >
           {settingsSections.map(({ id, label, description, icon: Icon }) => {

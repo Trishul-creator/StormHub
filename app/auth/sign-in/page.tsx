@@ -14,8 +14,10 @@ import { Captcha } from "@/components/auth/captcha";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { PasswordInput } from "@/components/auth/password-input";
 import { safeAuthRedirectPath } from "@/lib/auth-redirect";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 export default function SignInPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
@@ -27,23 +29,23 @@ export default function SignInPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("password_updated") === "1") {
       toast({
-        title: "Password updated",
-        description: "Sign in with your new password.",
+        title: t("auth.passwordUpdated"),
+        description: t("auth.passwordUpdatedDescription"),
       });
     } else if (params.get("error") === "invalid_or_expired_link") {
       toast({
-        title: "Link unavailable",
-        description: "That email link is invalid or expired. Request a new one and try again.",
+        title: t("auth.linkUnavailable"),
+        description: t("auth.linkUnavailableDescription"),
         variant: "destructive",
       });
     } else if (params.get("error") === "google_sign_in_failed") {
       toast({
-        title: "Google sign-in failed",
-        description: "Google could not finish signing you in. Please try again.",
+        title: t("auth.googleFailed"),
+        description: t("auth.googleFailedDescription"),
         variant: "destructive",
       });
     }
-  }, []);
+  }, [t]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -55,8 +57,8 @@ export default function SignInPage() {
     if (captchaRequired && !captchaToken) {
       setLoading(false);
       toast({
-        title: "CAPTCHA required",
-        description: "Complete the CAPTCHA before signing in.",
+        title: t("auth.captchaRequired"),
+        description: t("auth.captchaRequiredDescription"),
         variant: "destructive",
       });
       return;
@@ -66,7 +68,7 @@ export default function SignInPage() {
 
     setLoading(false);
     if (result.success) {
-      toast({ title: "Welcome back!", description: "You're signed in to StormHub." });
+      toast({ title: t("auth.welcomeBack"), description: t("auth.signedIn") });
       const params = new URLSearchParams(window.location.search);
       const redirectTo = "redirectTo" in result && typeof result.redirectTo === "string" ? result.redirectTo : undefined;
       router.push(safeAuthRedirectPath(params.get("redirect"), redirectTo || "/dashboard"));
@@ -75,7 +77,7 @@ export default function SignInPage() {
       setCaptchaToken(null);
       setCaptchaAttempt((attempt) => attempt + 1);
       toast({
-        title: result.errorTitle || "Couldn’t sign in",
+        title: result.errorTitle || t("auth.couldNotSignIn"),
         description: result.error,
         variant: "destructive",
       });
@@ -89,8 +91,8 @@ export default function SignInPage() {
           <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-storm-gradient">
             <Zap className="h-5 w-5 text-white" />
           </div>
-          <CardTitle>Sign in to StormHub</CardTitle>
-          <CardDescription>Use your school email to sign in</CardDescription>
+          <CardTitle>{t("auth.signInTitle")}</CardTitle>
+          <CardDescription>{t("auth.signInDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           {googleAuthEnabled && (
@@ -98,18 +100,18 @@ export default function SignInPage() {
               <GoogleAuthButton />
               <div className="my-4 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
                 <span className="h-px flex-1 bg-border" />
-                <span>or use your password</span>
+                <span>{t("auth.orPassword")}</span>
                 <span className="h-px flex-1 bg-border" />
               </div>
             </>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("auth.email")}</Label>
               <Input id="email" name="email" type="email" required placeholder="you@example.com" className="mt-1" />
             </div>
             <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("auth.password")}</Label>
               <PasswordInput
                 id="password"
                 name="password"
@@ -119,18 +121,18 @@ export default function SignInPage() {
               />
               <div className="mt-2 text-right">
                 <Link href="/auth/forgot-password" className="text-sm text-storm-electric underline underline-offset-2">
-                  Forgot password?
+                  {t("auth.forgotPassword")}
                 </Link>
               </div>
             </div>
             <Captcha key={captchaAttempt} onToken={setCaptchaToken} />
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
+              {loading ? t("auth.signingIn") : t("common.signIn")}
             </Button>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/auth/sign-up" className="text-storm-electric underline">Sign up</Link>
+            {t("auth.noAccount")}{" "}
+            <Link href="/auth/sign-up" className="text-storm-electric underline">{t("auth.signUp")}</Link>
           </p>
         </CardContent>
       </Card>

@@ -9,6 +9,7 @@ describe("SettingsNavigation", () => {
     expect(screen.getByRole("navigation", { name: "Settings sections" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /profile/i })).toHaveAttribute("href", "#profile");
     expect(screen.getByRole("link", { name: /notifications/i })).toHaveAttribute("href", "#notifications");
+    expect(screen.getByRole("link", { name: /language/i })).toHaveAttribute("href", "#language");
 
     const accountLink = screen.getByRole("link", { name: /account & privacy/i });
     expect(accountLink).toHaveAttribute("href", "#account");
