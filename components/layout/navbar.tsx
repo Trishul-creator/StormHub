@@ -15,13 +15,8 @@ import { NotificationBell } from "@/components/notifications/notification-bell";
 import { cn } from "@/lib/cn";
 import { ThemeToggle } from "@/components/theme/theme-controls";
 import { useDismissibleLayer } from "@/hooks/use-dismissible-layer";
-
-const baseNavLinks = [
-  { href: "/", label: "Home" },
-  { href: "/clubs", label: "Clubs" },
-  { href: "/calendar", label: "Calendar" },
-  { href: "/opportunities", label: "Opportunities" },
-];
+import { useLanguage } from "@/components/i18n/language-provider";
+import { LanguageSwitcher } from "@/components/i18n/language-controls";
 
 interface NavbarProps {
   isLoggedIn?: boolean;
@@ -47,6 +42,7 @@ export function Navbar({
   districtSlug,
 }: NavbarProps) {
   const [open, setOpen] = useState(false);
+  const { t } = useLanguage();
   const router = useRouter();
   const pathname = usePathname();
   const mobileMenuRef = useDismissibleLayer<HTMLElement>(open, () => setOpen(false));
@@ -60,47 +56,53 @@ export function Navbar({
         ? "/manage"
         : "/dashboard";
   const primaryLabel = role === "super_admin"
-    ? "Platform Admin"
+    ? t("common.platformAdmin")
     : role === "district_admin"
-      ? "District Admin"
+      ? t("common.districtAdmin")
       : role === "admin" || role === "teacher"
-        ? "Manage"
-        : "Dashboard";
+        ? t("common.manage")
+        : t("common.dashboard");
+  const baseNavLinks = [
+    { href: "/", label: t("common.home"), tourKey: "home" },
+    { href: "/clubs", label: t("common.clubs"), tourKey: "clubs" },
+    { href: "/calendar", label: t("common.calendar"), tourKey: "calendar" },
+    { href: "/opportunities", label: t("common.opportunities"), tourKey: "opportunities" },
+  ];
   const schoolClubHref = schoolSlug ? `/s/${schoolSlug}/clubs` : "/clubs";
   const schoolCalendarHref = schoolSlug ? `/s/${schoolSlug}/calendar` : "/calendar";
   const schoolOpportunitiesHref = schoolSlug ? `/s/${schoolSlug}/opportunities` : "/opportunities";
   const navLinks = !isLoggedIn
     ? baseNavLinks
       : role === "super_admin" || role === "district_admin"
-      ? [{ href: primaryHref, label: primaryLabel }]
+      ? [{ href: primaryHref, label: primaryLabel, tourKey: "primary" }]
       : role === "admin" || role === "teacher"
         ? [
-            { href: primaryHref, label: primaryLabel },
-            { href: schoolClubHref, label: "Clubs" },
-            { href: schoolCalendarHref, label: "Calendar" },
-            { href: schoolOpportunitiesHref, label: "Opportunities" },
+            { href: primaryHref, label: primaryLabel, tourKey: "primary" },
+            { href: schoolClubHref, label: t("common.clubs"), tourKey: "clubs" },
+            { href: schoolCalendarHref, label: t("common.calendar"), tourKey: "calendar" },
+            { href: schoolOpportunitiesHref, label: t("common.opportunities"), tourKey: "opportunities" },
             ...(role === "admin"
               ? [
-                  { href: "/admin", label: "Administration" },
+                  { href: "/admin", label: t("common.administration"), tourKey: "administration" },
                 ]
               : []),
           ]
         : [
-            { href: primaryHref, label: primaryLabel },
-            { href: schoolClubHref, label: "Clubs" },
-            { href: schoolCalendarHref, label: "Calendar" },
-            { href: schoolOpportunitiesHref, label: "Opportunities" },
+            { href: primaryHref, label: primaryLabel, tourKey: "primary" },
+            { href: schoolClubHref, label: t("common.clubs"), tourKey: "clubs" },
+            { href: schoolCalendarHref, label: t("common.calendar"), tourKey: "calendar" },
+            { href: schoolOpportunitiesHref, label: t("common.opportunities"), tourKey: "opportunities" },
           ];
   const isActivePath = (href: string) => {
     if ((role === "super_admin" || role === "district_admin") && href === primaryHref && pathname.startsWith("/admin")) return true;
     return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
   };
-  const tourTargetForLink = (href: string, label: string) => {
-    if (href === primaryHref) return "primary-nav";
-    if (label === "Clubs") return "clubs-nav";
-    if (label === "Calendar") return "calendar-nav";
-    if (label === "Opportunities") return "opportunities-nav";
-    if (label === "Administration") return "administration-nav";
+  const tourTargetForLink = (tourKey: string) => {
+    if (tourKey === "primary") return "primary-nav";
+    if (tourKey === "clubs") return "clubs-nav";
+    if (tourKey === "calendar") return "calendar-nav";
+    if (tourKey === "opportunities") return "opportunities-nav";
+    if (tourKey === "administration") return "administration-nav";
     return undefined;
   };
 
@@ -126,7 +128,7 @@ export function Navbar({
             <Link
               key={link.href}
               href={link.href}
-              data-tour={tourTargetForLink(link.href, link.label)}
+              data-tour={tourTargetForLink(link.tourKey)}
               aria-current={isActivePath(link.href) ? "page" : undefined}
               className={cn(
                 "relative py-2 text-sm font-medium transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:origin-left after:rounded-full after:bg-storm-electric after:transition-transform after:duration-200 hover:text-storm-electric hover:after:scale-x-100",
@@ -144,11 +146,11 @@ export function Navbar({
           {isLoggedIn ? (
             <>
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/search" aria-label="Search"><Search className="h-4 w-4" /></Link>
+                <Link href="/search" aria-label={t("common.search")}><Search className="h-4 w-4" /></Link>
               </Button>
               {canManage && role !== "super_admin" && role !== "district_admin" && primaryHref !== "/manage" && (
                 <Button variant="ghost" size="sm" asChild>
-                  <Link href="/manage" data-tour="manage-nav"><Shield className="h-4 w-4 mr-1" />Manage</Link>
+                  <Link href="/manage" data-tour="manage-nav"><Shield className="h-4 w-4 mr-1" />{t("common.manage")}</Link>
                 </Button>
               )}
               <span data-tour="notifications" className="inline-flex">
@@ -157,11 +159,12 @@ export function Navbar({
               <span data-tour="appearance" className="inline-flex">
                 <ThemeToggle />
               </span>
+              <LanguageSwitcher />
               <Button variant="ghost" size="sm" asChild>
                 <Link
                   href="/settings"
                   data-tour="settings"
-                  aria-label="Settings"
+                  aria-label={t("common.settings")}
                   aria-current={isActivePath("/settings") ? "page" : undefined}
                   className={isActivePath("/settings") ? "bg-storm-light/70 text-storm-electric" : undefined}
                 >
@@ -169,17 +172,18 @@ export function Navbar({
                 </Link>
               </Button>
               <Button variant="outline" size="sm" onClick={handleSignOut}>
-                <LogOut className="h-4 w-4 mr-1" />Sign out
+                <LogOut className="h-4 w-4 mr-1" />{t("common.signOut")}
               </Button>
             </>
           ) : (
             <>
               <ThemeToggle />
+              <LanguageSwitcher />
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/auth/sign-in">Sign in</Link>
+                <Link href="/auth/sign-in">{t("common.signIn")}</Link>
               </Button>
               <Button size="sm" asChild>
-                <Link href="/auth/sign-up">Get started</Link>
+                <Link href="/auth/sign-up">{t("common.getStarted")}</Link>
               </Button>
             </>
           )}
@@ -189,7 +193,7 @@ export function Navbar({
           data-tour="mobile-menu"
           className="rounded-lg p-2 transition-colors hover:bg-storm-light/60 lg:hidden"
           onClick={() => setOpen(!open)}
-          aria-label="Toggle menu"
+          aria-label={t("common.toggleMenu")}
           aria-expanded={open}
           aria-controls="mobile-navigation"
         >
@@ -204,7 +208,7 @@ export function Navbar({
               <Link
                 key={link.href}
                 href={link.href}
-                data-tour={tourTargetForLink(link.href, link.label)}
+                data-tour={tourTargetForLink(link.tourKey)}
                 aria-current={isActivePath(link.href) ? "page" : undefined}
                 className={cn(
                   "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
@@ -219,10 +223,11 @@ export function Navbar({
             {isLoggedIn ? (
               <>
                 <span data-tour="appearance"><ThemeToggle showLabel /></span>
-                <Link href="/search" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Search</Link>
-                {canManage && role !== "super_admin" && role !== "district_admin" && primaryHref !== "/manage" && <Link href="/manage" data-tour="manage-nav" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Manage</Link>}
+                <LanguageSwitcher showLabel />
+                <Link href="/search" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>{t("common.search")}</Link>
+                {canManage && role !== "super_admin" && role !== "district_admin" && primaryHref !== "/manage" && <Link href="/manage" data-tour="manage-nav" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>{t("common.manage")}</Link>}
                 <Link href="/notifications" data-tour="notifications-trigger" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>
-                  Notifications{unreadNotificationCount > 0 ? ` (${unreadNotificationCount})` : ""}
+                  {t("common.notifications")}{unreadNotificationCount > 0 ? ` (${unreadNotificationCount})` : ""}
                 </Link>
                 <Link
                   href="/settings"
@@ -234,15 +239,16 @@ export function Navbar({
                   )}
                   onClick={() => setOpen(false)}
                 >
-                  Settings
+                  {t("common.settings")}
                 </Link>
-                <button onClick={handleSignOut} className="text-sm font-medium py-2 text-left text-red-600">Sign out</button>
+                <button onClick={handleSignOut} className="text-sm font-medium py-2 text-left text-red-600">{t("common.signOut")}</button>
               </>
             ) : (
               <>
                 <ThemeToggle showLabel />
-                <Link href="/auth/sign-in" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>Sign in</Link>
-                <Link href="/auth/sign-up" className="text-sm font-medium py-2 text-storm-electric" onClick={() => setOpen(false)}>Get started</Link>
+                <LanguageSwitcher showLabel />
+                <Link href="/auth/sign-in" className="text-sm font-medium py-2" onClick={() => setOpen(false)}>{t("common.signIn")}</Link>
+                <Link href="/auth/sign-up" className="text-sm font-medium py-2 text-storm-electric" onClick={() => setOpen(false)}>{t("common.getStarted")}</Link>
               </>
             )}
           </nav>
@@ -251,7 +257,7 @@ export function Navbar({
 
       {isDemoMode && (
         <div className="bg-amber-50 border-t border-amber-200 px-4 py-1.5 text-center text-xs text-amber-800">
-          Demo mode — configure Supabase in .env.local for full functionality
+          {t("nav.demoMode")}
         </div>
       )}
     </header>

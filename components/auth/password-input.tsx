@@ -4,11 +4,13 @@ import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Input, type InputProps } from "@/components/ui/input";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 export function PasswordInput({
   className,
   ...props
 }: Omit<InputProps, "type">) {
+  const { t } = useLanguage();
   const [visible, setVisible] = useState(false);
   const inputId = props.id;
 
@@ -21,7 +23,7 @@ export function PasswordInput({
       />
       <button
         type="button"
-        aria-label={visible ? "Hide password" : "Show password"}
+        aria-label={visible ? t("auth.hidePassword") : t("auth.showPassword")}
         aria-controls={inputId}
         aria-pressed={visible}
         onClick={() => setVisible((current) => !current)}

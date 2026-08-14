@@ -8,8 +8,10 @@ import {
   getPublicDemoSchool,
   getSchoolForProfile,
 } from "@/lib/schools";
+import { getServerTranslator } from "@/lib/i18n/server";
 
 export default async function HomePage() {
+  const { t } = await getServerTranslator();
   const auth = await getAuthContext();
   const pilotSchool = auth.isLoggedIn
     ? await getSchoolForProfile(auth.profile)
@@ -23,19 +25,21 @@ export default async function HomePage() {
           <div className="max-w-3xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-sm backdrop-blur">
               <Zap className="h-4 w-4 text-storm-electric" />
-              Student-built club and opportunity platform
+              {t("home.badge")}
             </div>
             <h1 className="text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl text-balance">
-              Club discovery and opportunity management for school communities.
+              {t("home.title")}
             </h1>
             <p className="mt-6 max-w-2xl text-lg text-storm-silver md:text-xl">
-              StormHub helps students discover clubs, track school opportunities, follow events, and stay connected through one organized school workspace.
+              {t("home.description")}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               {pilotSchool && (
                 <Button size="lg" variant="secondary" asChild>
                   <Link href={getSchoolPublicUrl(pilotSchool)}>
-                    {auth.isLoggedIn ? `Explore ${pilotSchool.name}` : "Explore the demo school"} <ArrowRight className="h-4 w-4" />
+                    {auth.isLoggedIn
+                      ? t("home.exploreSchool", { school: pilotSchool.name })
+                      : t("home.exploreDemo")} <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
               )}
@@ -46,14 +50,14 @@ export default async function HomePage() {
                 asChild
               >
                 <Link href={auth.isLoggedIn ? accountPath : "/auth/sign-in"}>
-                  {auth.isLoggedIn ? "Open dashboard" : "Sign in"}
+                  {auth.isLoggedIn ? t("home.openDashboard") : t("common.signIn")}
                 </Link>
               </Button>
             </div>
             {pilotSchool && (
               <p className="mt-4 text-sm text-storm-silver">
-                {auth.isLoggedIn ? "Current pilot workspace" : "Fictional public showcase"} · Need help?{" "}
-                <Link href="/contact" className="underline underline-offset-4">Contact us</Link>
+                {auth.isLoggedIn ? t("home.currentWorkspace") : t("home.fictionalShowcase")} · {t("home.needHelp")}{" "}
+                <Link href="/contact" className="underline underline-offset-4">{t("home.contactUs")}</Link>
               </p>
             )}
           </div>
@@ -62,16 +66,16 @@ export default async function HomePage() {
 
       <section className="container mx-auto px-4 py-16">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-2xl font-bold text-storm-navy">One workspace for school activity</h2>
+          <h2 className="text-2xl font-bold text-storm-navy">{t("home.workspaceTitle")}</h2>
           <p className="mt-3 text-muted-foreground">
-            StormHub keeps school clubs, calendars, signups, resources, and important notifications organized without creating a public social feed or student messaging system.
+            {t("home.workspaceDescription")}
           </p>
         </div>
         <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <PlatformCard icon={Users} title="Clubs" description="Students find clubs; Advisors and student leaders keep club portals organized." />
-          <PlatformCard icon={Calendar} title="Calendar" description="Meetings, deadlines, auditions, and competitions are visible in one place." />
-          <PlatformCard icon={GraduationCap} title="Opportunities" description="Schools publish interest forms, tryouts, applications, and deadline-based items." />
-          <PlatformCard icon={Bell} title="Notifications" description="Normal updates stay in-app. Important or urgent updates can also be emailed." />
+          <PlatformCard icon={Users} title={t("common.clubs")} description={t("home.clubsDescription")} />
+          <PlatformCard icon={Calendar} title={t("common.calendar")} description={t("home.calendarDescription")} />
+          <PlatformCard icon={GraduationCap} title={t("common.opportunities")} description={t("home.opportunitiesDescription")} />
+          <PlatformCard icon={Bell} title={t("common.notifications")} description={t("home.notificationsDescription")} />
         </div>
       </section>
 
@@ -83,12 +87,12 @@ export default async function HomePage() {
                 <Shield className="h-6 w-6 text-green-700" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-storm-navy">Privacy-first and school-safe</h2>
+                <h2 className="text-xl font-bold text-storm-navy">{t("home.privacyTitle")}</h2>
                 <p className="mt-2 max-w-3xl text-muted-foreground">
-                  StormHub is designed around school workspaces and role-based access. Students see their school’s clubs and opportunities, school admins manage their own school, and platform admins manage school setup separately.
+                  {t("home.privacyDescription")}
                 </p>
                 <Button variant="link" className="mt-2 px-0" asChild>
-                  <Link href="/privacy">Read our privacy approach →</Link>
+                  <Link href="/privacy">{t("home.privacyLink")}</Link>
                 </Button>
               </div>
             </div>
