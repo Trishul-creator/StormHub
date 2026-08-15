@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import {
   DEFAULT_LOCALE,
+  getLocaleDirection,
   LOCALE_COOKIE,
   normalizeLocale,
   translate,
@@ -45,12 +46,14 @@ export function LanguageProvider({
 
   useEffect(() => {
     document.documentElement.lang = locale;
+    document.documentElement.dir = getLocaleDirection(locale);
   }, [locale]);
 
   const setLocale = useCallback((nextLocale: Locale) => {
     const normalized = normalizeLocale(nextLocale);
     document.cookie = `${LOCALE_COOKIE}=${normalized}; Path=/; Max-Age=31536000; SameSite=Lax`;
     document.documentElement.lang = normalized;
+    document.documentElement.dir = getLocaleDirection(normalized);
     setLocaleState(normalized);
     window.dispatchEvent(new CustomEvent("stormhub:language-change", { detail: normalized }));
     router.refresh();
