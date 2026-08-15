@@ -6,7 +6,7 @@ describe("internationalization", () => {
   it("normalizes supported regional locales and safely falls back to English", () => {
     expect(normalizeLocale("es-MX")).toBe("es");
     expect(normalizeLocale(" EN-us ")).toBe("en");
-    expect(normalizeLocale("de")).toBe("en");
+    expect(normalizeLocale("it")).toBe("en");
     expect(normalizeLocale(undefined)).toBe("en");
   });
 
@@ -15,6 +15,11 @@ describe("internationalization", () => {
     expect(normalizeLocale("zh-CN")).toBe("zh");
     expect(normalizeLocale("ar-SA")).toBe("ar");
     expect(normalizeLocale("hi-IN")).toBe("hi");
+    expect(normalizeLocale("de-DE")).toBe("de");
+    expect(normalizeLocale("pt-BR")).toBe("pt");
+    expect(normalizeLocale("vi-VN")).toBe("vi");
+    expect(normalizeLocale("ja-JP")).toBe("ja");
+    expect(normalizeLocale("ko-KR")).toBe("ko");
     expect(getLocaleDirection("ar")).toBe("rtl");
     expect(getLocaleDirection("fr")).toBe("ltr");
   });

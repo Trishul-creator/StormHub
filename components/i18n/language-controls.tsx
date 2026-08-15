@@ -28,7 +28,7 @@ export function LanguageSwitcher({ showLabel = false }: { showLabel?: boolean })
         aria-label={t("language.change")}
         className={cn(
           "min-w-0 cursor-pointer bg-transparent text-sm outline-none",
-          showLabel ? "ms-auto" : "w-[5.4rem]"
+          showLabel ? "ms-auto" : "w-[7.5rem]"
         )}
       >
         {localeOptions.map((option) => (
@@ -49,8 +49,7 @@ export function LanguageSettings() {
       <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label={t("language.interface")}>
         {localeOptions.map((option) => {
           const selected = locale === option.value;
-          const labelKey = `common.${option.value === "zh" ? "chinese" : option.value === "en" ? "english" : option.value === "es" ? "spanish" : option.value === "fr" ? "french" : option.value === "ar" ? "arabic" : "hindi"}` as const;
-          const label = t(labelKey);
+          const label = option.nativeLabel;
           return (
             <button
               key={option.value}
@@ -70,7 +69,7 @@ export function LanguageSettings() {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold">{label}</span>
-                <span className="block text-xs text-muted-foreground">{option.nativeLabel}</span>
+                <span className="block text-xs text-muted-foreground">{option.label}</span>
               </span>
               {selected && <Check className="h-5 w-5 text-storm-electric" aria-hidden="true" />}
             </button>

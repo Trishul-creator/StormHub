@@ -16,14 +16,24 @@ import { LanguageProvider } from "@/components/i18n/language-provider";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { getLocaleDirection, translate } from "@/lib/i18n/config";
 import { InterfaceTranslator } from "@/components/i18n/interface-translator";
+import { loadInterfaceDictionary } from "@/lib/i18n/interface-dictionaries";
+import { translateInterfaceText } from "@/lib/i18n/interface-phrases";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getRequestLocale();
+  const dictionary = await loadInterfaceDictionary(locale);
+  const localizedMetadata = (key: "meta.title" | "meta.description") => {
+    const semanticTranslation = translate(locale, key);
+    const english = translate("en", key);
+    return semanticTranslation === english
+      ? translateInterfaceText(english, locale, dictionary)
+      : semanticTranslation;
+  };
   return {
-    title: translate(locale, "meta.title"),
-    description: translate(locale, "meta.description"),
+    title: localizedMetadata("meta.title"),
+    description: localizedMetadata("meta.description"),
   };
 }
 

@@ -42,5 +42,10 @@ describe("language preferences", () => {
     expect(screen.getByRole("combobox", { name: "Cambiar idioma" })).toHaveValue("es");
     expect(screen.getByRole("option", { name: "English" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Español" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Deutsch" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Português" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Tiếng Việt" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "日本語" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "한국어" })).toBeInTheDocument();
   });
 });

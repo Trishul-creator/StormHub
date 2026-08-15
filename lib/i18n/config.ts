@@ -1,6 +1,8 @@
 import { additionalDictionaries } from "@/lib/i18n/additional-dictionaries";
 
-export const SUPPORTED_LOCALES = ["en", "es", "fr", "zh", "ar", "hi"] as const;
+export const SUPPORTED_LOCALES = [
+  "en", "es", "fr", "zh", "ar", "hi", "de", "pt", "vi", "ja", "ko",
+] as const;
 
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
@@ -19,6 +21,11 @@ export const localeOptions: ReadonlyArray<{
   { value: "zh", label: "Simplified Chinese", nativeLabel: "简体中文", shortLabel: "中文" },
   { value: "ar", label: "Arabic", nativeLabel: "العربية", shortLabel: "ع" },
   { value: "hi", label: "Hindi", nativeLabel: "हिन्दी", shortLabel: "हि" },
+  { value: "de", label: "German", nativeLabel: "Deutsch", shortLabel: "DE" },
+  { value: "pt", label: "Portuguese", nativeLabel: "Português", shortLabel: "PT" },
+  { value: "vi", label: "Vietnamese", nativeLabel: "Tiếng Việt", shortLabel: "VI" },
+  { value: "ja", label: "Japanese", nativeLabel: "日本語", shortLabel: "日本" },
+  { value: "ko", label: "Korean", nativeLabel: "한국어", shortLabel: "한국" },
 ];
 
 export function getLocaleDirection(locale: Locale): "ltr" | "rtl" {
@@ -104,7 +111,7 @@ const english = {
   "settings.appearance": "Appearance",
   "settings.appearanceShort": "Light, dark, or system",
   "settings.appearanceDescription": "Choose light, dark, or your device's system setting.",
-  "settings.languageShort": "Six interface languages",
+  "settings.languageShort": "Eleven interface languages",
   "settings.walkthrough": "Walkthrough",
   "settings.walkthroughShort": "Replay the guided tour",
   "settings.walkthroughTitle": "Guided walkthrough",
@@ -287,7 +294,7 @@ const spanish: Record<TranslationKey, string> = {
   "settings.appearance": "Apariencia",
   "settings.appearanceShort": "Claro, oscuro o sistema",
   "settings.appearanceDescription": "Elige el modo claro, oscuro o la configuración del dispositivo.",
-  "settings.languageShort": "Seis idiomas de interfaz",
+  "settings.languageShort": "Once idiomas de interfaz",
   "settings.walkthrough": "Recorrido",
   "settings.walkthroughShort": "Repetir el recorrido guiado",
   "settings.walkthroughTitle": "Recorrido guiado",
@@ -402,7 +409,7 @@ const spanish: Record<TranslationKey, string> = {
   "verification.returnSignup": "Volver al registro",
 };
 
-const dictionaries: Record<Locale, Partial<Record<TranslationKey, string>>> = {
+const dictionaries: Partial<Record<Locale, Partial<Record<TranslationKey, string>>>> = {
   en: english,
   es: spanish,
   ...additionalDictionaries,

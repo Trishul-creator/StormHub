@@ -58,6 +58,19 @@ test.describe("public platform surfaces", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "ar");
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await expect(page.getByRole("heading", { name: "دليل الأندية" })).toBeVisible();
+
+    await page.context().addCookies([{
+      name: "stormhub-locale",
+      value: "de",
+      url: "http://127.0.0.1:3000",
+      sameSite: "Lax",
+    }]);
+    await page.goto("/privacy");
+    await expect(page.getByRole("heading", { name: "Datenschutzerklärung für Studenten" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Umfang und Verantwortung" })).toBeVisible();
+    await expect(page.getByText(/Logged-out visitors see fictional demonstration content/)).toHaveCount(0);
+    await expect(page.locator("html")).toHaveAttribute("lang", "de");
+    await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
   });
 
   test("contact/support page shows the support email", async ({ page }) => {

@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/i18n/config";
+import type { InterfaceDictionary } from "@/lib/i18n/interface-dictionaries";
 
 type LocalizedPhrase = readonly [
   english: string,
@@ -452,7 +453,9 @@ const phrases: LocalizedPhrase[] = [
   ["Restart tour", "Reiniciar recorrido", "Recommencer la visite", "重新开始导览", "إعادة الجولة", "भ्रमण फिर शुरू करें"],
 ];
 
-const localeIndex: Record<Exclude<Locale, "en">, number> = {
+type LegacyLocale = "es" | "fr" | "zh" | "ar" | "hi";
+
+const localeIndex: Record<LegacyLocale, number> = {
   es: 1,
   fr: 2,
   zh: 3,
@@ -466,7 +469,7 @@ const phraseMap = new Map<string, LocalizedPhrase>(
 
 const dynamicPatterns: ReadonlyArray<{
   pattern: RegExp;
-  translate: (match: RegExpMatchArray, locale: Exclude<Locale, "en">) => string;
+  translate: (match: RegExpMatchArray, locale: LegacyLocale) => string;
 }> = [
   {
     pattern: /^Discover clubs and activities at (.+)\. Join to access member resources, announcements, and events\.$/,
@@ -598,6 +601,11 @@ const months: Record<Exclude<Locale, "en">, readonly string[]> = {
   zh: ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"],
   ar: ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"],
   hi: ["जनवरी", "फ़रवरी", "मार्च", "अप्रैल", "मई", "जून", "जुलाई", "अगस्त", "सितंबर", "अक्टूबर", "नवंबर", "दिसंबर"],
+  de: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"],
+  pt: ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"],
+  vi: ["tháng 1", "tháng 2", "tháng 3", "tháng 4", "tháng 5", "tháng 6", "tháng 7", "tháng 8", "tháng 9", "tháng 10", "tháng 11", "tháng 12"],
+  ja: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
+  ko: ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"],
 };
 
 const englishMonths = [
@@ -615,6 +623,11 @@ const localizedWeekdays: Record<Exclude<Locale, "en">, readonly string[]> = {
   zh: ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"],
   ar: ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"],
   hi: ["रविवार", "सोमवार", "मंगलवार", "बुधवार", "गुरुवार", "शुक्रवार", "शनिवार"],
+  de: ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"],
+  pt: ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"],
+  vi: ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"],
+  ja: ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"],
+  ko: ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"],
 };
 
 function localizeMonthNames(value: string, locale: Exclude<Locale, "en">): string {
@@ -628,7 +641,67 @@ function localizeMonthNames(value: string, locale: Exclude<Locale, "en">): strin
   );
 }
 
-export function translateInterfaceText(value: string, locale: Locale): string {
+interface CompiledTemplate {
+  pattern: RegExp;
+  slots: string[];
+  translation: string;
+}
+
+const compiledTemplates = new WeakMap<InterfaceDictionary, CompiledTemplate[]>();
+const dictionaryResultCache = new WeakMap<InterfaceDictionary, Map<string, string>>();
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getTemplates(dictionary: InterfaceDictionary): CompiledTemplate[] {
+  const cached = compiledTemplates.get(dictionary);
+  if (cached) return cached;
+  const templates = Object.entries(dictionary).flatMap(([source, translation]) => {
+    const slots = [...source.matchAll(/\{([^}]+)\}/g)].map((match) => match[1]);
+    if (slots.length === 0) return [];
+    const pattern = new RegExp(`^${escapeRegExp(source).replace(/\\\{[^}]+\\\}/g, "(.+?)")}$`, "i");
+    return [{ pattern, slots, translation }];
+  });
+  compiledTemplates.set(dictionary, templates);
+  return templates;
+}
+
+function translateFromDictionary(value: string, dictionary?: InterfaceDictionary): string | undefined {
+  if (!dictionary) return undefined;
+  const exact = dictionary[value];
+  if (exact) return exact;
+  let cache = dictionaryResultCache.get(dictionary);
+  if (!cache) {
+    cache = new Map();
+    dictionaryResultCache.set(dictionary, cache);
+  }
+  if (cache.has(value)) return cache.get(value);
+
+  for (const template of getTemplates(dictionary)) {
+    const match = value.match(template.pattern);
+    if (!match) continue;
+    const valuesBySlot = new Map<string, string[]>();
+    template.slots.forEach((slot, index) => {
+      const values = valuesBySlot.get(slot) ?? [];
+      values.push(match[index + 1]);
+      valuesBySlot.set(slot, values);
+    });
+    const translated = template.translation.replace(/\{([^}]+)\}/g, (placeholder, slot: string) =>
+      valuesBySlot.get(slot)?.shift() ?? placeholder
+    );
+    cache.set(value, translated);
+    return translated;
+  }
+  cache.set(value, value);
+  return undefined;
+}
+
+export function translateInterfaceText(
+  value: string,
+  locale: Locale,
+  dictionary?: InterfaceDictionary,
+): string {
   if (locale === "en") return value;
   const leading = value.match(/^\s*/)?.[0] ?? "";
   const trailing = value.match(/\s*$/)?.[0] ?? "";
@@ -636,12 +709,20 @@ export function translateInterfaceText(value: string, locale: Locale): string {
   if (!normalized) return value;
 
   const exact = phraseMap.get(normalized);
-  if (exact) return `${leading}${exact[localeIndex[locale]]}${trailing}`;
+  const legacyLocale = localeIndex[locale as LegacyLocale] ? locale as LegacyLocale : undefined;
+  if (exact && legacyLocale) return `${leading}${exact[localeIndex[legacyLocale]]}${trailing}`;
 
-  for (const entry of dynamicPatterns) {
-    const match = normalized.match(entry.pattern);
-    if (match) return `${leading}${entry.translate(match, locale)}${trailing}`;
+  const dictionaryExact = dictionary?.[normalized];
+  if (dictionaryExact) return `${leading}${dictionaryExact}${trailing}`;
+
+  if (legacyLocale) {
+    for (const entry of dynamicPatterns) {
+      const match = normalized.match(entry.pattern);
+      if (match) return `${leading}${entry.translate(match, legacyLocale)}${trailing}`;
+    }
   }
+  const dictionaryTranslation = translateFromDictionary(normalized, dictionary);
+  if (dictionaryTranslation) return `${leading}${dictionaryTranslation}${trailing}`;
   const localizedDate = localizeMonthNames(normalized, locale);
   return localizedDate === normalized ? value : `${leading}${localizedDate}${trailing}`;
 }
