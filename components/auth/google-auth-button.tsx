@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { safeAuthRedirectPath } from "@/lib/auth-redirect";
 import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 function GoogleMark() {
   return (
@@ -18,14 +19,15 @@ function GoogleMark() {
 }
 
 export function GoogleAuthButton({ next }: { next?: string | null }) {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
 
   async function continueWithGoogle() {
     const supabase = createClient();
     if (!supabase) {
       toast({
-        title: "Google sign-in is unavailable",
-        description: "Authentication has not been configured for this deployment.",
+        title: t("auth.googleUnavailable"),
+        description: t("auth.notConfigured"),
         variant: "destructive",
       });
       return;
@@ -49,8 +51,8 @@ export function GoogleAuthButton({ next }: { next?: string | null }) {
     if (error) {
       setLoading(false);
       toast({
-        title: "Google sign-in failed",
-        description: error.message || "Please try again.",
+        title: t("auth.googleFailed"),
+        description: error.message || t("auth.tryAgain"),
         variant: "destructive",
       });
     }
@@ -65,7 +67,7 @@ export function GoogleAuthButton({ next }: { next?: string | null }) {
       onClick={continueWithGoogle}
     >
       <GoogleMark />
-      {loading ? "Opening Google..." : "Continue with Google"}
+      {loading ? t("auth.openingGoogle") : t("auth.continueGoogle")}
     </Button>
   );
 }

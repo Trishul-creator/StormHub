@@ -4,15 +4,16 @@ import { useEffect, useState } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 export type ThemePreference = "light" | "dark" | "system";
 
 const STORAGE_KEY = "stormhub-theme";
 const THEME_EVENT = "stormhub:theme-change";
 const themeOptions = [
-  { value: "light" as const, label: "Light", description: "Always use the light palette.", icon: Sun },
-  { value: "dark" as const, label: "Dark", description: "Always use the dark palette.", icon: Moon },
-  { value: "system" as const, label: "System", description: "Match this device automatically.", icon: Monitor },
+  { value: "light" as const, labelKey: "theme.light" as const, descriptionKey: "theme.lightDescription" as const, icon: Sun },
+  { value: "dark" as const, labelKey: "theme.dark" as const, descriptionKey: "theme.darkDescription" as const, icon: Moon },
+  { value: "system" as const, labelKey: "theme.system" as const, descriptionKey: "theme.systemDescription" as const, icon: Monitor },
 ];
 
 function isThemePreference(value: string | null): value is ThemePreference {
@@ -66,10 +67,14 @@ function useThemePreference() {
 }
 
 export function ThemeToggle({ showLabel = false }: { showLabel?: boolean }) {
+  const { t } = useLanguage();
   const { preference, setPreference } = useThemePreference();
   const option = themeOptions.find((item) => item.value === preference) ?? themeOptions[2];
   const Icon = option.icon;
   const next = preference === "light" ? "dark" : preference === "dark" ? "system" : "light";
+  const nextOption = themeOptions.find((item) => item.value === next) ?? themeOptions[0];
+  const label = t(option.labelKey);
+  const nextLabel = t(nextOption.labelKey);
 
   return (
     <Button
@@ -77,23 +82,26 @@ export function ThemeToggle({ showLabel = false }: { showLabel?: boolean }) {
       variant="ghost"
       size={showLabel ? "sm" : "icon"}
       onClick={() => setPreference(next)}
-      aria-label={`Theme: ${option.label}. Switch to ${next}.`}
-      title={`Theme: ${option.label}`}
+      aria-label={t("theme.switch", { theme: label, next: nextLabel })}
+      title={t("theme.current", { theme: label })}
       className={showLabel ? "justify-start" : undefined}
     >
       <Icon className="h-4 w-4" />
-      {showLabel && `Theme: ${option.label}`}
+      {showLabel && t("theme.current", { theme: label })}
     </Button>
   );
 }
 
 export function ThemeSettings() {
+  const { t } = useLanguage();
   const { preference, setPreference } = useThemePreference();
 
   return (
-    <div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Color theme">
-      {themeOptions.map(({ value, label, description, icon: Icon }) => {
+    <div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label={t("theme.colorTheme")}>
+      {themeOptions.map(({ value, labelKey, descriptionKey, icon: Icon }) => {
         const selected = preference === value;
+        const label = t(labelKey);
+        const description = t(descriptionKey);
         return (
           <button
             key={value}

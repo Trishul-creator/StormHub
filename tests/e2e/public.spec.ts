@@ -14,6 +14,52 @@ test.describe("public platform surfaces", () => {
     await expect(page.getByRole("link", { name: /^workshops$/i })).toHaveCount(0);
   });
 
+  test("language selection updates immediately and persists", async ({ page }) => {
+    await page.goto("/");
+    if ((page.viewportSize()?.width ?? 1280) < 1024) {
+      await page.getByRole("button", { name: /toggle menu/i }).click();
+    }
+
+    await page.getByRole("combobox", { name: /change language/i }).selectOption("es");
+
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
+    await expect(page.getByRole("heading", {
+      name: /descubrimiento de clubes y gestión de oportunidades/i,
+    })).toBeVisible();
+
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
+    await expect(page.getByRole("heading", {
+      name: /descubrimiento de clubes y gestión de oportunidades/i,
+    })).toBeVisible();
+  });
+
+  test("language selection translates feature pages and supports right-to-left layout", async ({ page }) => {
+    await page.context().addCookies([{
+      name: "stormhub-locale",
+      value: "fr",
+      url: "http://127.0.0.1:3000",
+      sameSite: "Lax",
+    }]);
+    await page.goto("/clubs");
+
+    await expect(page.getByRole("heading", { name: "Répertoire des clubs" })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "fr");
+    await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
+
+    await page.context().addCookies([{
+      name: "stormhub-locale",
+      value: "ar",
+      url: "http://127.0.0.1:3000",
+      sameSite: "Lax",
+    }]);
+    await page.reload();
+    await expect(page).toHaveTitle(/مركز فرص الطلاب/);
+    await expect(page.locator("html")).toHaveAttribute("lang", "ar");
+    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+    await expect(page.getByRole("heading", { name: "دليل الأندية" })).toBeVisible();
+  });
+
   test("contact/support page shows the support email", async ({ page }) => {
     await page.goto("/contact");
     await expect(page.getByRole("link", { name: "stormhubsupport@gmail.com" })).toBeVisible();
