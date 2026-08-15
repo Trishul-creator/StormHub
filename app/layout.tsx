@@ -14,14 +14,18 @@ import { ThemeScript } from "@/components/theme/theme-script";
 import { GuidedTour } from "@/components/onboarding/guided-tour";
 import { LanguageProvider } from "@/components/i18n/language-provider";
 import { getRequestLocale } from "@/lib/i18n/server";
-import { translate } from "@/lib/i18n/config";
+import { getLocaleDirection, translate } from "@/lib/i18n/config";
+import { InterfaceTranslator } from "@/components/i18n/interface-translator";
 
 const inter = Inter({ subsets: ["latin"] });
 
-export const metadata: Metadata = {
-  title: "StormHub — Student Opportunity Hub",
-  description: "Discover clubs, events, applications, tryouts, auditions, and deadlines at your school.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getRequestLocale();
+  return {
+    title: translate(locale, "meta.title"),
+    description: translate(locale, "meta.description"),
+  };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const demoMode = isDemoMode();
@@ -50,12 +54,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   );
 
   return (
-    <html lang={locale} suppressHydrationWarning>
+    <html lang={locale} dir={getLocaleDirection(locale)} suppressHydrationWarning>
       <head>
         <ThemeScript />
       </head>
       <body className={inter.className}>
         <LanguageProvider initialLocale={locale}>
+          <InterfaceTranslator />
           <a href="#main-content" className="skip-link">{translate(locale, "common.skipToContent")}</a>
           <Navbar
             isLoggedIn={isLoggedIn}

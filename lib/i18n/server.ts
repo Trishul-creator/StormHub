@@ -1,8 +1,9 @@
 import "server-only";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import {
   LOCALE_COOKIE,
+  isLocale,
   normalizeLocale,
   translate,
   type TranslationKey,
@@ -11,7 +12,17 @@ import {
 
 export async function getRequestLocale() {
   const cookieStore = await cookies();
-  return normalizeLocale(cookieStore.get(LOCALE_COOKIE)?.value);
+  const savedLocale = cookieStore.get(LOCALE_COOKIE)?.value;
+  if (isLocale(savedLocale)) return savedLocale;
+
+  const requestHeaders = await headers();
+  const acceptedLanguages = requestHeaders.get("accept-language")?.split(",") ?? [];
+  for (const language of acceptedLanguages) {
+    const candidate = language.split(";")[0]?.trim();
+    const normalized = normalizeLocale(candidate);
+    if (candidate && isLocale(candidate.toLowerCase().split("-")[0])) return normalized;
+  }
+  return normalizeLocale(undefined);
 }
 
 export async function getServerTranslator() {

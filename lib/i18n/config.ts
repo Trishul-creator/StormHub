@@ -1,4 +1,6 @@
-export const SUPPORTED_LOCALES = ["en", "es"] as const;
+import { additionalDictionaries } from "@/lib/i18n/additional-dictionaries";
+
+export const SUPPORTED_LOCALES = ["en", "es", "fr", "zh", "ar", "hi"] as const;
 
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
@@ -9,10 +11,23 @@ export const localeOptions: ReadonlyArray<{
   value: Locale;
   label: string;
   nativeLabel: string;
+  shortLabel: string;
 }> = [
-  { value: "en", label: "English", nativeLabel: "English" },
-  { value: "es", label: "Spanish", nativeLabel: "Español" },
+  { value: "en", label: "English", nativeLabel: "English", shortLabel: "EN" },
+  { value: "es", label: "Spanish", nativeLabel: "Español", shortLabel: "ES" },
+  { value: "fr", label: "French", nativeLabel: "Français", shortLabel: "FR" },
+  { value: "zh", label: "Simplified Chinese", nativeLabel: "简体中文", shortLabel: "中文" },
+  { value: "ar", label: "Arabic", nativeLabel: "العربية", shortLabel: "ع" },
+  { value: "hi", label: "Hindi", nativeLabel: "हिन्दी", shortLabel: "हि" },
 ];
+
+export function getLocaleDirection(locale: Locale): "ltr" | "rtl" {
+  return locale === "ar" ? "rtl" : "ltr";
+}
+
+export function getExternalLocale(locale: Locale): string {
+  return locale === "zh" ? "zh-CN" : locale;
+}
 
 export function isLocale(value: string | null | undefined): value is Locale {
   return SUPPORTED_LOCALES.includes(value as Locale);
@@ -28,6 +43,10 @@ const english = {
   "common.language": "Language",
   "common.english": "English",
   "common.spanish": "Spanish",
+  "common.french": "French",
+  "common.chinese": "Simplified Chinese",
+  "common.arabic": "Arabic",
+  "common.hindi": "Hindi",
   "common.save": "Save",
   "common.open": "Open",
   "common.view": "View",
@@ -49,9 +68,11 @@ const english = {
   "common.districtAdmin": "District Admin",
   "common.toggleMenu": "Toggle menu",
   "common.skipToContent": "Skip to content",
+  "meta.title": "StormHub — Student Opportunity Hub",
+  "meta.description": "Discover clubs, events, applications, tryouts, auditions, and deadlines at your school.",
   "language.change": "Change language",
   "language.interface": "Interface language",
-  "language.description": "Choose the language used for StormHub navigation and account controls.",
+  "language.description": "Choose the language used throughout the StormHub interface.",
   "language.current": "Current language: {language}",
   "language.contentNote": "Club names, announcements, assignments, and other school-created content remain in the language in which they were written.",
   "nav.demoMode": "Demo mode — configure Supabase in .env.local for full functionality",
@@ -83,7 +104,7 @@ const english = {
   "settings.appearance": "Appearance",
   "settings.appearanceShort": "Light, dark, or system",
   "settings.appearanceDescription": "Choose light, dark, or your device's system setting.",
-  "settings.languageShort": "English or Spanish",
+  "settings.languageShort": "Six interface languages",
   "settings.walkthrough": "Walkthrough",
   "settings.walkthroughShort": "Replay the guided tour",
   "settings.walkthroughTitle": "Guided walkthrough",
@@ -205,6 +226,10 @@ const spanish: Record<TranslationKey, string> = {
   "common.language": "Idioma",
   "common.english": "Inglés",
   "common.spanish": "Español",
+  "common.french": "Francés",
+  "common.chinese": "Chino simplificado",
+  "common.arabic": "Árabe",
+  "common.hindi": "Hindi",
   "common.save": "Guardar",
   "common.open": "Abrir",
   "common.view": "Ver",
@@ -226,9 +251,11 @@ const spanish: Record<TranslationKey, string> = {
   "common.districtAdmin": "Administración del distrito",
   "common.toggleMenu": "Abrir o cerrar el menú",
   "common.skipToContent": "Saltar al contenido",
+  "meta.title": "StormHub — Centro de oportunidades estudiantiles",
+  "meta.description": "Descubre clubes, eventos, solicitudes, pruebas, audiciones y fechas límite en tu escuela.",
   "language.change": "Cambiar idioma",
   "language.interface": "Idioma de la interfaz",
-  "language.description": "Elige el idioma de la navegación y los controles de cuenta de StormHub.",
+  "language.description": "Elige el idioma utilizado en toda la interfaz de StormHub.",
   "language.current": "Idioma actual: {language}",
   "language.contentNote": "Los nombres de clubes, anuncios, tareas y demás contenido creado por la escuela permanecen en el idioma en que fueron escritos.",
   "nav.demoMode": "Modo de demostración — configura Supabase en .env.local para habilitar todas las funciones",
@@ -260,7 +287,7 @@ const spanish: Record<TranslationKey, string> = {
   "settings.appearance": "Apariencia",
   "settings.appearanceShort": "Claro, oscuro o sistema",
   "settings.appearanceDescription": "Elige el modo claro, oscuro o la configuración del dispositivo.",
-  "settings.languageShort": "Inglés o español",
+  "settings.languageShort": "Seis idiomas de interfaz",
   "settings.walkthrough": "Recorrido",
   "settings.walkthroughShort": "Repetir el recorrido guiado",
   "settings.walkthroughTitle": "Recorrido guiado",
@@ -375,9 +402,10 @@ const spanish: Record<TranslationKey, string> = {
   "verification.returnSignup": "Volver al registro",
 };
 
-const dictionaries: Record<Locale, Record<TranslationKey, string>> = {
+const dictionaries: Record<Locale, Partial<Record<TranslationKey, string>>> = {
   en: english,
   es: spanish,
+  ...additionalDictionaries,
 };
 
 export function translate(
@@ -385,7 +413,7 @@ export function translate(
   key: TranslationKey,
   values?: TranslationValues,
 ): string {
-  const template = dictionaries[locale][key] ?? english[key];
+  const template = dictionaries[locale]?.[key] ?? english[key];
   if (!values) return template;
   return template.replace(/\{(\w+)\}/g, (match, name: string) =>
     Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : match

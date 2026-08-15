@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/client";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { HIGH_SCHOOL_AGE_ASSURANCE } from "@/lib/policy";
 import { useLanguage } from "@/components/i18n/language-provider";
+import { translateInterfaceText } from "@/lib/i18n/interface-phrases";
 
 interface SignUpSchool {
   id: string;
@@ -181,7 +182,7 @@ export function SignUpForm({
               <option value="">{t("signup.notApplicable")}</option>
               {[9, 10, 11, 12].map((grade) => (
                 <option key={grade} value={grade}>
-                  {locale === "es" ? `${grade}.º grado` : `${grade}th grade`}
+                  {t("signup.gradeValue", { grade })}
                 </option>
               ))}
             </select>
@@ -243,7 +244,7 @@ export function SignUpForm({
             <span>
               {t("signup.policyPrefix")}{" "}
               <Link href="/acceptable-use" className="text-storm-electric hover:underline">{t("signup.acceptableUse")}</Link>,{" "}
-              <Link href="/terms" className="text-storm-electric hover:underline">{t("footer.terms")}</Link>, {locale === "es" ? "y" : "and"}{" "}
+              <Link href="/terms" className="text-storm-electric hover:underline">{t("footer.terms")}</Link>, {translateInterfaceText("and", locale)}{" "}
               <Link href="/privacy" className="text-storm-electric hover:underline">{t("signup.privacyNotice")}</Link>.
             </span>
           </label>

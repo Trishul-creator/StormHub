@@ -7,6 +7,7 @@ import { useLanguage } from "@/components/i18n/language-provider";
 
 export function LanguageSwitcher({ showLabel = false }: { showLabel?: boolean }) {
   const { locale, setLocale, t } = useLanguage();
+  const currentOption = localeOptions.find((option) => option.value === locale) ?? localeOptions[0];
 
   return (
     <label
@@ -15,7 +16,7 @@ export function LanguageSwitcher({ showLabel = false }: { showLabel?: boolean })
         showLabel ? "w-full px-3 py-2" : "px-2 py-1.5"
       )}
       title={t("language.current", {
-        language: locale === "es" ? t("common.spanish") : t("common.english"),
+        language: currentOption.nativeLabel,
       })}
     >
       <Globe2 className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -27,7 +28,7 @@ export function LanguageSwitcher({ showLabel = false }: { showLabel?: boolean })
         aria-label={t("language.change")}
         className={cn(
           "min-w-0 cursor-pointer bg-transparent text-sm outline-none",
-          showLabel ? "ml-auto" : "w-[4.4rem]"
+          showLabel ? "ms-auto" : "w-[5.4rem]"
         )}
       >
         {localeOptions.map((option) => (
@@ -48,7 +49,8 @@ export function LanguageSettings() {
       <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label={t("language.interface")}>
         {localeOptions.map((option) => {
           const selected = locale === option.value;
-          const label = option.value === "es" ? t("common.spanish") : t("common.english");
+          const labelKey = `common.${option.value === "zh" ? "chinese" : option.value === "en" ? "english" : option.value === "es" ? "spanish" : option.value === "fr" ? "french" : option.value === "ar" ? "arabic" : "hindi"}` as const;
+          const label = t(labelKey);
           return (
             <button
               key={option.value}
@@ -64,7 +66,7 @@ export function LanguageSettings() {
               )}
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-storm-light text-sm font-bold text-storm-blue">
-                {option.value.toUpperCase()}
+                {option.shortLabel}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold">{label}</span>
