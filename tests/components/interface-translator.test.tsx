@@ -49,4 +49,20 @@ describe("InterfaceTranslator", () => {
     await waitFor(() => expect(document.documentElement).toHaveAttribute("dir", "rtl"));
     expect(document.documentElement).toHaveAttribute("lang", "ar");
   });
+
+  it("loads the exhaustive dictionary for page-specific instructions", async () => {
+    render(
+      <LanguageProvider initialLocale="de">
+        <InterfaceTranslator />
+        <p>Choose a school for its settings, users, opportunities, previews, and school-level statistics.</p>
+        <p>Your role in Robotics Club is now President.</p>
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Choose a school for its settings/)).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Your role in Robotics Club is now President/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Robotics Club/)).toBeVisible();
+  });
 });
