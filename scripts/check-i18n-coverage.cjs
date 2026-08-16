@@ -25,7 +25,8 @@ function looksLikeInterfaceText(value) {
   if (!text || text.length > 650 || !/[A-Za-z]/.test(text)) return false;
   if (/^(https?:|mailto:|tel:|\/|@\/|[.#?_,{(-]|\[|[A-Z0-9_]{3,}$)/.test(text)) return false;
   if (/\b(example\.(com|org|edu)|school\.edu|students\.example|staff\.example)\b/i.test(text)) return false;
-  if (/^(?:\d+(?:px|vh|rem|s)?\s*)+$/.test(text) || /rgb\(|hsl\(/.test(text)) return false;
+  const numericTokens = text.split(/\s+/);
+  if (numericTokens.every((token) => /^\d+(?:px|vh|rem|s)?$/.test(token)) || /rgb\(|hsl\(/.test(text)) return false;
   if (/^[a-z0-9_.-]+\.(tsx?|jsx?|css|json|sql|md|png|jpg|svg)$/i.test(text)) return false;
   if (/^(GET|POST|PUT|PATCH|DELETE|Bearer|Content-Type|application\/|image\/)/.test(text)) return false;
   if (/^[a-z]+(?:_[a-z0-9]+)+$/.test(text)) return false;
