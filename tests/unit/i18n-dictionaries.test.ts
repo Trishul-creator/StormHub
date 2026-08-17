@@ -15,6 +15,7 @@ describe("complete interface dictionaries", () => {
     expect(sourceKeys.length).toBeGreaterThan(2_500);
     dictionaries.forEach((dictionary) => {
       expect(Object.keys(dictionary).sort()).toEqual(sourceKeys);
+      const malformed: string[] = [];
       for (const source of sourceKeys) {
         const translation = dictionary[source];
         expect(translation).toBeTruthy();
@@ -22,7 +23,18 @@ describe("complete interface dictionaries", () => {
         const translationSlots = [...translation.matchAll(/\{[^}]+\}/g)].map((match) => match[0]).sort();
         expect(translationSlots).toEqual(sourceSlots);
         if (source.includes("StormHub")) expect(translation).toContain("StormHub");
+
+        const tokens = translation.trim().split(/\s+/);
+        const uniqueTokenRatio = new Set(tokens).size / tokens.length;
+        const excessiveRepetition = tokens.length >= 20 && uniqueTokenRatio < 0.35;
+        const excessivePunctuation = (translation.match(/[.!؟。、]{1,3}/g) ?? []).length >= 30;
+        const excessiveLength = translation.length > Math.max(500, source.length * 5);
+        const generatorArtifact = /ZXQ|QXZ|\\pos|#{10,}/.test(translation);
+        if (excessiveRepetition || excessivePunctuation || excessiveLength || generatorArtifact) {
+          malformed.push(source);
+        }
       }
+      expect(malformed).toEqual([]);
     });
   });
 
@@ -41,5 +53,35 @@ describe("complete interface dictionaries", () => {
     expect(dynamic).toContain("Robotics Club");
     expect(dynamic).toContain("President");
     expect(dynamic).not.toBe("Your role in Robotics Club is now President.");
+    expect(translateInterfaceText("Sep 14, 2026", "de", german)).not.toBe("Sep 14, 2026");
+    expect(translateInterfaceText("Sep 14, 2026", "de", german)).not.toBe("Sep 14, 2026");
+    expect(translateInterfaceText("8/15/2026, 7:30 PM", "de", german)).not.toBe(
+      "8/15/2026, 7:30 PM",
+    );
+    expect(
+      translateInterfaceText(
+        "A student-built opportunity hub designed to help students find their next step.",
+        "de",
+        german,
+      ),
+    ).not.toBe("A student-built opportunity hub designed to help students find their next step.");
+  });
+
+  it("uses localized core navigation and role labels in every newer language", async () => {
+    for (const locale of ["de", "pt", "vi", "ja", "ko"] as const) {
+      const dictionary = await loadInterfaceDictionary(locale);
+      for (const source of [
+        "Clubs",
+        "Dashboard",
+        "Notifications",
+        "Teacher",
+        "Vice President",
+        "Assignments",
+        "Attendance",
+        "Walkthrough",
+      ]) {
+        expect(translateInterfaceText(source, locale, dictionary)).not.toBe(source);
+      }
+    }
   });
 });

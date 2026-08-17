@@ -617,6 +617,20 @@ const englishWeekdays = [
   "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 ] as const;
 
+const englishMonthIndexes = new Map<string, number>([
+  ["january", 0], ["jan", 0], ["february", 1], ["feb", 1],
+  ["march", 2], ["mar", 2], ["april", 3], ["apr", 3],
+  ["may", 4], ["june", 5], ["jun", 5], ["july", 6], ["jul", 6],
+  ["august", 7], ["aug", 7], ["september", 8], ["sep", 8], ["sept", 8],
+  ["october", 9], ["oct", 9], ["november", 10], ["nov", 10],
+  ["december", 11], ["dec", 11],
+]);
+
+const localeTags: Record<Exclude<Locale, "en">, string> = {
+  es: "es", fr: "fr", zh: "zh-CN", ar: "ar", hi: "hi",
+  de: "de", pt: "pt", vi: "vi", ja: "ja", ko: "ko",
+};
+
 const localizedWeekdays: Record<Exclude<Locale, "en">, readonly string[]> = {
   es: ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"],
   fr: ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"],
@@ -641,6 +655,75 @@ function localizeMonthNames(value: string, locale: Exclude<Locale, "en">): strin
   );
 }
 
+function formatLocalizedDate(
+  locale: Exclude<Locale, "en">,
+  year: number,
+  month: number,
+  day: number,
+  hour?: number,
+  minute?: number,
+  second?: number,
+) {
+  if (month < 0 || month > 11 || day < 1 || day > 31) return undefined;
+  const includesTime = hour !== undefined && minute !== undefined;
+  const value = new Date(Date.UTC(year, month, day, hour ?? 12, minute ?? 0, second ?? 0));
+  if (
+    value.getUTCFullYear() !== year ||
+    value.getUTCMonth() !== month ||
+    value.getUTCDate() !== day
+  ) return undefined;
+  return new Intl.DateTimeFormat(localeTags[locale], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    ...(includesTime ? { hour: "numeric", minute: "2-digit", second: second === undefined ? undefined : "2-digit" } : {}),
+    timeZone: "UTC",
+  }).format(value);
+}
+
+function localizeDateText(value: string, locale: Exclude<Locale, "en">): string {
+  const namedDates = value.replace(
+    /\b(January|Jan|February|Feb|March|Mar|April|Apr|May|June|Jun|July|Jul|August|Aug|September|Sept?|October|Oct|November|Nov|December|Dec)\s+(\d{1,2}),\s+(\d{4})(?:\s+at\s+(\d{1,2}):(\d{2})\s+(AM|PM))?/gi,
+    (match, monthName: string, day: string, year: string, hour?: string, minute?: string, meridiem?: string) => {
+      const month = englishMonthIndexes.get(monthName.toLowerCase());
+      if (month === undefined) return match;
+      let numericHour = hour === undefined ? undefined : Number(hour);
+      if (numericHour !== undefined && meridiem) {
+        numericHour %= 12;
+        if (meridiem.toUpperCase() === "PM") numericHour += 12;
+      }
+      return formatLocalizedDate(
+        locale,
+        Number(year),
+        month,
+        Number(day),
+        numericHour,
+        minute === undefined ? undefined : Number(minute),
+      ) ?? match;
+    },
+  );
+  const numericDates = namedDates.replace(
+    /\b(\d{1,2})\/(\d{1,2})\/(\d{4})(?:,\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM))?/gi,
+    (match, month: string, day: string, year: string, hour?: string, minute?: string, second?: string, meridiem?: string) => {
+      let numericHour = hour === undefined ? undefined : Number(hour);
+      if (numericHour !== undefined && meridiem) {
+        numericHour %= 12;
+        if (meridiem.toUpperCase() === "PM") numericHour += 12;
+      }
+      return formatLocalizedDate(
+        locale,
+        Number(year),
+        Number(month) - 1,
+        Number(day),
+        numericHour,
+        minute === undefined ? undefined : Number(minute),
+        second === undefined ? undefined : Number(second),
+      ) ?? match;
+    },
+  );
+  return localizeMonthNames(numericDates, locale);
+}
+
 interface CompiledTemplate {
   pattern: RegExp;
   slots: string[];
@@ -648,7 +731,7 @@ interface CompiledTemplate {
 }
 
 const compiledTemplates = new WeakMap<InterfaceDictionary, CompiledTemplate[]>();
-const dictionaryResultCache = new WeakMap<InterfaceDictionary, Map<string, string>>();
+const dictionaryResultCache = new WeakMap<InterfaceDictionary, Map<string, string | undefined>>();
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -660,6 +743,8 @@ function getTemplates(dictionary: InterfaceDictionary): CompiledTemplate[] {
   const templates = Object.entries(dictionary).flatMap(([source, translation]) => {
     const slots = [...source.matchAll(/\{([^}]+)\}/g)].map((match) => match[1]);
     if (slots.length === 0) return [];
+    const literalText = source.replace(/\{[^}]+\}/g, "").replace(/[\s.,:;·—–%()'"“”/-]/g, "");
+    if (!literalText) return [];
     const pattern = new RegExp(`^${escapeRegExp(source).replace(/\\\{[^}]+\\\}/g, "(.+?)")}$`, "i");
     return [{ pattern, slots, translation }];
   });
@@ -667,7 +752,11 @@ function getTemplates(dictionary: InterfaceDictionary): CompiledTemplate[] {
   return templates;
 }
 
-function translateFromDictionary(value: string, dictionary?: InterfaceDictionary): string | undefined {
+function translateFromDictionary(
+  value: string,
+  locale: Exclude<Locale, "en">,
+  dictionary?: InterfaceDictionary,
+): string | undefined {
   if (!dictionary) return undefined;
   const exact = dictionary[value];
   if (exact) return exact;
@@ -684,7 +773,7 @@ function translateFromDictionary(value: string, dictionary?: InterfaceDictionary
     const valuesBySlot = new Map<string, string[]>();
     template.slots.forEach((slot, index) => {
       const values = valuesBySlot.get(slot) ?? [];
-      values.push(match[index + 1]);
+      values.push(localizeDateText(match[index + 1], locale));
       valuesBySlot.set(slot, values);
     });
     const translated = template.translation.replace(/\{([^}]+)\}/g, (placeholder, slot: string) =>
@@ -693,7 +782,7 @@ function translateFromDictionary(value: string, dictionary?: InterfaceDictionary
     cache.set(value, translated);
     return translated;
   }
-  cache.set(value, value);
+  cache.set(value, undefined);
   return undefined;
 }
 
@@ -721,8 +810,8 @@ export function translateInterfaceText(
       if (match) return `${leading}${entry.translate(match, legacyLocale)}${trailing}`;
     }
   }
-  const dictionaryTranslation = translateFromDictionary(normalized, dictionary);
+  const dictionaryTranslation = translateFromDictionary(normalized, locale, dictionary);
   if (dictionaryTranslation) return `${leading}${dictionaryTranslation}${trailing}`;
-  const localizedDate = localizeMonthNames(normalized, locale);
+  const localizedDate = localizeDateText(normalized, locale);
   return localizedDate === normalized ? value : `${leading}${localizedDate}${trailing}`;
 }

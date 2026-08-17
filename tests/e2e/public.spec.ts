@@ -59,18 +59,33 @@ test.describe("public platform surfaces", () => {
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await expect(page.getByRole("heading", { name: "دليل الأندية" })).toBeVisible();
 
+    await page.goto("about:blank");
     await page.context().addCookies([{
       name: "stormhub-locale",
       value: "de",
       url: "http://127.0.0.1:3000",
       sameSite: "Lax",
     }]);
-    await page.goto("/privacy");
-    await expect(page.getByRole("heading", { name: "Datenschutzerklärung für Studenten" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Umfang und Verantwortung" })).toBeVisible();
-    await expect(page.getByText(/Logged-out visitors see fictional demonstration content/)).toHaveCount(0);
-    await expect(page.locator("html")).toHaveAttribute("lang", "de");
-    await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
+    const germanPrivacyPage = await page.context().newPage();
+    await germanPrivacyPage.goto("/privacy");
+    await expect(germanPrivacyPage.getByRole("heading", { name: "Datenschutzerklärung für Studenten" })).toBeVisible();
+    await expect(germanPrivacyPage.getByRole("heading", { name: "Umfang und Verantwortung" })).toBeVisible();
+    await expect(germanPrivacyPage.getByText(/Logged-out visitors see fictional demonstration content/)).toHaveCount(0);
+    await expect(germanPrivacyPage.locator("html")).toHaveAttribute("lang", "de");
+    await expect(germanPrivacyPage.locator("html")).toHaveAttribute("dir", "ltr");
+
+    const germanAboutPage = await page.context().newPage();
+    await germanAboutPage.goto("/about");
+    await expect(germanAboutPage.getByText("A student-built opportunity hub designed to help students find their next step.")).toHaveCount(0);
+    const germanContactPage = await page.context().newPage();
+    await germanContactPage.goto("/contact");
+    await expect(germanContactPage.getByText("Share feedback, report issues, or suggest improvements for StormHub.")).toHaveCount(0);
+    const germanSignupPage = await page.context().newPage();
+    await germanSignupPage.goto("/auth/sign-up");
+    await expect(germanSignupPage.getByRole("heading", { name: "StormHub beitreten" })).toBeVisible();
+    const germanOpportunitiesPage = await page.context().newPage();
+    await germanOpportunitiesPage.goto("/opportunities");
+    await expect(germanOpportunitiesPage.getByText(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}$/)).toHaveCount(0);
   });
 
   test("contact/support page shows the support email", async ({ page }) => {
