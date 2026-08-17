@@ -23,7 +23,7 @@ describe("language preferences", () => {
       </LanguageProvider>,
     );
 
-    fireEvent.click(screen.getByRole("radio", { name: /spanish/i }));
+    fireEvent.click(screen.getByRole("radio", { name: /español/i }));
 
     expect(document.cookie).toContain("stormhub-locale=es");
     expect(document.documentElement.lang).toBe("es");

@@ -8,7 +8,7 @@ import {
   type InterfaceDictionary,
 } from "@/lib/i18n/interface-dictionaries";
 
-const translatedAttributes = ["aria-label", "aria-description", "placeholder", "title"] as const;
+const translatedAttributes = ["aria-label", "aria-description", "placeholder", "title", "alt"] as const;
 const originalText = new WeakMap<Node, string>();
 const lastAppliedText = new WeakMap<Node, string>();
 const originalAttributes = new WeakMap<Element, Map<string, string>>();
@@ -118,11 +118,17 @@ export function InterfaceTranslator() {
   useEffect(() => {
     let cancelled = false;
     let observer: MutationObserver | undefined;
+    let translationFrame: number | undefined;
 
     void loadInterfaceDictionary(locale).then((dictionary) => {
       if (cancelled) return;
-      translateTree(document.body, locale, dictionary);
-
+      const scheduleTranslationPass = () => {
+        if (translationFrame !== undefined) return;
+        translationFrame = window.requestAnimationFrame(() => {
+          translationFrame = undefined;
+          if (!cancelled) translateTree(document.body, locale, dictionary);
+        });
+      };
       observer = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
           if (mutation.type === "characterData") {
@@ -150,6 +156,7 @@ export function InterfaceTranslator() {
 
           mutation.addedNodes.forEach((node) => translateTree(node, locale, dictionary));
         }
+        scheduleTranslationPass();
       });
 
       observer.observe(document.body, {
@@ -159,11 +166,14 @@ export function InterfaceTranslator() {
         attributes: true,
         attributeFilter: [...translatedAttributes],
       });
+      translateTree(document.body, locale, dictionary);
+      scheduleTranslationPass();
     });
 
     return () => {
       cancelled = true;
       observer?.disconnect();
+      if (translationFrame !== undefined) window.cancelAnimationFrame(translationFrame);
     };
   }, [locale]);
 

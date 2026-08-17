@@ -16,7 +16,10 @@ describe("InterfaceTranslator", () => {
         <LanguageSwitcher showLabel />
         <h1>Club Directory</h1>
         <input aria-label="Search clubs" placeholder="Search clubs" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img alt="Club Directory" />
         <p data-no-translate>Club Directory</p>
+        <p>Sep 14, 2026</p>
       </LanguageProvider>,
     );
 
@@ -32,6 +35,8 @@ describe("InterfaceTranslator", () => {
       "Rechercher des clubs",
     );
     expect(screen.getByText("Club Directory")).toHaveAttribute("data-no-translate");
+    expect(screen.getByRole("img", { name: "Répertoire des clubs" })).toBeVisible();
+    expect(screen.queryByText("Sep 14, 2026")).not.toBeInTheDocument();
   });
 
   it("applies right-to-left document direction for Arabic", async () => {

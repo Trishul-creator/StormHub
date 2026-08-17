@@ -22,8 +22,13 @@ function normalize(value) {
 
 function looksLikeInterfaceText(value) {
   const text = normalize(value);
-  if (!text || text.length > 650 || !/[A-Za-z]/.test(text)) return false;
-  if (/^(https?:|mailto:|tel:|\/|@\/|[.#?_,{(-]|\[|[A-Z0-9_]{3,}$)/.test(text)) return false;
+  if (!text || text.length > 5_000 || !/[A-Za-z]/.test(text)) return false;
+  if (/^(https?:|mailto:|tel:|\/|@\/|\[|[A-Z0-9_]{3,}$)/.test(text)) return false;
+  if (/^[a-f0-9]{8}-[a-f0-9-]{27,}$/i.test(text)) return false;
+  if (/^[a-z][a-zA-Z0-9_-]*(?:\.[a-zA-Z0-9_-]+)+$/.test(text)) return false;
+  if (/^[a-z0-9_]+(?:,[a-z0-9_]+)+$/i.test(text)) return false;
+  if (/^[a-z]{1,3}\d+$/i.test(text) || /^(?:AM|PM)$/i.test(text) || /^[A-Za-z]$/.test(text)) return false;
+  if (/^[.#?_,{(-][^\s]+$/.test(text)) return false;
   if (/\b(example\.(com|org|edu)|school\.edu|students\.example|staff\.example)\b/i.test(text)) return false;
   const numericTokens = text.split(/\s+/);
   if (numericTokens.every((token) => /^\d+(?:px|vh|rem|s)?$/.test(token)) || /rgb\(|hsl\(/.test(text)) return false;
@@ -48,7 +53,7 @@ function isVisibleContext(node) {
   let current = node.parent;
   while (current) {
     if (ts.isJsxAttribute(current)) {
-      return /^(title|placeholder|aria-label|aria-description|alt)$/i.test(current.name.getText());
+      return /^(placeholder|aria-label|aria-description|alt|eyebrow|heading|subheading|hint|note|caption|summary|text|copy|message|.*title|.*description|.*label)$/i.test(current.name.getText());
     }
     if (ts.isJsxExpression(current)) return true;
     if (ts.isCallExpression(current)) {
