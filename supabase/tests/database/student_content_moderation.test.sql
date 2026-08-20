@@ -32,6 +32,8 @@ VALUES (
   TRUE,
   TRUE
 );
+INSERT INTO public.school_settings (school_id)
+VALUES ('e1c10000-0000-4000-8000-000000000010');
 INSERT INTO public.clubs (
   id, school_id, name, slug, status, is_listed, is_active, visibility
 ) VALUES (
