@@ -23,8 +23,29 @@ SELECT has_function(
   ARRAY['uuid'],
   'the moderation setting is resolved through a stable helper'
 );
+
+INSERT INTO public.schools (id, name, slug, is_active, is_public)
+VALUES (
+  'e1c10000-0000-4000-8000-000000000010',
+  'Student Moderation Test School',
+  'student-moderation-test-school',
+  TRUE,
+  TRUE
+);
+INSERT INTO public.clubs (
+  id, school_id, name, slug, status, is_listed, is_active, visibility
+) VALUES (
+  'e1c10000-0000-4000-8000-000000000011',
+  'e1c10000-0000-4000-8000-000000000010',
+  'Student Moderation Test Club',
+  'student-moderation-test-club',
+  'active',
+  TRUE,
+  TRUE,
+  'public'
+);
 SELECT is(
-  public.club_requires_staff_content_approval('c0000001-0000-4000-8000-000000000003'),
+  public.club_requires_staff_content_approval('e1c10000-0000-4000-8000-000000000011'),
   FALSE,
   'existing schools retain President publishing by default'
 );
@@ -41,11 +62,11 @@ INSERT INTO auth.users (
   NOW(), NOW()
 );
 UPDATE public.profiles
-SET school_id = 'a0000000-0000-4000-8000-000000000001', role = 'student'
+SET school_id = 'e1c10000-0000-4000-8000-000000000010', role = 'student'
 WHERE id = 'e1c10000-0000-4000-8000-000000000001';
 INSERT INTO public.club_memberships (club_id, user_id, status, role)
 VALUES (
-  'c0000001-0000-4000-8000-000000000003',
+  'e1c10000-0000-4000-8000-000000000011',
   'e1c10000-0000-4000-8000-000000000001',
   'active',
   'president'
@@ -54,7 +75,7 @@ INSERT INTO public.club_announcements (
   id, club_id, author_id, title, body, visibility, status
 ) VALUES (
   'e1c10000-0000-4000-8000-000000000002',
-  'c0000001-0000-4000-8000-000000000003',
+  'e1c10000-0000-4000-8000-000000000011',
   'e1c10000-0000-4000-8000-000000000001',
   'Moderated student draft',
   'Fictional database authorization test.',
@@ -64,9 +85,9 @@ INSERT INTO public.club_announcements (
 
 UPDATE public.school_settings
 SET student_content_requires_staff_approval = TRUE
-WHERE school_id = 'a0000000-0000-4000-8000-000000000001';
+WHERE school_id = 'e1c10000-0000-4000-8000-000000000010';
 SELECT ok(
-  public.club_requires_staff_content_approval('c0000001-0000-4000-8000-000000000003'),
+  public.club_requires_staff_content_approval('e1c10000-0000-4000-8000-000000000011'),
   'the opted-in school requires staff review'
 );
 
@@ -95,7 +116,7 @@ SELECT is(
 RESET ROLE;
 UPDATE public.school_settings
 SET student_content_requires_staff_approval = FALSE
-WHERE school_id = 'a0000000-0000-4000-8000-000000000001';
+WHERE school_id = 'e1c10000-0000-4000-8000-000000000010';
 SET LOCAL ROLE authenticated;
 SELECT lives_ok(
   $$
