@@ -48,7 +48,7 @@ import type {
   TenantOffboardingStatus,
 } from "@/types/database";
 import { slugify } from "@/lib/utils";
-import { DEFAULT_SCHOOL_ID, SUPPORT_EMAIL, getCurrentSchool, getSchoolById } from "@/lib/schools";
+import { DEFAULT_SCHOOL_ID, SUPPORT_EMAIL, getCurrentSchool, getSchoolById, getSchoolSettings } from "@/lib/schools";
 import { getDistrictById } from "@/lib/districts";
 import {
   createAdminAttentionNotification,
@@ -1235,9 +1235,23 @@ export async function submitContent(data: {
     && data.type !== "opportunity"
     && canPublishClubContent(profile, club, membership, data.type)
   );
-  const trustedPost = isAdminRole(profile.role) || canPublishClubPost;
+  const schoolSettings = club ? await getSchoolSettings(club.school_id) : null;
+  const studentStaffReviewRequired = Boolean(
+    club
+    && profile.role === "student"
+    && ["announcement", "resource"].includes(data.type)
+    && schoolSettings?.student_content_requires_staff_approval
+  );
+  const trustedPost = isAdminRole(profile.role)
+    || (canPublishClubPost && !studentStaffReviewRequired);
   let scheduledFor: string | null = null;
   if (data.type === "announcement" && data.release_at) {
+    if (studentStaffReviewRequired) {
+      return {
+        success: false,
+        error: "Student-authored announcements must complete staff review before they can be scheduled.",
+      };
+    }
     if (!canPublishClubPost) {
       return {
         success: false,
@@ -1381,7 +1395,9 @@ export async function submitContent(data: {
       schoolId: profile.school_id,
       clubId: club?.id ?? null,
       clubMembershipRoles:
-        club && ["announcement", "resource"].includes(data.type)
+        club && studentStaffReviewRequired
+          ? ["sponsor"]
+          : club && ["announcement", "resource"].includes(data.type)
           ? ["sponsor", "president"]
           : ["sponsor"],
       title: `${contentTitle} needs approval`,
@@ -5203,6 +5219,98 @@ const CLUB_CONTENT_TABLES: Record<"announcement" | "event" | "resource", string>
   resource: "club_resources",
 };
 
+export async function submitAnnouncementForStaffApproval(
+  announcementId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) {
+    return { success: false, error: "Approval actions require a configured Supabase demo environment." };
+  }
+  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  if (!supabase || !profile) return { success: false, error: "Please sign in." };
+  if (profile.role !== "student") {
+    return { success: false, error: "Only the student author can submit this draft." };
+  }
+
+  const { data: announcement, error: announcementError } = await supabase
+    .from("club_announcements")
+    .select("id,club_id,author_id,title,status")
+    .eq("id", announcementId)
+    .maybeSingle();
+  if (announcementError || !announcement) {
+    return { success: false, error: "Announcement draft not found." };
+  }
+  if (announcement.author_id !== profile.id || announcement.status !== "draft") {
+    return { success: false, error: "Only your own private draft can be submitted." };
+  }
+
+  const [{ data: club }, { data: membership }] = await Promise.all([
+    supabase.from("clubs").select("*").eq("id", announcement.club_id).maybeSingle(),
+    supabase
+      .from("club_memberships")
+      .select("club_id,status,role")
+      .eq("club_id", announcement.club_id)
+      .eq("user_id", profile.id)
+      .eq("status", "active")
+      .maybeSingle(),
+  ]);
+  if (!club || !membership || !["officer", "president"].includes(membership.role)) {
+    return { success: false, error: "Active student leadership access is required." };
+  }
+
+  const settings = await getSchoolSettings(club.school_id);
+  if (!settings.student_content_requires_staff_approval) {
+    return { success: false, error: "This school does not require the staff-review workflow." };
+  }
+
+  const { data: existingRequest } = await supabase
+    .from("approval_requests")
+    .select("id")
+    .eq("content_type", "announcement")
+    .eq("content_id", announcement.id)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (existingRequest) return { success: false, error: "This announcement is already awaiting review." };
+
+  const { error: updateError } = await supabase
+    .from("club_announcements")
+    .update({ status: "pending", published_at: null, send_email_to_members: false })
+    .eq("id", announcement.id)
+    .eq("author_id", profile.id)
+    .eq("status", "draft");
+  if (updateError) return { success: false, error: friendlyError(updateError, "Could not submit this draft.") };
+
+  const { error: requestError } = await supabase.from("approval_requests").insert({
+    school_id: club.school_id,
+    content_type: "announcement",
+    content_id: announcement.id,
+    submitted_by: profile.id,
+    status: "pending",
+  });
+  if (requestError) {
+    await supabase
+      .from("club_announcements")
+      .update({ status: "draft" })
+      .eq("id", announcement.id)
+      .eq("author_id", profile.id)
+      .eq("status", "pending");
+    return { success: false, error: friendlyError(requestError, "Could not create the review request.") };
+  }
+
+  await createApprovalNeededNotifications({
+    schoolId: club.school_id,
+    clubId: club.id,
+    clubMembershipRoles: ["sponsor"],
+    title: `${announcement.title} needs staff approval`,
+    message: `${profile.full_name ?? profile.email ?? "A student leader"} submitted an announcement for staff review.`,
+    link: "/manage/approvals",
+  });
+
+  revalidatePath("/manage/approvals");
+  revalidatePath(`/manage/clubs/${club.slug}/announcements`);
+  return { success: true };
+}
+
 export async function archiveClubContent(
   id: string,
   contentType: "announcement" | "event" | "resource"
@@ -5367,7 +5475,8 @@ export async function approveContent(
 export async function rejectContent(
   id: string,
   contentType: ApprovalContentType,
-  reviewerNotes?: string
+  reviewerNotes?: string,
+  returnForRevision = false
 ): Promise<{ success: boolean; error?: string }> {
   if (isDemoMode()) {
     return { success: false, error: "Approval actions are unavailable in demo mode." };
@@ -5419,7 +5528,8 @@ export async function rejectContent(
     .eq("content_id", id)
     .eq("status", "pending")
     .maybeSingle();
-  const { error } = await supabase.from(table).update({ status: "rejected" }).eq("id", id);
+  const nextContentStatus = returnForRevision ? "draft" : "rejected";
+  const { error } = await supabase.from(table).update({ status: nextContentStatus }).eq("id", id);
   if (error) return { success: false, error: friendlyError(error) };
   const approvalWriter = createAdminClient() ?? supabase;
   await approvalWriter
@@ -5428,7 +5538,7 @@ export async function rejectContent(
       status: "rejected",
       reviewed_by: profile.id,
       reviewed_at: new Date().toISOString(),
-      reviewer_notes: reviewerNotes || null,
+      reviewer_notes: reviewerNotes || (returnForRevision ? "Returned for revision." : null),
     })
     .eq("content_id", id)
     .eq("status", "pending");
@@ -5438,8 +5548,12 @@ export async function rejectContent(
       recipientUserId: approval.submitted_by,
       type: "content_rejected",
       importance: "important",
-      title: `${content?.title ?? "Content"} needs changes`,
-      message: reviewerNotes || `Your ${contentType.replace("_", " ")} was rejected.`,
+      title: returnForRevision
+        ? `${content?.title ?? "Content"} was returned for revision`
+        : `${content?.title ?? "Content"} needs changes`,
+      message: reviewerNotes || (returnForRevision
+        ? `Revise your ${contentType.replace("_", " ")} and submit it again when it is ready.`
+        : `Your ${contentType.replace("_", " ")} was rejected.`),
       link: contentReviewLink(contentType, contentRecord, contentClub),
       clubId: content?.club_id ?? null,
       eventId: contentType === "event" ? id : null,
@@ -5448,6 +5562,14 @@ export async function rejectContent(
   }
   revalidatePath("/manage/approvals");
   return { success: true };
+}
+
+export async function returnContentForRevision(
+  id: string,
+  contentType: ApprovalContentType,
+  reviewerNotes?: string
+): Promise<{ success: boolean; error?: string }> {
+  return rejectContent(id, contentType, reviewerNotes, true);
 }
 
 export async function markNotificationRead(id: string): Promise<{ success: boolean; error?: string }> {

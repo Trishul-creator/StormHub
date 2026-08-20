@@ -10,6 +10,8 @@ import { canApproveClubContent, canManageClubCoursework, canPublishClubContent }
 import type { ClubAnnouncement } from "@/types/database";
 import { ClubCreateNavigation } from "@/components/manage/club-create-navigation";
 import { ContentForm } from "@/components/forms/content-form";
+import { getSchoolSettings } from "@/lib/schools";
+import { SubmitAnnouncementForReviewButton } from "@/components/manage/submit-announcement-for-review-button";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -24,6 +26,11 @@ export default async function ManageAnnouncementsPage({ params }: PageProps) {
   const announcements = (await getClubManagedContent(club.id, "announcement")) as ClubAnnouncement[];
   const canDelete = canApproveClubContent(auth.profile, club, auth.membership);
   const canPublish = canPublishClubContent(auth.profile, club, auth.membership, "announcement");
+  const schoolSettings = await getSchoolSettings(club.school_id);
+  const staffReviewRequired = Boolean(
+    auth.profile.role === "student"
+    && schoolSettings.student_content_requires_staff_approval
+  );
   const courseworkEnabled = canManageClubCoursework(auth.profile, club, auth.membership);
 
   return (
@@ -43,7 +50,12 @@ export default async function ManageAnnouncementsPage({ params }: PageProps) {
             activeType="announcement"
             courseworkEnabled={courseworkEnabled}
           />
-          <ContentForm type="announcement" clubSlug={slug} canPublish={canPublish} />
+          <ContentForm
+            type="announcement"
+            clubSlug={slug}
+            canPublish={canPublish && !staffReviewRequired}
+            staffReviewRequired={staffReviewRequired}
+          />
         </>
       )}
       <section className={`${readOnlySupport ? "mt-2" : "mt-8"} rounded-xl border bg-card p-5 shadow-sm`}>
@@ -65,6 +77,12 @@ export default async function ManageAnnouncementsPage({ params }: PageProps) {
                   </p>
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">
+                  {staffReviewRequired
+                    && announcement.status === "draft"
+                    && announcement.author_id === auth.profile.id
+                    && (
+                      <SubmitAnnouncementForReviewButton announcementId={announcement.id} />
+                    )}
                   {canPublish && announcement.status === "pending" && (
                     <ApprovalActions id={announcement.id} type="announcement" />
                   )}

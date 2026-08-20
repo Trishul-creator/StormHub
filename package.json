@@ -16,6 +16,9 @@
     "test:e2e:staging": "npm run staging:setup && playwright test --project=chromium",
     "test:e2e:headed": "playwright test --headed",
     "staging:setup": "tsx scripts/setup-staging-e2e.ts",
+    "demo:seed:elkhorn": "tsx scripts/demo/elkhorn-demo.ts seed",
+    "demo:verify:elkhorn": "tsx scripts/demo/elkhorn-demo.ts verify",
+    "demo:reset:elkhorn": "tsx scripts/demo/elkhorn-demo.ts reset",
     "qa": "npm run lint && npm run typecheck && npm run i18n:check && npm run build && npm run test",
     "qa:full": "npm run qa && npm run test:e2e:readonly",
     "test:all": "npm run qa:full"

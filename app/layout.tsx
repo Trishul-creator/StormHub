@@ -18,6 +18,8 @@ import { getLocaleDirection, translate } from "@/lib/i18n/config";
 import { InterfaceTranslator } from "@/components/i18n/interface-translator";
 import { loadInterfaceDictionary } from "@/lib/i18n/interface-dictionaries";
 import { translateInterfaceText } from "@/lib/i18n/interface-phrases";
+import { isElkhornDemoDeployment } from "@/lib/demo-environment";
+import { DemoEnvironmentBanner } from "@/components/layout/demo-environment-banner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -39,6 +41,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const demoMode = isDemoMode();
+  const elkhornDemoDeployment = isElkhornDemoDeployment();
   const { isLoggedIn, email: userEmail, profile } = await getAuthContext();
   const [canManage, notifications, unreadNotificationCount, school, district, locale] = await Promise.all([
     hasManagementAccess(profile),
@@ -84,6 +87,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             districtSlug={district?.slug}
           />
           <SetupBanner role={profile?.role} />
+          {isLoggedIn && elkhornDemoDeployment && <DemoEnvironmentBanner />}
           <main id="main-content" className="min-h-[calc(100vh-4rem)]" tabIndex={-1}>{children}</main>
           <Footer />
           {profile && (

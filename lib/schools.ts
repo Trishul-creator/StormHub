@@ -23,6 +23,7 @@ export interface SchoolSettings {
   volunteering_enabled: boolean;
   workshops_enabled: boolean;
   email_sending_enabled: boolean;
+  student_content_requires_staff_approval: boolean;
 }
 
 export const defaultSchoolSettings = (schoolId: string): SchoolSettings => ({
@@ -34,6 +35,7 @@ export const defaultSchoolSettings = (schoolId: string): SchoolSettings => ({
   volunteering_enabled: false,
   workshops_enabled: false,
   email_sending_enabled: true,
+  student_content_requires_staff_approval: false,
 });
 
 export async function getSchoolBySlug(slug: string): Promise<School | null> {

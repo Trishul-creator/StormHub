@@ -17,10 +17,18 @@ interface ContentFormProps {
   clubSlug?: string;
   schoolId?: string;
   canPublish?: boolean;
+  staffReviewRequired?: boolean;
   className?: string;
 }
 
-export function ContentForm({ type, clubSlug, schoolId, canPublish = true, className }: ContentFormProps) {
+export function ContentForm({
+  type,
+  clubSlug,
+  schoolId,
+  canPublish = true,
+  staffReviewRequired = false,
+  className,
+}: ContentFormProps) {
   const [loading, setLoading] = useState(false);
   const [importance, setImportance] = useState<NotificationImportance>("normal");
   const [sendEmail, setSendEmail] = useState(false);
@@ -78,10 +86,13 @@ export function ContentForm({ type, clubSlug, schoolId, canPublish = true, class
     <form onSubmit={handleSubmit} className={cn("space-y-4 rounded-xl border bg-card p-6", className)}>
       {!canPublish && clubSlug && (
         <div className="rounded-xl border border-amber-300/70 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-700/70 dark:bg-amber-950/40 dark:text-amber-100">
-          <p className="font-semibold">This will be saved for review</p>
+          <p className="font-semibold">
+            {staffReviewRequired ? "Staff approval is required" : "This will be saved for review"}
+          </p>
           <p className="mt-1 text-amber-800 dark:text-amber-200">
-            Vice Presidents can prepare drafts. Presidents may publish announcements and resources,
-            while an Advisor must approve club events.
+            {staffReviewRequired
+              ? "Student-authored content stays private until an Advisor or school administrator approves it."
+              : "Vice Presidents can prepare drafts. Presidents may publish announcements and resources, while an Advisor must approve club events."}
           </p>
         </div>
       )}
