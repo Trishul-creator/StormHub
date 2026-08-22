@@ -77,7 +77,7 @@ GRANT EXECUTE ON FUNCTION public.list_signup_schools(INTEGER, INTEGER, TEXT)
   TO anon, authenticated, service_role;
 
 CREATE TABLE IF NOT EXISTS public.club_suggestions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   school_id UUID NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
   club_id UUID NOT NULL REFERENCES public.clubs(id) ON DELETE CASCADE,
   suggested_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
