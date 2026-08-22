@@ -1759,7 +1759,9 @@ export async function getPendingApprovals(): Promise<PendingApprovalItem[]> {
     supabase.from("club_announcements").select("id,title,created_at,clubs(name)").eq("status", "pending"),
     supabase.from("events").select("id,title,created_at,clubs(name)").eq("status", "pending"),
     supabase.from("club_resources").select("id,title,created_at,clubs(name)").eq("status", "pending"),
-    supabase.from("opportunities").select("id,title,created_at,clubs(name)").eq("status", "pending"),
+    profile?.role === "teacher"
+      ? Promise.resolve({ data: [], error: null })
+      : supabase.from("opportunities").select("id,title,created_at,clubs(name)").eq("status", "pending"),
   ]);
 
   const results = [announcements, events, resources, opportunities];
@@ -1794,6 +1796,40 @@ export async function getPendingApprovals(): Promise<PendingApprovalItem[]> {
       id: row.id, type: "opportunity" as const, title: row.title, context: clubName(row), submitted_at: row.created_at,
     })),
   ];
+
+  if (profile?.role === "admin" && profile.school_id) {
+    const admin = createAdminClient();
+    if (admin) {
+      const { data: suggestions, error: suggestionError } = await admin
+        .from("club_suggestions")
+        .select("id,created_at,clubs(name,slug)")
+        .eq("school_id", profile.school_id)
+        .eq("status", "pending")
+        .order("created_at");
+      if (suggestionError) {
+        if (suggestionError.code !== "42P01") {
+          console.error("[getPendingApprovals club suggestions]", suggestionError.message);
+        }
+      } else {
+        type SuggestionRow = {
+          id: string;
+          created_at?: string | null;
+          clubs?: { name: string; slug: string } | { name: string; slug: string }[] | null;
+        };
+        items.push(...((suggestions ?? []) as SuggestionRow[]).map((row) => {
+          const club = Array.isArray(row.clubs) ? row.clubs[0] : row.clubs;
+          return {
+            id: row.id,
+            type: "club" as const,
+            title: club?.name ?? "Club suggestion",
+            context: "Suggested for school administrator review",
+            submitted_at: row.created_at,
+            action_href: club?.slug ? `/manage/clubs/${club.slug}/edit?publish=1` : null,
+          };
+        }));
+      }
+    }
+  }
 
   return items.sort((a, b) => {
     const aTime = a.submitted_at ? new Date(a.submitted_at).getTime() : 0;

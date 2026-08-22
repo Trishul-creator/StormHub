@@ -3,6 +3,8 @@ import {
   canAccessSchoolAdmin,
   canAccessDistrictAdmin,
   canCreateClub,
+  canCreateOpportunity,
+  canCreateSchoolOpportunity,
   canDeleteUser,
   canEditRole,
   canJoinClub,
@@ -322,6 +324,24 @@ describe("club permissions", () => {
 });
 
 describe("opportunity-style school scoping expectations", () => {
+  it("lets teachers add opportunities only to their own school", () => {
+    expect(canCreateOpportunity(profile("teacher"))).toBe(true);
+    expect(canCreateOpportunity(profile("admin"))).toBe(true);
+    expect(canCreateOpportunity(profile("district_admin"))).toBe(true);
+    expect(canCreateOpportunity(profile("super_admin"))).toBe(true);
+    expect(canCreateOpportunity(profile("student"))).toBe(false);
+    expect(canCreateSchoolOpportunity(profile("teacher", { school_id: schoolA }), schoolA)).toBe(true);
+    expect(canCreateSchoolOpportunity(profile("teacher", { school_id: schoolA }), schoolB)).toBe(false);
+    expect(canCreateSchoolOpportunity(profile("student", { school_id: schoolA }), schoolA)).toBe(false);
+    expect(canCreateSchoolOpportunity(profile("admin", { school_id: schoolA }), schoolA)).toBe(true);
+    expect(canCreateSchoolOpportunity(
+      profile("district_admin", { district_id: "district-a", school_id: null }),
+      schoolB,
+      "district-a",
+    )).toBe(true);
+    expect(canCreateSchoolOpportunity(profile("super_admin"), schoolB, "district-b")).toBe(true);
+  });
+
   it("uses student feature and admin-school helpers for opportunity boundaries", () => {
     expect(canUseStudentFeatures(profile("student", { school_id: schoolA }), schoolA)).toBe(true);
     expect(canUseStudentFeatures(profile("student", { school_id: schoolA }), schoolB)).toBe(false);

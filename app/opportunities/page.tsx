@@ -9,7 +9,7 @@ import { getAuthContext } from "@/lib/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { buildEmptyStateActions } from "@/lib/product";
-import { canAccessSchoolAdmin, isAdminRole } from "@/lib/permissions";
+import { canCreateSchoolOpportunity, isAdminRole } from "@/lib/permissions";
 import { SchoolFilter } from "@/components/layout/school-filter";
 import { getSchoolFilterContext } from "@/lib/schools";
 import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
@@ -44,12 +44,12 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
         return selectedGrade! >= min && selectedGrade! <= max;
       })
     : allOpportunities;
-  const canManageSelectedSchool = Boolean(
+  const canAddForSelectedSchool = Boolean(
     selectedSchool
-    && canAccessSchoolAdmin(profile, selectedSchool.id, selectedSchool.district_id)
+    && canCreateSchoolOpportunity(profile, selectedSchool.id, selectedSchool.district_id)
   );
   const managementHref = selectedSchool
-    ? profile?.role === "admin"
+    ? profile?.role === "admin" || profile?.role === "teacher"
       ? "/manage/opportunities"
       : `/admin/schools/${selectedSchool.slug}/opportunities`
     : null;
@@ -85,13 +85,15 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
           profile && isAdminRole(profile.role)
             ? "Review all school-wide opportunities. Administrator accounts can create and manage listings but cannot participate."
             : profile?.role === "teacher"
-              ? "Browse school-wide opportunities in read-only mode. Teacher accounts cannot save, RSVP, or sign up."
+              ? "Browse school-wide opportunities and submit new listings for school-administrator approval. Teacher accounts cannot participate."
             : "Signups, applications, tryouts, auditions, competitions, interest forms, and deadlines."
         }
       >
-        {canManageSelectedSchool && managementHref && (
+        {canAddForSelectedSchool && managementHref && (
           <Button asChild>
-            <Link href={managementHref}>Manage opportunities</Link>
+            <Link href={managementHref}>
+              {profile?.role === "teacher" ? "Add opportunity" : "Manage opportunities"}
+            </Link>
           </Button>
         )}
       </PageHeader>

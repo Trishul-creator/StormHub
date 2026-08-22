@@ -52,9 +52,9 @@ export default async function SchoolClubsPage({ params, searchParams }: SchoolCl
         title={`${school.short_name || school.name} Clubs`}
         description="Discover clubs in this school workspace."
       >
-        {auth.profile?.role === "teacher" && auth.profile.school_id === school.id && (
+        {auth.profile && ["student", "teacher"].includes(auth.profile.role) && auth.profile.school_id === school.id && (
           <Button asChild>
-            <Link href="/manage/clubs/drafts">Propose a club</Link>
+            <Link href={`/s/${school.slug}/clubs/suggest`}>Suggest a club</Link>
           </Button>
         )}
         {canAccessSchoolAdmin(auth.profile, school.id, school.district_id) && (

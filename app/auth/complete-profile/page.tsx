@@ -35,7 +35,11 @@ export default async function CompleteProfilePage({ searchParams }: CompleteProf
   }
 
   const schools = (await getSignupSchools())
-    .map((school) => ({ id: school.id, name: school.name }));
+    .map((school) => ({
+      id: school.id,
+      name: school.name,
+      requires_access_code: school.requires_access_code !== false,
+    }));
   const params = await searchParams;
   const next = safeAuthRedirectPath(params.next);
   const suggestedName =

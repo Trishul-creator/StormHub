@@ -18,6 +18,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
           name: school.name,
           short_name: school.short_name,
           slug: school.slug,
+          requires_access_code: school.requires_access_code !== false,
         }))}
         preselectedSchoolId={preselectedSchool?.id}
         googleAuthEnabled={process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true"}

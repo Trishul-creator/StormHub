@@ -11,7 +11,7 @@ import { getUserBookmarkIds, getUserOpportunitySignupIds } from "@/lib/actions";
 import { getAuthContext } from "@/lib/auth";
 import { getSchoolBySlugForViewer } from "@/lib/schools";
 import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
-import { canAccessSchoolAdmin } from "@/lib/permissions";
+import { canCreateSchoolOpportunity } from "@/lib/permissions";
 
 interface SchoolOpportunitiesPageProps {
   params: Promise<{ schoolSlug: string }>;
@@ -49,8 +49,8 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
   const [bookmarkedIds, signedUpIds] = canParticipate
     ? await Promise.all([getUserBookmarkIds(userId), getUserOpportunitySignupIds(userId)])
     : [new Set<string>(), new Set<string>()];
-  const canManage = canAccessSchoolAdmin(profile, school.id, school.district_id);
-  const managementHref = profile?.role === "admin"
+  const canAdd = canCreateSchoolOpportunity(profile, school.id, school.district_id);
+  const managementHref = profile?.role === "admin" || profile?.role === "teacher"
     ? "/manage/opportunities"
     : `/admin/schools/${school.slug}/opportunities`;
   const filterOptions = categories.map((category) => ({ label: category, value: category }));
@@ -68,13 +68,15 @@ export default async function SchoolOpportunitiesPage({ params, searchParams }: 
         title={`${school.short_name || school.name} Opportunities`}
         description={
           profile?.role === "teacher"
-            ? "Browse this school’s opportunities in read-only mode. Teacher accounts cannot save, RSVP, or sign up."
+            ? "Browse this school’s opportunities and submit new listings for school-administrator approval. Teacher accounts cannot participate."
             : "Signups, applications, tryouts, auditions, competitions, interest forms, and deadlines for this school."
         }
       >
-        {canManage && (
+        {canAdd && (
           <Button asChild>
-            <Link href={managementHref}>Manage opportunities</Link>
+            <Link href={managementHref}>
+              {profile?.role === "teacher" ? "Add opportunity" : "Manage opportunities"}
+            </Link>
           </Button>
         )}
       </PageHeader>

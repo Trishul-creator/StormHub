@@ -16,12 +16,14 @@ export function ClubProposalForm({
   defaultSponsorUserId,
   targetSchoolId,
   returnHref = "/manage/clubs/drafts",
+  successHref,
 }: {
   requiresApproval?: boolean;
   teachers?: Profile[];
   defaultSponsorUserId?: string;
   targetSchoolId: string;
   returnHref?: string;
+  successHref?: string;
 }) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -44,7 +46,7 @@ export function ClubProposalForm({
             ? "A school admin can review and publish it."
             : "Review the draft details, then publish it when ready."),
         });
-        router.push(requiresApproval ? "/manage/clubs" : returnHref);
+        router.push(successHref ?? (requiresApproval ? "/manage/clubs" : returnHref));
         router.refresh();
       } else {
         toast({ title: "Could not submit club", description: result.error, variant: "destructive" });

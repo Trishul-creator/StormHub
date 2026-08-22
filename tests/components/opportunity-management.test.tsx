@@ -86,6 +86,15 @@ describe("OpportunityManagement", () => {
     );
   });
 
+  it("lets teachers submit while hiding publication and edit controls", () => {
+    render(<OpportunityManagement school={school} opportunities={opportunities} createOnly />);
+    fireEvent.click(screen.getByText("Create an opportunity"));
+    expect(screen.getByTestId("create-opportunity-form")).toBeVisible();
+    expect(screen.getByText(/sent to your school administrator for approval/i)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /^publish$/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("Edit details")).not.toBeInTheDocument();
+  });
+
   it("closes a published listing without deleting its history", async () => {
     render(<OpportunityManagement school={school} opportunities={opportunities} />);
 

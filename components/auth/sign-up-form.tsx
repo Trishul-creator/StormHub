@@ -23,6 +23,7 @@ interface SignUpSchool {
   name: string;
   short_name?: string | null;
   slug: string;
+  requires_access_code?: boolean;
 }
 
 export function SignUpForm({
@@ -41,6 +42,9 @@ export function SignUpForm({
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaAttempt, setCaptchaAttempt] = useState(0);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [selectedSchoolId, setSelectedSchoolId] = useState(preselectedSchoolId ?? "");
+  const selectedSchool = schools.find((school) => school.id === selectedSchoolId);
+  const requiresAccessCode = selectedSchool?.requires_access_code !== false;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -153,6 +157,7 @@ export function SignUpForm({
               name="schoolId"
               required
               defaultValue={preselectedSchoolId ?? ""}
+              onChange={(event) => setSelectedSchoolId(event.target.value)}
               className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             >
               <option value="">{t("signup.chooseSchool")}</option>
@@ -213,20 +218,24 @@ export function SignUpForm({
               className="mt-1"
             />
           </div>
-          <div>
-            <Label htmlFor="accessCode">{t("signup.accessCode")}</Label>
-            <Input
-              id="accessCode"
-              name="accessCode"
-              required
-              autoComplete="one-time-code"
-              className="mt-1 font-mono uppercase"
-              placeholder="SH-1234-ABCD-5678"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              {t("signup.accessCodeHelp")}
-            </p>
-          </div>
+          {requiresAccessCode ? (
+            <div>
+              <Label htmlFor="accessCode">{t("signup.accessCode")}</Label>
+              <Input
+                id="accessCode"
+                name="accessCode"
+                required
+                autoComplete="one-time-code"
+                className="mt-1 font-mono uppercase"
+                placeholder="SH-1234-ABCD-5678"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t("signup.accessCodeHelp")}
+              </p>
+            </div>
+          ) : (
+            <input type="hidden" name="accessCode" value="" />
+          )}
           <div className="hidden" aria-hidden="true">
             <Label htmlFor="website">{t("signup.website")}</Label>
             <Input id="website" name="website" tabIndex={-1} autoComplete="off" />

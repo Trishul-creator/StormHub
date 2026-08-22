@@ -143,6 +143,7 @@ export default async function AdminSchoolPage({ params }: AdminSchoolPageProps) 
           schoolId={school.id}
           schoolName={school.name}
           initialCode={signupAccess?.access_code ?? null}
+          initialEnabled={signupAccess?.is_enabled ?? true}
           initialRotatedAt={signupAccess?.rotated_at ?? null}
         />
         <SignupDomainSettings
