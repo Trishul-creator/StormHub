@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(166);
+SELECT plan(168);
 
 SELECT is(
   (SELECT public FROM storage.buckets WHERE id = 'coursework-private'),
@@ -165,6 +165,22 @@ SELECT throws_ok(
   'P0001',
   'Enter the correct school access code',
   'the auth trigger rejects an incorrect school access code'
+);
+
+UPDATE public.school_signup_access
+SET is_enabled = FALSE
+WHERE school_id = 'a0000000-0000-4000-8000-000000000001';
+SELECT ok(
+  public.verify_school_signup_code('a0000000-0000-4000-8000-000000000001', ''),
+  'a school can turn off access-code checks without exposing or deleting its saved code'
+);
+UPDATE public.school_signup_access
+SET is_enabled = TRUE
+WHERE school_id = 'a0000000-0000-4000-8000-000000000001';
+SELECT is(
+  public.verify_school_signup_code('a0000000-0000-4000-8000-000000000001', ''),
+  FALSE,
+  'turning access-code checks back on immediately requires the saved code again'
 );
 SELECT throws_ok(
   $$

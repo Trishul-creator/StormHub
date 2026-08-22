@@ -44,7 +44,7 @@ export default async function SchoolOpportunityManagementPage({
         title={`${school.short_name || school.name} opportunities`}
         description={
           readOnlySupport
-            ? "Recorded support view of published, closed, archived, and draft listings. Changes are disabled."
+            ? "Recorded support view of the school inventory. Existing listings are read-only, but platform administrators may add a new public opportunity."
             : "This inventory is locked to the selected school and includes published, closed, archived, and draft listings."
         }
       >
@@ -54,6 +54,7 @@ export default async function SchoolOpportunityManagementPage({
         school={school}
         opportunities={opportunities}
         readOnly={readOnlySupport}
+        allowCreate
       />
     </div>
   );

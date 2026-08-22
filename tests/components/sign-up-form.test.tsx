@@ -108,10 +108,21 @@ describe("SignUpForm", () => {
     expect(push).toHaveBeenCalledWith("/auth/check-email");
   });
 
-  it("always requires the selected school's access code", () => {
+  it("requires an access code only when the selected school enables it", () => {
     const schools = [{ id: "school-1", name: "Storm High", slug: "storm-high" }];
     render(<SignUpForm schools={schools} />);
     expect(screen.getByLabelText("School access code")).toBeRequired();
+  });
+
+  it("hides the access-code field for a school that turns the requirement off", () => {
+    render(<SignUpForm schools={[{
+      id: "school-1",
+      name: "Storm High",
+      slug: "storm-high",
+      requires_access_code: false,
+    }]} preselectedSchoolId="school-1" />);
+    expect(screen.queryByLabelText("School access code")).not.toBeInTheDocument();
+    expect(document.querySelector<HTMLInputElement>('input[name="accessCode"]')).toHaveValue("");
   });
 
   it("keeps Google signup hidden until production configuration is complete", () => {

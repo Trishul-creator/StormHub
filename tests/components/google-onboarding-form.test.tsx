@@ -59,4 +59,18 @@ describe("GoogleOnboardingForm", () => {
     expect(replace).toHaveBeenCalledWith("/dashboard");
     expect(refresh).toHaveBeenCalled();
   });
+
+  it("does not ask for a code when the school disables access codes", () => {
+    render(
+      <GoogleOnboardingForm
+        schools={[{ id: "school-1", name: "Storm High", requires_access_code: false }]}
+        email="student@gmail.com"
+        suggestedName="Google Student"
+        next="/dashboard"
+      />
+    );
+    fireEvent.change(screen.getByLabelText("School"), { target: { value: "school-1" } });
+    expect(screen.queryByLabelText("School access code")).not.toBeInTheDocument();
+    expect(document.querySelector<HTMLInputElement>('input[name="accessCode"]')).toHaveValue("");
+  });
 });

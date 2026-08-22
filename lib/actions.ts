@@ -27,6 +27,7 @@ import {
   canPublishClubContent,
   canPublishClubCoursework,
   canCreateClub,
+  canCreateSchoolOpportunity,
   canAccessSchoolAdmin,
   isAdminRole,
 } from "@/lib/permissions";
@@ -1045,9 +1046,6 @@ export async function submitClubProposal(data: {
     return { success: false, error: "Platform support access is read-only." };
   }
   if (!admin) return { success: false, error: "Administrator configuration is incomplete." };
-  if (profile.role !== "teacher" && !isAdminRole(profile.role)) {
-    return { success: false, error: "Only teachers and administrators can propose clubs." };
-  }
   const name = data.name.trim();
   if (name.length < 3) return { success: false, error: "Club name is required." };
   const slugBase = slugify(name);
@@ -1056,12 +1054,13 @@ export async function submitClubProposal(data: {
   const school = requestedSchoolId ? await getSchoolById(requestedSchoolId) : null;
   if (!school) return { success: false, error: "Choose a valid school for this club." };
   const schoolId = school.id;
-  const canSubmitForSchool = profile.role === "teacher"
+  const canSubmitForSchool = profile.role === "student" || profile.role === "teacher"
     ? profile.school_id === schoolId
     : canCreateClub(profile, schoolId, school.district_id);
   if (!canSubmitForSchool) {
     return { success: false, error: "You cannot create a club for this school." };
   }
+  const requiresApproval = !canCreateClub(profile, schoolId, school.district_id);
   const sponsor = await getValidTeacherSponsor({
     sponsorUserId: data.sponsorUserId || (profile.role === "teacher" ? profile.id : null),
     schoolId,
@@ -1087,7 +1086,7 @@ export async function submitClubProposal(data: {
   }).select("id,slug").single();
   if (error) return { success: false, error: friendlyError(error, "Could not submit club proposal.") };
 
-  if (sponsor) {
+  if (!requiresApproval && sponsor) {
     await syncClubSponsorMembership({
       clubId: club.id,
       sponsorUserId: sponsor.id,
@@ -1095,12 +1094,26 @@ export async function submitClubProposal(data: {
     });
   }
 
-  if (profile.role === "teacher") {
+  if (requiresApproval) {
+    const { error: suggestionError } = await admin.from("club_suggestions").insert({
+      school_id: schoolId,
+      club_id: club.id,
+      suggested_by: profile.id,
+      source: "custom",
+      status: "pending",
+    });
+    if (suggestionError) {
+      await admin.from("clubs").delete().eq("id", club.id);
+      if (suggestionError.code === "42P01" || suggestionError.message.includes("club_suggestions")) {
+        return { success: false, error: "Apply the latest database migration before suggesting clubs." };
+      }
+      return { success: false, error: friendlyError(suggestionError, "Could not submit club suggestion.") };
+    }
     await createAdminAttentionNotification({
       title: "Club proposal needs review",
-      message: `${profile.full_name ?? profile.email ?? "A teacher"} proposed “${name}”.`,
+      message: `${profile.full_name ?? profile.email ?? "A school user"} suggested “${name}”.`,
       link: `/manage/clubs/${club.slug}`,
-      schoolId: profile.school_id ?? school?.id ?? DEFAULT_SCHOOL_ID,
+      schoolId,
       importance: "important",
       type: "approval_needed",
     });
@@ -1112,10 +1125,104 @@ export async function submitClubProposal(data: {
   revalidatePath("/dashboard");
   return {
     success: true,
-    message: profile.role === "teacher"
+    message: requiresApproval
       ? "A school admin can review and publish it."
       : "The draft club was created and is hidden from students.",
   };
+}
+
+export async function requestStarterClub(
+  clubId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: false, error: "Club suggestions are unavailable in demo mode." };
+  const profile = await getCurrentProfile();
+  const admin = createAdminClient();
+  if (!profile || !admin) return { success: false, error: "Please sign in." };
+  if (!["student", "teacher"].includes(profile.role) || !profile.school_id) {
+    return { success: false, error: "Use the administrator club tools to add a club directly." };
+  }
+  const { data: club, error: clubError } = await admin
+    .from("clubs")
+    .select("id,school_id,name,slug,status,is_active,is_listed,long_description")
+    .eq("id", clubId)
+    .maybeSingle();
+  if (clubError || !club) return { success: false, error: "Club template not found." };
+  if (
+    club.school_id !== profile.school_id
+    || club.status !== "draft"
+    || club.is_active
+    || club.is_listed
+    || !club.long_description?.startsWith("This is a prepared StormHub template.")
+  ) {
+    return { success: false, error: "This club is not available to suggest." };
+  }
+
+  const { error } = await admin.from("club_suggestions").insert({
+    school_id: club.school_id,
+    club_id: club.id,
+    suggested_by: profile.id,
+    source: "starter",
+    status: "pending",
+  });
+  if (error) {
+    if (error.code === "23505") return { success: true };
+    if (error.code === "42P01" || error.message.includes("club_suggestions")) {
+      return { success: false, error: "Apply the latest database migration before suggesting clubs." };
+    }
+    return { success: false, error: friendlyError(error, "Could not suggest this club.") };
+  }
+  await createAdminAttentionNotification({
+    title: "Club suggestion needs review",
+    message: `${profile.full_name ?? profile.email ?? "A school user"} suggested “${club.name}”.`,
+    link: `/manage/clubs/${club.slug}`,
+    schoolId: club.school_id,
+    importance: "important",
+    type: "approval_needed",
+  });
+  revalidatePath("/manage/approvals");
+  revalidatePath("/clubs");
+  return { success: true };
+}
+
+export async function rejectClubSuggestion(
+  suggestionId: string
+): Promise<{ success: boolean; error?: string }> {
+  if (isDemoMode()) return { success: false, error: "Club review is unavailable in demo mode." };
+  const profile = await getCurrentProfile();
+  const admin = createAdminClient();
+  if (!profile || !admin || profile.role !== "admin" || !profile.school_id) {
+    return { success: false, error: "A school administrator must review club suggestions." };
+  }
+  const { data: suggestion, error: loadError } = await admin
+    .from("club_suggestions")
+    .select("id,school_id,club_id,suggested_by,status,clubs(name)")
+    .eq("id", suggestionId)
+    .maybeSingle();
+  if (loadError || !suggestion || suggestion.school_id !== profile.school_id) {
+    return { success: false, error: "Club suggestion not found in your school." };
+  }
+  if (suggestion.status !== "pending") return { success: true };
+  const { error } = await admin
+    .from("club_suggestions")
+    .update({ status: "rejected", reviewed_by: profile.id, reviewed_at: new Date().toISOString() })
+    .eq("id", suggestion.id)
+    .eq("status", "pending");
+  if (error) return { success: false, error: friendlyError(error, "Could not reject the club suggestion.") };
+
+  const clubRecord = Array.isArray(suggestion.clubs) ? suggestion.clubs[0] : suggestion.clubs;
+  if (suggestion.suggested_by) {
+    await createNotification({
+      recipientUserId: suggestion.suggested_by,
+      type: "content_rejected",
+      importance: "normal",
+      title: `${clubRecord?.name ?? "Club suggestion"} was not approved`,
+      message: "Your school administrator reviewed the suggestion and did not approve it.",
+      link: "/clubs",
+      clubId: suggestion.club_id,
+    });
+  }
+  revalidatePath("/manage/approvals");
+  return { success: true };
 }
 
 export async function submitServiceHours(data: {
@@ -1156,7 +1263,7 @@ export async function submitContent(data: {
   const supabase = await createClient();
   const profile = await getCurrentProfile();
   if (!supabase || !profile) return { success: false, error: "Please sign in." };
-  if (profile.role === "super_admin") {
+  if (profile.role === "super_admin" && data.type !== "opportunity") {
     return { success: false, error: "Platform support access is read-only." };
   }
 
@@ -1188,9 +1295,6 @@ export async function submitContent(data: {
 
   let opportunitySchool: Awaited<ReturnType<typeof getSchoolById>> = null;
   if (data.type === "opportunity") {
-    if (!isAdminRole(profile.role)) {
-      return { success: false, error: "Only administrators can publish school-wide opportunities." };
-    }
     const requestedSchoolId = data.schoolId?.trim() || profile.school_id;
     if (!requestedSchoolId) {
       return {
@@ -1201,7 +1305,7 @@ export async function submitContent(data: {
     opportunitySchool = await getSchoolById(requestedSchoolId);
     if (
       !opportunitySchool
-      || !canAccessSchoolAdmin(
+      || !canCreateSchoolOpportunity(
         profile,
         opportunitySchool.id,
         opportunitySchool.district_id
@@ -1226,7 +1330,7 @@ export async function submitContent(data: {
     if (!canManageClub(profile, club, membership)) {
       return { success: false, error: "You do not have permission to manage this club." };
     }
-  } else if (!isAdminRole(profile.role)) {
+  } else if (data.type !== "opportunity" && !isAdminRole(profile.role)) {
     return { success: false, error: "Only an administrator can submit school-wide content." };
   }
 
@@ -3904,6 +4008,36 @@ export async function updateClubSettings(data: {
         is_active: true,
       },
     });
+    const admin = createAdminClient();
+    if (admin) {
+      const { data: suggestions, error: suggestionError } = await admin
+        .from("club_suggestions")
+        .update({
+          status: "approved",
+          reviewed_by: profile.id,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq("club_id", club.id)
+        .eq("status", "pending")
+        .select("suggested_by");
+      if (!suggestionError) {
+        await Promise.all((suggestions ?? []).map((suggestion) =>
+          suggestion.suggested_by
+            ? createNotification({
+                recipientUserId: suggestion.suggested_by,
+                type: "content_approved",
+                importance: "normal",
+                title: `${data.name} was approved`,
+                message: "Your club suggestion was approved and is now visible in the club directory.",
+                link: `/clubs/${club.slug}`,
+                clubId: club.id,
+              })
+            : Promise.resolve()
+        ));
+      } else if (suggestionError.code !== "42P01") {
+        console.error("[updateClubSettings club suggestions]", suggestionError.message);
+      }
+    }
   }
 
   revalidatePath(`/manage/clubs/${club.slug}`);
@@ -3911,6 +4045,7 @@ export async function updateClubSettings(data: {
   revalidatePath(`/clubs/${club.slug}`);
   revalidatePath("/clubs");
   revalidatePath("/manage/clubs/drafts");
+  revalidatePath("/manage/approvals");
   return {
     success: true,
     message: willPublish ? "The club is now live. Students at this school were notified by email." : undefined,
@@ -4917,6 +5052,42 @@ export async function setSchoolSignupAccessCode(input: {
   return { success: true, accessCode, rotatedAt };
 }
 
+export async function setSchoolSignupAccessRequirement(input: {
+  schoolId: string;
+  enabled: boolean;
+}): Promise<{ success: boolean; enabled?: boolean; error?: string }> {
+  if (isDemoMode()) {
+    return { success: false, error: "School access-code settings are unavailable in demo mode." };
+  }
+  const actor = await getCurrentProfile();
+  const admin = createAdminClient();
+  const school = await getSchoolById(input.schoolId);
+  if (!actor || !admin || !school || !canManageSchoolAccess(actor, school.id, school.district_id)) {
+    return { success: false, error: "Administrator access required." };
+  }
+  const reauthentication = await requireRecentAdminAuthentication(undefined, actor.id);
+  if (reauthentication) return reauthentication;
+
+  const { data, error } = await admin
+    .from("school_signup_access")
+    .update({ is_enabled: Boolean(input.enabled) })
+    .eq("school_id", school.id)
+    .select("is_enabled")
+    .maybeSingle();
+  if (error) {
+    if (error.code === "42P01" || error.code === "42703" || error.message.includes("is_enabled")) {
+      return { success: false, error: "Apply the latest database migration before changing this setting." };
+    }
+    return { success: false, error: friendlyError(error, "Could not update the school signup setting.") };
+  }
+  if (!data) return { success: false, error: "The school access-code record is missing." };
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/schools");
+  revalidatePath("/auth/sign-up");
+  return { success: true, enabled: data.is_enabled === true };
+}
+
 export async function startPlatformSupportSession(input: {
   schoolId: string;
   reason: string;
@@ -5189,7 +5360,7 @@ export async function getUserRsvpIds(userId: string | null): Promise<Set<string>
   return new Set((data ?? []).map((r) => r.event_id).filter(Boolean) as string[]);
 }
 
-const APPROVAL_TABLES: Record<ApprovalContentType, string> = {
+const APPROVAL_TABLES: Partial<Record<ApprovalContentType, string>> = {
   announcement: "club_announcements",
   event: "events",
   resource: "club_resources",
@@ -5279,6 +5450,10 @@ export async function approveContent(
 
   const table = APPROVAL_TABLES[contentType];
   if (!table) return { success: false, error: "Unknown content type." };
+
+  if (contentType === "opportunity" && !isAdminRole(profile.role)) {
+    return { success: false, error: "A school administrator must approve this opportunity." };
+  }
 
   const { data: content } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
   if (!content) return { success: false, error: "Content not found." };
@@ -5383,6 +5558,10 @@ export async function rejectContent(
 
   const table = APPROVAL_TABLES[contentType];
   if (!table) return { success: false, error: "Unknown content type." };
+
+  if (contentType === "opportunity" && !isAdminRole(profile.role)) {
+    return { success: false, error: "A school administrator must review this opportunity." };
+  }
 
   const { data: content } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
   if (!content) return { success: false, error: "Content not found." };

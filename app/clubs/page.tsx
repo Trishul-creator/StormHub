@@ -13,6 +13,7 @@ import { SchoolFilter } from "@/components/layout/school-filter";
 import { getSchoolFilterContext } from "@/lib/schools";
 import { PublicDemoNotice } from "@/components/layout/public-demo-notice";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 interface ClubsPageProps {
   searchParams: Promise<{ q?: string; category?: string; featured?: string; filter?: string; school?: string }>;
@@ -59,7 +60,13 @@ export default async function ClubsPage({ searchParams }: ClubsPageProps) {
       <PageHeader
         title="Club Directory"
         description={`Discover clubs and activities at ${school?.name ?? "your school"}. Join to access member resources, announcements, and events.`}
-      />
+      >
+        {school && profile && ["student", "teacher"].includes(profile.role) && profile.school_id === school.id && (
+          <Button asChild>
+            <Link href={`/s/${school.slug}/clubs/suggest`}>Suggest a club</Link>
+          </Button>
+        )}
+      </PageHeader>
 
       <div data-tour="club-directory-tools" className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
         <SearchBar placeholder="Search clubs..." defaultValue={params.q} className="flex-1" />

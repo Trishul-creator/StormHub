@@ -107,6 +107,8 @@ export interface School {
   is_active?: boolean;
   is_public?: boolean;
   allowed_email_domains?: string[];
+  /** Public signup-directory flag; the private code itself is never exposed. */
+  requires_access_code?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -467,6 +469,7 @@ export interface ServiceHour {
 }
 
 export type ApprovalContentType =
+  | "club"
   | "announcement"
   | "event"
   | "resource"
@@ -479,6 +482,7 @@ export interface PendingApprovalItem {
   title: string;
   context?: string | null;
   submitted_at?: string | null;
+  action_href?: string | null;
 }
 
 export interface Feedback {

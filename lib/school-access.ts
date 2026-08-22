@@ -7,6 +7,7 @@ import type { Profile } from "@/types/database";
 export interface SchoolSignupAccess {
   school_id: string;
   access_code: string;
+  is_enabled: boolean;
   rotated_at: string;
 }
 
@@ -58,7 +59,7 @@ export async function getSchoolSignupAccess(
   if (!admin) return null;
   const { data, error } = await admin
     .from("school_signup_access")
-    .select("school_id,access_code,rotated_at")
+    .select("school_id,access_code,is_enabled,rotated_at")
     .eq("school_id", schoolId)
     .maybeSingle();
   if (error) {

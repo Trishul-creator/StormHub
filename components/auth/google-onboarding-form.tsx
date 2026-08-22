@@ -13,6 +13,7 @@ import { HIGH_SCHOOL_AGE_ASSURANCE } from "@/lib/policy";
 interface OnboardingSchool {
   id: string;
   name: string;
+  requires_access_code?: boolean;
 }
 
 export function GoogleOnboardingForm({
@@ -28,6 +29,9 @@ export function GoogleOnboardingForm({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [selectedSchoolId, setSelectedSchoolId] = useState("");
+  const selectedSchool = schools.find((school) => school.id === selectedSchoolId);
+  const requiresAccessCode = selectedSchool?.requires_access_code !== false;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -77,6 +81,7 @@ export function GoogleOnboardingForm({
               name="schoolId"
               required
               defaultValue=""
+              onChange={(event) => setSelectedSchoolId(event.target.value)}
               className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             >
               <option value="">Choose your school</option>
@@ -114,20 +119,24 @@ export function GoogleOnboardingForm({
               Students should select their current high-school grade. Staff roles are assigned by an administrator.
             </p>
           </div>
-          <div>
-            <Label htmlFor="google-accessCode">School access code</Label>
-            <Input
-              id="google-accessCode"
-              name="accessCode"
-              required
-              autoComplete="one-time-code"
-              className="mt-1 font-mono uppercase"
-              placeholder="SH-1234-ABCD-5678"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Ask a school administrator or Advisor for the current code.
-            </p>
-          </div>
+          {requiresAccessCode ? (
+            <div>
+              <Label htmlFor="google-accessCode">School access code</Label>
+              <Input
+                id="google-accessCode"
+                name="accessCode"
+                required
+                autoComplete="one-time-code"
+                className="mt-1 font-mono uppercase"
+                placeholder="SH-1234-ABCD-5678"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Ask a school administrator or Advisor for the current code.
+              </p>
+            </div>
+          ) : (
+            <input type="hidden" name="accessCode" value="" />
+          )}
           <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
             <input name="ageAssurance" type="checkbox" required className="mt-1 h-4 w-4 rounded border-input" />
             <span>
@@ -148,7 +157,7 @@ export function GoogleOnboardingForm({
           </Button>
         </form>
         <p className="mt-4 text-center text-xs text-muted-foreground">
-          Your verified Google email and school access code must match the school you choose.
+          Your verified Google email must match the school you choose. If that school requires an access code, enter its current code too.
         </p>
       </CardContent>
     </Card>

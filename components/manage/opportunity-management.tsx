@@ -23,6 +23,8 @@ interface OpportunityManagementProps {
   school: School;
   opportunities: Opportunity[];
   readOnly?: boolean;
+  createOnly?: boolean;
+  allowCreate?: boolean;
 }
 
 function datetimeLocalValue(value?: string | null) {
@@ -37,12 +39,15 @@ export function OpportunityManagement({
   school,
   opportunities,
   readOnly = false,
+  createOnly = false,
+  allowCreate,
 }: OpportunityManagementProps) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const publishedCount = opportunities.filter((item) => item.status === "approved").length;
   const closedCount = opportunities.filter((item) => item.status === "closed").length;
+  const canCreate = allowCreate ?? !readOnly;
 
   function refreshWithMessage(title: string, description: string) {
     toast({ title, description });
@@ -137,9 +142,15 @@ export function OpportunityManagement({
     <div className="space-y-8" data-tour="opportunity-management">
       {readOnly && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-          <strong>Recorded read-only support:</strong> listing details are available for
-          inspection, but creating, editing, publishing, closing, archiving, deleting,
-          and sending reminders are disabled.
+          <strong>Recorded read-only support:</strong>{" "}
+          {canCreate
+            ? "listing details are available for inspection, but editing, publishing existing drafts, closing, archiving, deleting, and sending reminders are disabled. You may still add a new public opportunity."
+            : "listing details are available for inspection, but creating, editing, publishing, closing, archiving, deleting, and sending reminders are disabled."}
+        </div>
+      )}
+      {createOnly && (
+        <div className="rounded-xl border border-blue-300 bg-blue-50 p-4 text-sm text-blue-950 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-100">
+          <strong>Teacher submission:</strong> new opportunities are sent to your school administrator for approval before students can see them.
         </div>
       )}
       <section className="grid gap-3 sm:grid-cols-3" aria-label="Opportunity inventory summary">
@@ -148,12 +159,14 @@ export function OpportunityManagement({
         <Summary label="Closed" value={closedCount} tone="muted" />
       </section>
 
-      {!readOnly && <details className="group overflow-hidden rounded-2xl border bg-card shadow-sm">
+      {canCreate && <details className="group overflow-hidden rounded-2xl border bg-card shadow-sm">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
           <div>
             <h2 className="font-semibold text-storm-navy">Create an opportunity</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Publish an application, audition, scholarship, tryout, or other school-wide listing.
+              {createOnly
+                ? "Suggest an application, audition, scholarship, tryout, or other school-wide listing for administrator review."
+                : "Publish an application, audition, scholarship, tryout, or other school-wide listing."}
             </p>
           </div>
           <span className="text-sm font-medium text-storm-electric group-open:hidden">Open form</span>
@@ -175,7 +188,9 @@ export function OpportunityManagement({
               Existing opportunities
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Closed and archived listings retain signup history. Only unused, unpublished drafts can be deleted.
+              {createOnly
+                ? "Your submissions stay here while a school administrator reviews them."
+                : "Closed and archived listings retain signup history. Only unused, unpublished drafts can be deleted."}
             </p>
           </div>
           <Button variant="outline" size="sm" asChild>
@@ -189,7 +204,9 @@ export function OpportunityManagement({
           <div className="rounded-2xl border border-dashed bg-card p-8 text-center">
             <p className="font-medium text-storm-navy">No opportunities yet</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Open the form above to publish the first school-wide opportunity.
+              {createOnly
+                ? "Open the form above to submit an opportunity for review."
+                : "Open the form above to publish the first school-wide opportunity."}
             </p>
           </div>
         ) : (
@@ -220,7 +237,7 @@ export function OpportunityManagement({
                       </p>
                     </div>
 
-                    {!readOnly && <div className="flex shrink-0 flex-wrap gap-2">
+                    {!readOnly && !createOnly && <div className="flex shrink-0 flex-wrap gap-2">
                       {opportunity.status === "approved" ? (
                         <Button
                           variant="outline"
@@ -265,7 +282,7 @@ export function OpportunityManagement({
                     </div>}
                   </div>
 
-                  {!readOnly && <details className="group border-t">
+                  {!readOnly && !createOnly && <details className="group border-t">
                     <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3 text-sm font-medium text-storm-electric">
                       <Pencil className="h-3.5 w-3.5" />
                       Edit details

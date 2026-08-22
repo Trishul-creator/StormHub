@@ -168,6 +168,16 @@ export function canAccessSchoolAdmin(
   return user.role === "admin" && !!schoolId && user.school_id === schoolId;
 }
 
+export function canCreateSchoolOpportunity(
+  user: Profile | null,
+  schoolId?: string | null,
+  schoolDistrictId?: string | null
+): boolean {
+  if (!user || !schoolId) return false;
+  if (user.role === "teacher") return user.school_id === schoolId;
+  return canAccessSchoolAdmin(user, schoolId, schoolDistrictId);
+}
+
 export function canManageSchool(
   user: Profile | null,
   schoolId?: string | null,
@@ -382,7 +392,7 @@ export function canArchiveClub(
 }
 
 export function canCreateOpportunity(user: Profile | null): boolean {
-  return user?.role === "admin" || user?.role === "district_admin";
+  return !!user && ["teacher", "admin", "district_admin", "super_admin"].includes(user.role);
 }
 
 export function canParticipate(user: Profile | null): boolean {

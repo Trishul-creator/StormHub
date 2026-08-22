@@ -58,7 +58,7 @@ function isVisibleContext(node) {
     if (ts.isNewExpression(current) && current.expression.getText() === "Error") return true;
     if (ts.isPropertyAssignment(current)) {
       const name = current.name.getText().replace(/["']/g, "");
-      if (!/^(href|url|path|slug|id|status|role|type|event|kind|value|key|code|className|route|table|column|method|scope)$/i.test(name)) return true;
+      if (!/^(href|url|path|slug|id|status|role|type|source|event|kind|value|key|code|className|route|table|column|method|scope)$/i.test(name)) return true;
     }
     if (ts.isSourceFile(current) || ts.isFunctionLike(current) || ts.isVariableDeclaration(current)) break;
     current = current.parent;

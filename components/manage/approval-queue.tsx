@@ -36,7 +36,12 @@ export function ApprovalQueue({
               </p>
             </div>
             {actionsEnabled ? (
-              <ApprovalActions id={item.id} type={item.type} disabled={demo} />
+              <ApprovalActions
+                id={item.id}
+                type={item.type}
+                disabled={demo}
+                reviewHref={item.action_href}
+              />
             ) : (
               <p className="shrink-0 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
                 Read-only platform view

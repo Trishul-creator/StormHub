@@ -4,12 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   rotate: vi.fn(),
   save: vi.fn(),
+  setRequirement: vi.fn(),
   toast: vi.fn(),
 }));
 
 vi.mock("@/lib/actions", () => ({
   rotateSchoolSignupAccessCode: mocks.rotate,
   setSchoolSignupAccessCode: mocks.save,
+  setSchoolSignupAccessRequirement: mocks.setRequirement,
 }));
 vi.mock("@/hooks/use-toast", () => ({ toast: mocks.toast }));
 vi.mock("@/lib/admin-step-up-shared", () => ({
@@ -27,6 +29,24 @@ describe("SchoolAccessCodeSettings", () => {
       accessCode: "EAGLES-2026",
       rotatedAt: "2026-08-02T12:00:00.000Z",
     });
+    mocks.setRequirement.mockResolvedValue({ success: true, enabled: false });
+  });
+
+  it("lets an administrator turn the school access-code requirement off", async () => {
+    render(
+      <SchoolAccessCodeSettings
+        schoolId="school-1"
+        schoolName="North High"
+        initialCode="SH-ABCD-1234-EF56"
+        initialEnabled
+      />,
+    );
+    fireEvent.click(screen.getByRole("switch", { name: /require a school access code/i }));
+    await waitFor(() => {
+      expect(mocks.setRequirement).toHaveBeenCalledWith({ schoolId: "school-1", enabled: false });
+    });
+    expect(await screen.findByText("Off")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Rotate code" })).toBeDisabled();
   });
 
   it("lets an administrator replace a generated code with a custom code", async () => {

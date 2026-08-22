@@ -76,11 +76,11 @@ export default function PrivacyPage() {
 
         <NoticeSection title="School access and account verification">
           <p>
-            Every new account must verify its email and enter the current private access code for
-            the selected school. A school may accept its official email domain or allow other
-            verified email domains, but the school code is required in either case. Administrators
-            can rotate a compromised code without affecting existing accounts. Staff and
-            administrative roles are assigned only by authorized administrators.
+            Every new account must verify its email and meet the selected school’s email-domain
+            rules. Schools may also require a private access code; school administrators can turn
+            that requirement off, re-enable it, or rotate a compromised code without affecting
+            existing accounts. Staff and administrative roles are assigned only by authorized
+            administrators.
           </p>
           <p>
             The current rollout is limited to high-school communities and people age 13 or older.

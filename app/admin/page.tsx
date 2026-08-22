@@ -117,6 +117,7 @@ export default async function AdminPage() {
             schoolId={school.id}
             schoolName={school.name}
             initialCode={signupAccess?.access_code ?? null}
+            initialEnabled={signupAccess?.is_enabled ?? true}
             initialRotatedAt={signupAccess?.rotated_at ?? null}
           />
         </section>
